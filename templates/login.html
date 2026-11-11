@@ -1,0 +1,3 @@
+{% extends "base.html" %}{% block content %}<section class="login card"><h1>Sign in</h1><p class="muted">Access your running error and accuracy records.</p>
+<form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><label>Username</label><input name="username" required autofocus><label>Password</label><input type="password" name="password" required><button>Login</button></form>
+<p class="muted small">First setup default: admin / Admin@12345. Change this password before team use.</p></section>{% endblock %}

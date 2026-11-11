@@ -1,0 +1,6 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Billers Running Error / Accuracy</title><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body><header><div class="brand">Billers Running Error <span>/ Accuracy</span></div>
+{% if session.get('user_id') %}<nav><span>{{ session.get('display_name') }} · {{ session.get('role')|upper }}</span><a href="{{ url_for('index') }}">Dashboard</a><a href="{{ url_for('logout') }}">Logout</a></nav>{% endif %}</header>
+<main>{% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}{% endwith %}{% block content %}{% endblock %}</main>
+<footer>Internal QC tool · Source data is read-only for Billers</footer></body></html>
