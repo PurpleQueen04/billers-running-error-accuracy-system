@@ -43,6 +43,11 @@
                    class="btn secondary">
                     Back to Dashboard
                 </a>
+            {% elif role == 'qc' %}
+                <a href="{{ url_for('qc_dashboard') }}"
+                   class="btn secondary">
+                    Back to Dashboard
+                </a>
             {% endif %}
 
         </div>
@@ -64,6 +69,17 @@
             <h3 class="record-pro">
                 PRO# {{ e.pro or '—' }}
             </h3>
+
+
+            <!-- PROJECT -->
+            <div class="record-info-grid">
+
+                <div>
+                    <small>PROJECT:</small>
+                    <strong>{{ e.project_name or 'Unassigned' }}</strong>
+                </div>
+
+            </div>
 
 
             <!-- BILLED DATE / WEEK / SOURCE -->
@@ -134,11 +150,15 @@
             </div>
 
 
-            <!-- MY RESPONSE -->
+            <!-- RESPONSE SECTION -->
             <div class="my-response">
 
-                <h3>MY RESPONSE</h3>
+                <h3>RESPONSE DETAILS</h3>
 
+
+                {% if role == 'biller' %}
+
+                <!-- BILLER RESPONSE FORM -->
                 <form method="post"
                       action="{{ url_for('save_response', record_key=e.record_key) }}">
 
@@ -147,75 +167,106 @@
                            value="{{ csrf }}">
 
 
-                    <!-- VERIFIED ERROR -->
                     <label>
                         VERIFIED ERROR
 
-                        {% if role == 'biller' or role == 'admin' %}
+                        <select name="verified_error" required>
 
-                            <select name="verified_error">
+                            <option value=""
+                                {% if not e.verified_error %}selected{% endif %}>
+                                Pending
+                            </option>
 
-                                <option value=""
-                                    {% if not e.verified_error %}selected{% endif %}>
-                                    Pending
-                                </option>
+                            <option value="Y"
+                                {% if e.verified_error == 'Y' %}selected{% endif %}>
+                                Y
+                            </option>
 
-                                <option value="Y"
-                                    {% if e.verified_error == 'Y' %}selected{% endif %}>
-                                    Y
-                                </option>
+                            <option value="N"
+                                {% if e.verified_error == 'N' %}selected{% endif %}>
+                                N
+                            </option>
 
-                                <option value="N"
-                                    {% if e.verified_error == 'N' %}selected{% endif %}>
-                                    N
-                                </option>
-
-                            </select>
-
-                        {% else %}
-
-                            <input type="text"
-                                   value="{{ e.verified_error or 'Pending' }}"
-                                   readonly>
-
-                        {% endif %}
+                        </select>
 
                     </label>
 
 
-                    <!-- BILLER COMMENT -->
                     <label>
-                        BILLER COMMENT
+                        BILLER EXPLANATION
 
-                        {% if role == 'biller' or role == 'admin' %}
-
-                            <textarea name="biller_comment"
-                                      rows="3">{{ e.biller_comment or '' }}</textarea>
-
-                        {% else %}
-
-                            <textarea rows="3" readonly>{{ e.biller_comment or '' }}</textarea>
-
-                        {% endif %}
+                        <textarea name="biller_comment"
+                                  rows="3"
+                                  placeholder="Enter your explanation...">{{ e.biller_comment or '' }}</textarea>
 
                     </label>
 
 
-                    <!-- QC EXPLANATION -->
                     <label>
                         QC EXPLANATION
 
-                        {% if role == 'qc' and e.verified_error == 'N' %}
+                        <textarea rows="3"
+                                  readonly>{{ e.qc_explanation or '' }}</textarea>
+
+                    </label>
+
+
+                    <label>
+                        QC NAME
+
+                        <input type="text"
+                               value="{{ e.qc_name or '' }}"
+                               readonly>
+
+                    </label>
+
+
+                    <button type="submit">
+                        SAVE BILLER RESPONSE
+                    </button>
+
+                </form>
+
+
+                {% elif role == 'qc' %}
+
+                <!-- QC RESPONSE FORM -->
+                <form method="post"
+                      action="{{ url_for('save_response', record_key=e.record_key) }}">
+
+                    <input type="hidden"
+                           name="csrf"
+                           value="{{ csrf }}">
+
+
+                    <label>
+                        VERIFIED ERROR
+
+                        <input type="text"
+                               value="{{ e.verified_error or 'Pending' }}"
+                               readonly>
+
+                    </label>
+
+
+                    <label>
+                        BILLER EXPLANATION
+
+                        <textarea rows="3"
+                                  readonly>{{ e.biller_comment or '' }}</textarea>
+
+                    </label>
+
+
+                    <label>
+                        QC EXPLANATION
+
+                        {% if e.verified_error == 'N' %}
 
                             <textarea name="qc_explanation"
                                       rows="3"
                                       placeholder="Enter QC explanation..."
                                       required>{{ e.qc_explanation or '' }}</textarea>
-
-                        {% elif role == 'admin' %}
-
-                            <textarea name="qc_explanation"
-                                      rows="3">{{ e.qc_explanation or '' }}</textarea>
 
                         {% else %}
 
@@ -227,43 +278,79 @@
                     </label>
 
 
-                    <!-- QC NAME -->
                     <label>
                         QC NAME
 
-                        {% if role == 'qc' %}
-
-                            <input type="text"
-                                   value="{{ session.get('display_name', '') }}"
-                                   readonly>
-
-                        {% else %}
-
-                            <input type="text"
-                                   value="{{ e.qc_name or '' }}"
-                                   readonly>
-
-                        {% endif %}
+                        <input type="text"
+                               value="{{ session.get('display_name', '') }}"
+                               readonly>
 
                     </label>
 
 
-                    <!-- SAVE BUTTON -->
-                    {% if role == 'biller' or role == 'admin' %}
+                    {% if e.verified_error == 'N' %}
 
                         <button type="submit">
-                            Save Response
+                            SUBMIT QC EXPLANATION
                         </button>
 
-                    {% elif role == 'qc' and e.verified_error == 'N' %}
+                    {% else %}
 
-                        <button type="submit">
-                            Submit QC Explanation
-                        </button>
+                        <p class="muted small">
+                            QC explanation is available only for records
+                            with VERIFIED ERROR = N.
+                        </p>
 
                     {% endif %}
 
                 </form>
+
+
+                {% elif role == 'admin' %}
+
+                <!-- ADMIN VIEW ONLY -->
+                <div>
+
+                    <label>
+                        VERIFIED ERROR
+
+                        <input type="text"
+                               value="{{ e.verified_error or 'Pending' }}"
+                               readonly>
+
+                    </label>
+
+
+                    <label>
+                        BILLER EXPLANATION
+
+                        <textarea rows="3"
+                                  readonly>{{ e.biller_comment or '' }}</textarea>
+
+                    </label>
+
+
+                    <label>
+                        QC EXPLANATION
+
+                        <textarea rows="3"
+                                  readonly>{{ e.qc_explanation or '' }}</textarea>
+
+                    </label>
+
+
+                    <label>
+                        QC NAME
+
+                        <input type="text"
+                               value="{{ e.qc_name or '' }}"
+                               readonly>
+
+                    </label>
+
+                </div>
+
+                {% endif %}
 
 
                 {% if e.updated_at %}
