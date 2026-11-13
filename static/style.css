@@ -1,5 +1,467 @@
 
-/* RUNNING ERROR RECORDS - DATE SELECTION LAYOUT */
+:root {
+    font-family: Arial, sans-serif;
+    color: #172033;
+    background: #f4f6fa;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+}
+
+/* =========================================
+   HEADER AND NAVIGATION
+========================================= */
+
+header {
+    background: #14243a;
+    color: white;
+    padding: 16px max(20px, calc((100% - 1200px) / 2));
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+}
+
+.brand {
+    font-size: 19px;
+    font-weight: 700;
+}
+
+.brand span {
+    color: #9db4d1;
+}
+
+nav {
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+nav a {
+    color: white;
+    text-decoration: none;
+}
+
+nav a:hover {
+    color: #9db4d1;
+}
+
+/* =========================================
+   MAIN CONTENT
+========================================= */
+
+main {
+    max-width: 1200px;
+    margin: 28px auto;
+    padding: 0 18px;
+}
+
+h1 {
+    font-size: 27px;
+    margin: 0 0 18px;
+}
+
+h2 {
+    font-size: 19px;
+    margin: 0 0 14px;
+}
+
+h3 {
+    font-size: 16px;
+    margin: 20px 0 10px;
+}
+
+/* =========================================
+   CARDS
+========================================= */
+
+.card {
+    background: white;
+    border: 1px solid #e1e6ef;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 16px 0;
+    box-shadow: 0 2px 8px #182c4610;
+}
+
+.login {
+    max-width: 430px;
+    margin: 70px auto;
+}
+
+.login form {
+    display: grid;
+    gap: 10px;
+}
+
+/* =========================================
+   TEXT
+========================================= */
+
+.muted,
+small {
+    color: #6b778b;
+}
+
+.small {
+    font-size: 12px;
+}
+
+/* =========================================
+   DASHBOARD STATISTICS
+========================================= */
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+}
+
+.stat {
+    background: white;
+    border: 1px solid #e1e6ef;
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.stat small {
+    display: block;
+}
+
+.stat b {
+    font-size: 27px;
+    display: block;
+    margin-top: 8px;
+}
+
+/* =========================================
+   FORMS
+========================================= */
+
+label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #34445b;
+}
+
+input,
+select,
+textarea {
+    width: 100%;
+    margin-top: 6px;
+    border: 1px solid #ccd5e2;
+    border-radius: 7px;
+    padding: 10px;
+    font: inherit;
+    background: white;
+    color: #172033;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    border-color: #1d5fa7;
+    box-shadow: 0 0 0 2px #1d5fa720;
+}
+
+textarea {
+    resize: vertical;
+    min-height: 85px;
+}
+
+/* =========================================
+   BUTTONS
+========================================= */
+
+button,
+.button,
+.btn {
+    border: 0;
+    border-radius: 7px;
+    background: #1d5fa7;
+    color: white;
+    padding: 10px 16px;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 14px;
+}
+
+button:hover,
+.button:hover,
+.btn:hover {
+    filter: brightness(.94);
+}
+
+.secondary {
+    background: #e8edf4;
+    color: #26364c;
+}
+
+.smallbtn {
+    padding: 7px 10px;
+    font-size: 12px;
+}
+
+/* =========================================
+   INLINE AND GRID FORMS
+========================================= */
+
+.inline {
+    display: flex;
+    gap: 14px;
+    align-items: end;
+    flex-wrap: wrap;
+}
+
+.inline input[type="file"] {
+    max-width: 420px;
+}
+
+.inline label {
+    min-width: 130px;
+}
+
+.gridform {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 18px;
+}
+
+/* =========================================
+   MONTH AND PERIOD FILTERS
+========================================= */
+
+.filter-form {
+    display: flex;
+    align-items: end;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin: 18px 0;
+}
+
+.filter-form label {
+    min-width: 180px;
+    max-width: 240px;
+}
+
+.filter-form select {
+    min-width: 180px;
+}
+
+/* =========================================
+   SECTION HEADINGS
+========================================= */
+
+.section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+/* =========================================
+   TABLES
+========================================= */
+
+.tablewrap,
+.table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    margin-top: 12px;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+}
+
+th,
+td {
+    text-align: left;
+    padding: 10px;
+    border-bottom: 1px solid #e8edf3;
+    vertical-align: top;
+}
+
+th {
+    background: #f6f8fb;
+    color: #47566c;
+    font-weight: 700;
+}
+
+tbody tr:hover {
+    background: #f9fbfd;
+}
+
+/* =========================================
+   FLASH MESSAGES
+========================================= */
+
+.flash {
+    padding: 12px 15px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+.flash.success {
+    background: #e7f7ed;
+    color: #17663a;
+}
+
+.flash.error {
+    background: #ffeded;
+    color: #9c2424;
+}
+
+/* =========================================
+   ACCURACY SUMMARY
+========================================= */
+
+.accuracy-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
+}
+
+.accuracy {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 15px;
+    display: grid;
+    gap: 8px;
+    background: white;
+}
+
+.accuracy strong {
+    font-size: 27px;
+    color: #176d45;
+}
+
+.accuracy small {
+    font-weight: 700;
+    color: #47566c;
+}
+
+/* =========================================
+   EXTERNAL WC AND WOC VALUES
+========================================= */
+
+.external-summary-values {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.external-summary-values > div {
+    display: grid;
+    gap: 6px;
+}
+
+.external-summary-values strong {
+    font-size: 25px;
+}
+
+/* =========================================
+   ACCURACY NAVIGATION BUTTONS
+========================================= */
+
+.accuracy-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 18px 0;
+}
+
+.accuracy-actions .btn {
+    min-width: 120px;
+    text-align: center;
+}
+
+/* =========================================
+   READ-ONLY SUMMARY DETAILS
+========================================= */
+
+.readonly-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    background: #f7f9fc;
+    padding: 12px;
+    border-radius: 8px;
+    margin: 14px 0;
+}
+
+.readonly-grid small {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.readonly-grid strong {
+    display: block;
+    font-size: 17px;
+    color: #172033;
+}
+
+/* =========================================
+   ERROR RECORDS - GENERAL
+========================================= */
+
+.error-card {
+    background: white;
+    border: 1px solid #e1e7ef;
+    border-radius: 10px;
+    padding: 18px;
+    margin: 14px 0;
+    box-shadow: 0 2px 8px #182c4608;
+}
+
+.error-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.response-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.wide {
+    grid-column: 1 / -1;
+}
+
+/* =========================================
+   ERROR RESPONSE FORMS
+========================================= */
+
+.card form:not(.filter-form):not(.inline) {
+    display: grid;
+    gap: 14px;
+}
+
+.card form:not(.filter-form):not(.inline) button {
+    justify-self: start;
+}
+
+/* =========================================
+   RUNNING ERROR RECORDS - DATE LAYOUT
+========================================= */
 
 .error-layout {
     display: grid;
@@ -8,6 +470,10 @@
     align-items: start;
 }
 
+/* =========================================
+   LEFT SIDE - DATE SELECTION
+========================================= */
+
 .date-sidebar {
     background: white;
     border: 1px solid #e1e6ef;
@@ -15,6 +481,16 @@
     padding: 16px;
     position: sticky;
     top: 16px;
+    box-shadow: 0 2px 8px #182c4610;
+}
+
+.date-sidebar h2 {
+    margin-bottom: 8px;
+}
+
+.date-sidebar > p {
+    line-height: 1.5;
+    margin-bottom: 14px;
 }
 
 .date-list {
@@ -22,6 +498,7 @@
     gap: 8px;
     max-height: 650px;
     overflow-y: auto;
+    padding-right: 3px;
 }
 
 .date-select-button {
@@ -33,11 +510,25 @@
     background: #f6f8fb;
     color: #172033;
     border: 1px solid #e1e6ef;
+    border-radius: 8px;
+    padding: 11px;
     text-align: left;
+    transition: background .15s ease, border-color .15s ease;
+}
+
+.date-select-button:hover {
+    background: #edf3f8;
+    filter: none;
+}
+
+.date-select-button span {
+    font-size: 13px;
+    font-weight: 700;
 }
 
 .date-select-button small {
     color: #6b778b;
+    font-size: 11px;
 }
 
 .date-select-button.active {
@@ -49,6 +540,10 @@
 .date-select-button.active small {
     color: #17663a;
 }
+
+/* =========================================
+   RIGHT SIDE - SELECTED DATE RECORDS
+========================================= */
 
 .error-content {
     min-width: 0;
@@ -66,10 +561,19 @@
     margin-bottom: 5px;
 }
 
+.error-content-header p {
+    margin: 0;
+}
+
+/* =========================================
+   ERROR RECORD INFORMATION
+========================================= */
+
 .record-pro {
     font-size: 18px;
     margin: 0 0 16px;
     color: #1d5fa7;
+    overflow-wrap: anywhere;
 }
 
 .record-info-grid {
@@ -87,32 +591,55 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.record-info-grid > div {
+    min-width: 0;
+}
+
 .record-info-grid small {
     display: block;
     font-size: 11px;
     font-weight: 700;
     margin-bottom: 5px;
+    color: #6b778b;
 }
 
 .record-info-grid strong {
     display: block;
     font-size: 13px;
+    color: #172033;
     overflow-wrap: anywhere;
 }
+
+/* =========================================
+   ERROR DETAILS
+========================================= */
 
 .record-error-details {
     padding: 15px 0;
     border-bottom: 1px solid #e8edf3;
 }
 
+.record-error-details > strong {
+    display: block;
+    font-size: 13px;
+    color: #34445b;
+    margin-bottom: 8px;
+}
+
 .record-error-details p {
     background: #f6f8fb;
+    border: 1px solid #e8edf3;
     padding: 12px;
     border-radius: 7px;
-    margin-bottom: 0;
+    margin: 0;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+    line-height: 1.6;
 }
+
+/* =========================================
+   MY RESPONSE
+========================================= */
 
 .my-response {
     margin-top: 18px;
@@ -120,6 +647,8 @@
 
 .my-response h3 {
     margin-top: 0;
+    margin-bottom: 14px;
+    color: #172033;
 }
 
 .my-response form {
@@ -127,12 +656,86 @@
     gap: 14px;
 }
 
-.my-response form button {
-    justify-self: start;
+.my-response label {
+    display: block;
 }
 
-/* MOBILE */
+.my-response textarea {
+    min-height: 85px;
+}
+
+.my-response form button {
+    justify-self: start;
+    margin-top: 3px;
+}
+
+.my-response .muted {
+    margin-top: 12px;
+}
+
+/* =========================================
+   EMPTY DATE MESSAGE
+========================================= */
+
+#no-date-records {
+    background: white;
+    border: 1px dashed #ccd5e2;
+    border-radius: 10px;
+    padding: 24px;
+    text-align: center;
+    color: #6b778b;
+}
+
+/* =========================================
+   FOOTER
+========================================= */
+
+footer {
+    text-align: center;
+    color: #8994a5;
+    padding: 30px;
+    font-size: 12px;
+}
+
+/* =========================================
+   RESPONSIVE DESIGN - TABLET
+========================================= */
+
+@media (max-width: 900px) {
+
+    .error-layout {
+        grid-template-columns: 220px minmax(0, 1fr);
+        gap: 14px;
+    }
+
+    .date-sidebar {
+        padding: 13px;
+    }
+
+    .record-info-grid {
+        gap: 10px;
+    }
+
+}
+
+/* =========================================
+   RESPONSIVE DESIGN - MOBILE
+========================================= */
+
 @media (max-width: 750px) {
+
+    header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    nav {
+        gap: 12px;
+    }
+
+    main {
+        margin: 18px auto;
+    }
 
     .error-layout {
         grid-template-columns: 1fr;
@@ -152,16 +755,85 @@
         flex-direction: column;
     }
 
+    .section-head {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .error-head {
+        flex-direction: column;
+    }
+
+    .filter-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .filter-form label,
+    .filter-form select {
+        width: 100%;
+        max-width: none;
+    }
+
+    .inline {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .inline input[type="file"] {
+        max-width: 100%;
+    }
+
+    .accuracy-actions {
+        flex-direction: column;
+    }
+
+    .accuracy-actions .btn {
+        width: 100%;
+    }
+
+    .card {
+        padding: 15px;
+    }
+
+    table {
+        min-width: 450px;
+    }
+
 }
 
+/* =========================================
+   RESPONSIVE DESIGN - SMALL MOBILE
+========================================= */
+
 @media (max-width: 480px) {
+
+    h1 {
+        font-size: 23px;
+    }
 
     .record-info-grid.three-columns {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    .record-info-grid.two-columns {
+        grid-template-columns: 1fr;
+    }
+
     .date-list {
         grid-template-columns: 1fr;
+    }
+
+    .date-select-button {
+        padding: 10px;
+    }
+
+    .error-card {
+        padding: 13px;
+    }
+
+    .my-response form button {
+        width: 100%;
     }
 
 }
