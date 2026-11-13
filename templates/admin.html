@@ -5,7 +5,7 @@
 
 {% block head %}
 <style>
-    
+
     .dashboard-heading {
         margin-bottom: 22px;
     }
@@ -168,19 +168,153 @@
         background: #35ad89;
     }
 
+    /* ACCURACY MONITORING */
+
+    .accuracy-section {
+        margin-top: 22px;
+    }
+
+    .accuracy-filters {
+        display: flex;
+        align-items: end;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+
+    .accuracy-filter {
+        flex: 1;
+        min-width: 160px;
+    }
+
+    .accuracy-filter label {
+        display: block;
+        margin-bottom: 7px;
+        font-size: 12px;
+        font-weight: bold;
+        color: #344054;
+    }
+
+    .accuracy-filter select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #d0d5dd;
+        border-radius: 6px;
+        background: #fff;
+    }
+
+    .filter-button {
+        background: #43c59e;
+        color: #172033;
+        border: none;
+        padding: 11px 18px;
+        border-radius: 6px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .accuracy-summary {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .accuracy-summary-card {
+        padding: 16px;
+        border: 1px solid #e0e6ef;
+        border-radius: 8px;
+        background: #fff;
+    }
+
+    .accuracy-summary-card h3 {
+        margin: 0;
+        font-size: 11px;
+        color: #667085;
+        text-transform: uppercase;
+    }
+
+    .accuracy-summary-card strong {
+        display: block;
+        margin-top: 9px;
+        font-size: 25px;
+        color: #172033;
+    }
+
+    .accuracy-subsection {
+        margin-top: 24px;
+    }
+
+    .accuracy-subsection h3 {
+        font-size: 14px;
+        color: #172033;
+        margin-bottom: 12px;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-weight: bold;
+        white-space: nowrap;
+    }
+
+    .status-below {
+        background: #fee4e2;
+        color: #b42318;
+    }
+
+    .status-hit {
+        background: #d1fadf;
+        color: #027a48;
+    }
+
+    .status-improved {
+        background: #d1fadf;
+        color: #027a48;
+    }
+
+    .status-declined {
+        background: #fee4e2;
+        color: #b42318;
+    }
+
+    .status-neutral {
+        background: #f2f4f7;
+        color: #475467;
+    }
+
+    .accuracy-value {
+        font-weight: bold;
+    }
+
+    .accuracy-note {
+        min-width: 230px;
+        line-height: 1.5;
+    }
+
+    .accuracy-date {
+        font-size: 12px;
+        color: #667085;
+        margin-bottom: 16px;
+    }
+
     @media (max-width: 800px) {
-        .stats-grid {
+        .stats-grid,
+        .quick-links {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
-        .quick-links {
+        .accuracy-summary {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
     }
 
     @media (max-width: 500px) {
         .stats-grid,
-        .quick-links {
+        .quick-links,
+        .accuracy-summary {
             grid-template-columns: 1fr;
         }
 
@@ -188,6 +322,7 @@
             font-size: 21px;
         }
     }
+
 </style>
 {% endblock %}
 
@@ -195,7 +330,7 @@
 
 <div class="dashboard-heading">
     <h1>Admin Dashboard</h1>
-    <p>Overview of running error records, biller responses, and workbook imports.</p>
+    <p>Overview of running error records, biller responses, accuracy, and workbook imports.</p>
 </div>
 
 <!-- DASHBOARD COUNTS -->
@@ -236,6 +371,328 @@
         <h3>Total Imports</h3>
         <div class="stat-value">{{ counts.imports }}</div>
         <div class="stat-description">Workbook import history entries</div>
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     BILLER ACCURACY MONITORING
+===================================================== -->
+
+<div class="card accuracy-section">
+
+    <h2 class="section-title">
+        Biller Accuracy Monitoring
+    </h2>
+
+    <p class="accuracy-date">
+        Monitoring Period:
+        <strong>{{ selected_period or 'No available records' }}</strong>
+        |
+        Comparison:
+        <strong>{{ previous_period or 'No previous period' }}</strong>
+    </p>
+
+    <!-- FILTERS -->
+
+    <form method="GET" action="{{ url_for('admin_dashboard') }}"
+          class="accuracy-filters">
+
+        <div class="accuracy-filter">
+
+            <label for="project_id">PROJECT</label>
+
+            <select name="project_id" id="project_id">
+
+                <option value="all"
+                    {% if selected_project == 'all' %}selected{% endif %}>
+                    ALL PROJECTS
+                </option>
+
+                {% for project in projects %}
+
+                <option value="{{ project.id }}"
+                    {% if selected_project == project.id|string %}selected{% endif %}>
+                    {{ project.project_name }}
+                </option>
+
+                {% endfor %}
+
+            </select>
+
+        </div>
+
+        <div class="accuracy-filter">
+
+            <label for="period">PERIOD TYPE</label>
+
+            <select name="period" id="period">
+
+                <option value="daily"
+                    {% if period_type == 'daily' %}selected{% endif %}>
+                    DAILY
+                </option>
+
+                <option value="weekly"
+                    {% if period_type == 'weekly' %}selected{% endif %}>
+                    WEEKLY
+                </option>
+
+                <option value="monthly"
+                    {% if period_type == 'monthly' %}selected{% endif %}>
+                    MONTHLY
+                </option>
+
+            </select>
+
+        </div>
+
+        <div class="accuracy-filter">
+
+            <label for="date">SELECT PERIOD</label>
+
+            <select name="date" id="date">
+
+                {% for period in periods %}
+
+                <option value="{{ period }}"
+                    {% if selected_period == period %}selected{% endif %}>
+                    {{ period }}
+                </option>
+
+                {% endfor %}
+
+            </select>
+
+        </div>
+
+        <button type="submit" class="filter-button">
+            APPLY FILTER
+        </button>
+
+    </form>
+
+
+    <!-- ACCURACY SUMMARY -->
+
+    <div class="accuracy-summary">
+
+        {% for accuracy_type, item in summary.items() %}
+
+        <div class="accuracy-summary-card">
+
+            <h3>{{ accuracy_type }} ACCURACY</h3>
+
+            <strong>
+                {% if item.accuracy is not none %}
+                    {{ format_accuracy(item.accuracy) }}
+                {% else %}
+                    —
+                {% endif %}
+            </strong>
+
+            <div class="stat-description">
+                Audited: {{ item.audited|int }}
+                |
+                Errors: {{ item.errors|int }}
+            </div>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+
+    <!-- BELOW 90% -->
+
+    <div class="accuracy-subsection">
+
+        <h3>Billers Below 90% Accuracy</h3>
+
+        {% for accuracy_type, items in below_90.items() %}
+
+        <h4 style="font-size:12px; color:#475467; margin:16px 0 8px;">
+            {{ accuracy_type }}
+        </h4>
+
+        <div class="table-wrap">
+
+            <table class="dashboard-table">
+
+                <thead>
+                    <tr>
+                        <th>PROJECT</th>
+                        <th>BILLER NAME</th>
+                        <th>USERNAME</th>
+                        <th>ACCURACY</th>
+                        <th>STATUS</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for item in items %}
+
+                    <tr>
+                        <td>{{ item.project_name }}</td>
+                        <td>{{ item.biller_name }}</td>
+                        <td>{{ item.username }}</td>
+                        <td class="accuracy-value">
+                            {{ item.accuracy_display }}
+                        </td>
+                        <td>
+                            <span class="status-badge status-below">
+                                BELOW 90%
+                            </span>
+                        </td>
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="5" class="empty-state">
+                            No Billers below 90% for this category.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+
+    <!-- IMPROVEMENT TRACKING -->
+
+    <div class="accuracy-subsection">
+
+        <h3>Biller Improvement Monitoring</h3>
+
+        <div class="table-wrap">
+
+            <table class="dashboard-table">
+
+                <thead>
+                    <tr>
+                        <th>PROJECT</th>
+                        <th>BILLER NAME</th>
+                        <th>ACCURACY TYPE</th>
+                        <th>PREVIOUS ACCURACY</th>
+                        <th>CURRENT ACCURACY</th>
+                        <th>CHANGE</th>
+                        <th>IMPROVEMENT STATUS</th>
+                        <th>REMARKS</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for item in improvements %}
+
+                    <tr>
+
+                        <td>{{ item.project_name }}</td>
+
+                        <td>{{ item.biller_name }}</td>
+
+                        <td>{{ item.accuracy_type }}</td>
+
+                        <td>
+                            {% if item.previous_accuracy is not none %}
+                                {{ format_accuracy(item.previous_accuracy) }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+
+                        <td class="accuracy-value">
+                            {% if item.current_accuracy is not none %}
+                                {{ format_accuracy(item.current_accuracy) }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if item.change is not none %}
+
+                                {% if item.change > 0 %}
+                                    <span style="color:#027a48; font-weight:bold;">
+                                        +{{ "%.2f"|format(item.change) }}%
+                                    </span>
+                                {% elif item.change < 0 %}
+                                    <span style="color:#b42318; font-weight:bold;">
+                                        {{ "%.2f"|format(item.change) }}%
+                                    </span>
+                                {% else %}
+                                    0.00%
+                                {% endif %}
+
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+
+                        <td>
+
+                            {% if item.status == 'Improved' %}
+
+                                <span class="status-badge status-improved">
+                                    IMPROVED
+                                </span>
+
+                            {% elif item.status == 'Declined' %}
+
+                                <span class="status-badge status-declined">
+                                    DECLINED
+                                </span>
+
+                            {% elif item.status == 'No Change' %}
+
+                                <span class="status-badge status-neutral">
+                                    NO CHANGE
+                                </span>
+
+                            {% else %}
+
+                                <span class="status-badge status-neutral">
+                                    {{ item.status|upper }}
+                                </span>
+
+                            {% endif %}
+
+                        </td>
+
+                        <td class="accuracy-note">
+                            {{ item.note }}
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+                        <td colspan="8" class="empty-state">
+                            No accuracy improvement records available.
+                        </td>
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
     </div>
 
 </div>
@@ -311,6 +768,7 @@
 
 </div>
 
+
 <!-- QUICK LINKS -->
 
 <div class="card dashboard-section">
@@ -342,6 +800,7 @@
     </div>
 
 </div>
+
 
 <!-- RECENT IMPORTS -->
 
