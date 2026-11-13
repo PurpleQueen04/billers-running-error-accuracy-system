@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -19,7 +20,10 @@
 
         body {
             margin: 0;
+            min-height: 100vh;
         }
+
+        /* HEADER */
 
         header {
             background: #172033;
@@ -47,6 +51,8 @@
             color: #d7deea;
         }
 
+        /* NAVIGATION */
+
         nav {
             background: white;
             border-bottom: 1px solid #dce3ed;
@@ -66,8 +72,9 @@
             padding: 15px 13px;
             text-decoration: none;
             color: #344054;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: bold;
+            border-bottom: 3px solid transparent;
         }
 
         nav a:hover {
@@ -76,14 +83,19 @@
 
         nav a.active {
             color: #15966d;
-            border-bottom: 3px solid #43c59e;
+            border-bottom-color: #43c59e;
         }
+
+        /* MAIN CONTENT */
 
         main {
             max-width: 1500px;
+            min-height: 65vh;
             margin: 25px auto;
             padding: 0 24px;
         }
+
+        /* FLASH MESSAGES */
 
         .flash {
             padding: 12px 15px;
@@ -106,6 +118,13 @@
             background: #eaf2ff;
             color: #2456a6;
         }
+
+        .flash.warning {
+            background: #fff4df;
+            color: #8a5700;
+        }
+
+        /* COMMON ELEMENTS */
 
         .page-title {
             margin: 0 0 20px;
@@ -138,6 +157,11 @@
             color: #172033;
         }
 
+        textarea {
+            resize: vertical;
+            min-height: 90px;
+        }
+
         button,
         .btn {
             display: inline-block;
@@ -149,6 +173,7 @@
             text-decoration: none;
             cursor: pointer;
             font-weight: bold;
+            font-size: 13px;
         }
 
         button:hover,
@@ -162,6 +187,13 @@
 
         .btn-danger {
             background: #c0392b;
+        }
+
+        /* TABLES */
+
+        .table-wrap {
+            width: 100%;
+            overflow-x: auto;
         }
 
         table {
@@ -185,9 +217,7 @@
             white-space: nowrap;
         }
 
-        .table-wrap {
-            overflow-x: auto;
-        }
+        /* FOOTER */
 
         footer {
             max-width: 1500px;
@@ -198,22 +228,42 @@
             text-align: center;
         }
 
+        /* MOBILE */
+
         @media (max-width: 700px) {
             header {
                 padding: 14px;
+            }
+
+            .brand {
+                font-size: 16px;
             }
 
             nav {
                 padding: 0 10px;
             }
 
-            main {
-                padding: 0 12px;
+            .nav-inner {
+                gap: 2px;
             }
 
             nav a {
                 padding: 12px 8px;
-                font-size: 11px;
+                font-size: 10px;
+            }
+
+            main {
+                padding: 0 12px;
+            }
+
+            .card {
+                padding: 15px;
+            }
+
+            th,
+            td {
+                padding: 9px;
+                font-size: 12px;
             }
         }
     </style>
@@ -223,8 +273,13 @@
 
 <body>
 
+<!-- =====================================================
+     HEADER
+====================================================== -->
+
 <header>
     <div class="header-inner">
+
         <div class="brand">
             Billers Running Error & Accuracy System
         </div>
@@ -236,76 +291,120 @@
             {{ session.get("role", "").upper() }}
         </div>
         {% endif %}
+
     </div>
 </header>
 
+
+<!-- =====================================================
+     NAVIGATION
+====================================================== -->
+
 {% if session.get("username") %}
+
 <nav>
     <div class="nav-inner">
 
         {% if session.get("role") == "admin" %}
 
-            <a href="{{ url_for('admin_dashboard') }}"
-               class="{% if request.endpoint == 'admin_dashboard' %}active{% endif %}">
+            <a
+                href="{{ url_for('admin_dashboard') }}"
+                class="{% if request.endpoint == 'admin_dashboard' %}active{% endif %}"
+            >
                 DASHBOARD
             </a>
 
-            <a href="{{ url_for('admin_accounts') }}"
-               class="{% if request.endpoint == 'admin_accounts' %}active{% endif %}">
+            <a
+                href="{{ url_for('admin_accounts') }}"
+                class="{% if request.endpoint == 'admin_accounts' %}active{% endif %}"
+            >
                 ACCOUNT
             </a>
 
-            <a href="{{ url_for('admin_projects') }}"
-               class="{% if request.endpoint == 'admin_projects' %}active{% endif %}">
+            <a
+                href="{{ url_for('admin_projects') }}"
+                class="{% if request.endpoint == 'admin_projects' %}active{% endif %}"
+            >
                 PROJECT
             </a>
 
-            <a href="{{ url_for('admin_accuracy') }}"
-               class="{% if request.endpoint == 'admin_accuracy' %}active{% endif %}">
+            <a
+                href="{{ url_for('admin_accuracy') }}"
+                class="{% if request.endpoint == 'admin_accuracy' %}active{% endif %}"
+            >
                 ACCURACY
             </a>
 
-            <a href="{{ url_for('admin_errors') }}"
-               class="{% if request.endpoint == 'admin_errors' %}active{% endif %}">
+            <a
+                href="{{ url_for('admin_errors') }}"
+                class="{% if request.endpoint == 'admin_errors' %}active{% endif %}"
+            >
                 ERROR DETAILS
             </a>
 
         {% elif session.get("role") == "qc" %}
 
-            <a href="{{ url_for('qc_dashboard') }}">ERROR DETAILS</a>
-            <a href="{{ url_for('qc_accuracy') }}">ACCURACY</a>
+            <a href="{{ url_for('qc_dashboard') }}">
+                ERROR DETAILS
+            </a>
+
+            <a href="{{ url_for('qc_accuracy') }}">
+                ACCURACY
+            </a>
 
         {% elif session.get("role") == "biller" %}
 
-            <a href="{{ url_for('biller_dashboard') }}">MY ERROR RECORDS</a>
+            <a href="{{ url_for('biller_dashboard') }}">
+                MY ERROR RECORDS
+            </a>
 
         {% endif %}
 
-        <a href="{{ url_for('logout') }}">LOGOUT</a>
+        <a href="{{ url_for('logout') }}">
+            LOGOUT
+        </a>
 
     </div>
 </nav>
+
 {% endif %}
+
+
+<!-- =====================================================
+     MAIN CONTENT
+====================================================== -->
 
 <main>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
+
         {% if messages %}
+
             {% for category, message in messages %}
+
                 <div class="flash {{ category }}">
                     {{ message }}
                 </div>
+
             {% endfor %}
+
         {% endif %}
+
     {% endwith %}
 
     {% block content %}{% endblock %}
 
 </main>
 
+
+<!-- =====================================================
+     FOOTER
+====================================================== -->
+
 <footer>
     Billers Running Error & Accuracy System
 </footer>
+
 
 {% block scripts %}{% endblock %}
 
