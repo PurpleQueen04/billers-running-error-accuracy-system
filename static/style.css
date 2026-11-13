@@ -1,102 +1,44 @@
 
-:root {
-    font-family: Arial, sans-serif;
-    color: #172033;
-    background: #f4f6fa;
-}
+/* =========================================================
+   BILLERS RUNNING ERROR & ACCURACY SYSTEM
+   PAGE-SPECIFIC STYLES
+   Global styles are maintained in base.html
+========================================================= */
 
-* {
-    box-sizing: border-box;
-}
+
+/* =========================================================
+   GENERAL PAGE ELEMENTS
+========================================================= */
 
 html {
     scroll-behavior: smooth;
 }
 
-body {
-    margin: 0;
+.muted,
+small {
+    color: #667085;
 }
 
-/* =========================================
-   HEADER AND NAVIGATION
-========================================= */
-
-header {
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    width: 100%;
-    background: #14243a;
-    color: white;
-    padding: 16px max(20px, calc((100% - 1200px) / 2));
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
+.small {
+    font-size: 12px;
 }
 
-.brand {
-    font-size: 19px;
-    font-weight: 700;
+.page-title {
+    margin: 0 0 20px;
+    font-size: 24px;
 }
 
-.brand span {
-    color: #9db4d1;
-}
 
-nav {
-    display: flex;
-    gap: 18px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-nav a {
-    color: white;
-    text-decoration: none;
-}
-
-nav a:hover {
-    color: #9db4d1;
-}
-
-/* =========================================
-   MAIN CONTENT
-========================================= */
-
-main {
-    max-width: 1200px;
-    margin: 28px auto;
-    padding: 0 18px;
-}
-
-h1 {
-    font-size: 27px;
-    margin: 0 0 18px;
-}
-
-h2 {
-    font-size: 19px;
-    margin: 0 0 14px;
-}
-
-h3 {
-    font-size: 16px;
-    margin: 20px 0 10px;
-}
-
-/* =========================================
+/* =========================================================
    CARDS
-========================================= */
+========================================================= */
 
 .card {
     background: white;
-    border: 1px solid #e1e6ef;
-    border-radius: 12px;
+    border: 1px solid #e0e6ef;
+    border-radius: 9px;
     padding: 20px;
-    margin: 16px 0;
-    box-shadow: 0 2px 8px #182c4610;
+    margin-bottom: 20px;
 }
 
 .login {
@@ -109,22 +51,10 @@ h3 {
     gap: 10px;
 }
 
-/* =========================================
-   TEXT
-========================================= */
 
-.muted,
-small {
-    color: #6b778b;
-}
-
-.small {
-    font-size: 12px;
-}
-
-/* =========================================
+/* =========================================================
    DASHBOARD STATISTICS
-========================================= */
+========================================================= */
 
 .stats {
     display: grid;
@@ -134,86 +64,44 @@ small {
 
 .stat {
     background: white;
-    border: 1px solid #e1e6ef;
-    border-radius: 12px;
+    border: 1px solid #e0e6ef;
+    border-radius: 9px;
     padding: 16px;
+    min-width: 0;
 }
 
 .stat small {
     display: block;
+    font-size: 12px;
+    color: #667085;
 }
 
 .stat b {
-    font-size: 27px;
     display: block;
     margin-top: 8px;
+    font-size: 27px;
+    overflow-wrap: anywhere;
 }
 
-/* =========================================
-   FORMS
-========================================= */
 
-label {
-    display: block;
-    font-size: 13px;
-    font-weight: 600;
-    color: #34445b;
-}
+/* =========================================================
+   BUTTON VARIATIONS
+========================================================= */
 
-input,
-select,
-textarea {
-    width: 100%;
-    margin-top: 6px;
-    border: 1px solid #ccd5e2;
-    border-radius: 7px;
-    padding: 10px;
-    font: inherit;
-    background: white;
-    color: #172033;
-}
-
-input:focus,
-select:focus,
-textarea:focus {
-    outline: none;
-    border-color: #1d5fa7;
-    box-shadow: 0 0 0 2px #1d5fa720;
-}
-
-textarea {
-    resize: vertical;
-    min-height: 85px;
-}
-
-/* =========================================
-   BUTTONS
-========================================= */
-
-button,
 .button,
-.btn {
-    border: 0;
-    border-radius: 7px;
-    background: #1d5fa7;
-    color: white;
-    padding: 10px 16px;
-    font-weight: 700;
-    cursor: pointer;
-    text-decoration: none;
+.smallbtn {
     display: inline-block;
-    font-size: 14px;
-}
-
-button:hover,
-.button:hover,
-.btn:hover {
-    filter: brightness(.94);
+    text-decoration: none;
+    cursor: pointer;
 }
 
 .secondary {
-    background: #e8edf4;
-    color: #26364c;
+    background: #475467;
+    color: white;
+}
+
+.secondary:hover {
+    background: #344054;
 }
 
 .smallbtn {
@@ -221,9 +109,18 @@ button:hover,
     font-size: 12px;
 }
 
-/* =========================================
+.btn-danger {
+    background: #c0392b;
+}
+
+.btn-danger:hover {
+    background: #962d22;
+}
+
+
+/* =========================================================
    INLINE AND GRID FORMS
-========================================= */
+========================================================= */
 
 .inline {
     display: flex;
@@ -248,9 +145,10 @@ button:hover,
     margin-bottom: 18px;
 }
 
-/* =========================================
+
+/* =========================================================
    MONTH AND PERIOD FILTERS
-========================================= */
+========================================================= */
 
 .filter-form {
     display: flex;
@@ -269,20 +167,23 @@ button:hover,
     min-width: 180px;
 }
 
-/* =========================================
+
+/* =========================================================
    SECTION HEADINGS
-========================================= */
+========================================================= */
 
 .section-head {
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 12px;
+    margin-bottom: 14px;
 }
 
-/* =========================================
+
+/* =========================================================
    TABLES
-========================================= */
+========================================================= */
 
 .tablewrap,
 .table-wrap {
@@ -291,53 +192,40 @@ button:hover,
     margin-top: 12px;
 }
 
-table {
-    border-collapse: collapse;
+.tablewrap table,
+.table-wrap table {
     width: 100%;
-    font-size: 13px;
+    border-collapse: collapse;
+    background: white;
 }
 
-th,
-td {
+.tablewrap th,
+.tablewrap td,
+.table-wrap th,
+.table-wrap td {
+    padding: 11px 12px;
+    border-bottom: 1px solid #e6ebf2;
     text-align: left;
-    padding: 10px;
-    border-bottom: 1px solid #e8edf3;
+    font-size: 13px;
     vertical-align: top;
 }
 
-th {
-    background: #f6f8fb;
-    color: #47566c;
-    font-weight: 700;
+.tablewrap th,
+.table-wrap th {
+    background: #f1f5f9;
+    color: #344054;
+    white-space: nowrap;
 }
 
-tbody tr:hover {
+.tablewrap tbody tr:hover,
+.table-wrap tbody tr:hover {
     background: #f9fbfd;
 }
 
-/* =========================================
-   FLASH MESSAGES
-========================================= */
 
-.flash {
-    padding: 12px 15px;
-    border-radius: 8px;
-    margin-bottom: 12px;
-}
-
-.flash.success {
-    background: #e7f7ed;
-    color: #17663a;
-}
-
-.flash.error {
-    background: #ffeded;
-    color: #9c2424;
-}
-
-/* =========================================
+/* =========================================================
    ACCURACY SUMMARY
-========================================= */
+========================================================= */
 
 .accuracy-grid {
     display: grid;
@@ -346,17 +234,19 @@ tbody tr:hover {
 }
 
 .accuracy {
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 15px;
     display: grid;
     gap: 8px;
     background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 15px;
+    min-width: 0;
 }
 
 .accuracy strong {
     font-size: 27px;
     color: #176d45;
+    overflow-wrap: anywhere;
 }
 
 .accuracy small {
@@ -364,9 +254,10 @@ tbody tr:hover {
     color: #47566c;
 }
 
-/* =========================================
+
+/* =========================================================
    EXTERNAL WC AND WOC VALUES
-========================================= */
+========================================================= */
 
 .external-summary-values {
     display: grid;
@@ -377,15 +268,18 @@ tbody tr:hover {
 .external-summary-values > div {
     display: grid;
     gap: 6px;
+    min-width: 0;
 }
 
 .external-summary-values strong {
     font-size: 25px;
+    overflow-wrap: anywhere;
 }
 
-/* =========================================
+
+/* =========================================================
    ACCURACY NAVIGATION BUTTONS
-========================================= */
+========================================================= */
 
 .accuracy-actions {
     display: flex;
@@ -399,9 +293,35 @@ tbody tr:hover {
     text-align: center;
 }
 
-/* =========================================
+
+/* =========================================================
+   ACCURACY STATUS
+========================================================= */
+
+.status-improved {
+    color: #176b45;
+    font-weight: 700;
+}
+
+.status-declined {
+    color: #b42318;
+    font-weight: 700;
+}
+
+.status-no-change {
+    color: #667085;
+    font-weight: 700;
+}
+
+.status-new-record {
+    color: #2456a6;
+    font-weight: 700;
+}
+
+
+/* =========================================================
    READ-ONLY SUMMARY DETAILS
-========================================= */
+========================================================= */
 
 .readonly-grid {
     display: grid;
@@ -424,16 +344,17 @@ tbody tr:hover {
     color: #172033;
 }
 
-/* =========================================
+
+/* =========================================================
    ERROR RECORDS - GENERAL
-========================================= */
+========================================================= */
 
 .error-card {
     background: white;
     border: 1px solid #e1e7ef;
     border-radius: 10px;
-    padding: 18px;
-    margin: 14px 0;
+    padding: 12px;
+    margin: 8px 0;
     box-shadow: 0 2px 8px #182c4608;
 }
 
@@ -455,45 +376,49 @@ tbody tr:hover {
     grid-column: 1 / -1;
 }
 
-/* =========================================
-   ERROR RESPONSE FORMS
-========================================= */
 
-.card form:not(.filter-form):not(.inline) {
+/* =========================================================
+   ERROR RESPONSE FORMS
+========================================================= */
+
+.error-card form {
     display: grid;
-    gap: 14px;
+    gap: 8px;
 }
 
-.card form:not(.filter-form):not(.inline) button {
+.error-card form button {
     justify-self: start;
 }
 
-/* =========================================
+
+/* =========================================================
    RUNNING ERROR RECORDS - DATE LAYOUT
-========================================= */
+========================================================= */
 
 .error-layout {
     display: grid;
-    grid-template-columns: 250px minmax(0, 1fr);
-    gap: 20px;
+    grid-template-columns: 210px minmax(0, 1fr);
+    gap: 14px;
     align-items: start;
 }
 
-/* =========================================
+
+/* =========================================================
    LEFT SIDE - DATE SELECTION
-========================================= */
+========================================================= */
 
 .date-sidebar {
     background: white;
     border: 1px solid #e1e6ef;
     border-radius: 12px;
-    padding: 16px;
+    padding: 12px;
     position: sticky;
     top: 90px;
     box-shadow: 0 2px 8px #182c4610;
 }
 
 .date-sidebar h2 {
+    font-size: 16px;
     margin-bottom: 8px;
 }
 
@@ -515,23 +440,22 @@ tbody tr:hover {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 5px;
+    gap: 3px;
     background: #f6f8fb;
     color: #172033;
     border: 1px solid #e1e6ef;
     border-radius: 8px;
-    padding: 11px;
+    padding: 8px 10px;
     text-align: left;
     transition: background .15s ease, border-color .15s ease;
 }
 
 .date-select-button:hover {
     background: #edf3f8;
-    filter: none;
 }
 
 .date-select-button span {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
 }
 
@@ -550,9 +474,10 @@ tbody tr:hover {
     color: #17663a;
 }
 
-/* =========================================
+
+/* =========================================================
    RIGHT SIDE - SELECTED DATE RECORDS
-========================================= */
+========================================================= */
 
 .error-content {
     min-width: 0;
@@ -574,21 +499,22 @@ tbody tr:hover {
     margin: 0;
 }
 
-/* =========================================
+
+/* =========================================================
    ERROR RECORD INFORMATION
-========================================= */
+========================================================= */
 
 .record-pro {
-    font-size: 18px;
-    margin: 0 0 16px;
-    color: #1d5fa7;
+    font-size: 16px;
+    margin: 0 0 10px;
+    color: #15966d;
     overflow-wrap: anywhere;
 }
 
 .record-info-grid {
     display: grid;
-    gap: 14px;
-    padding: 13px 0;
+    gap: 8px;
+    padding: 7px 0;
     border-bottom: 1px solid #e8edf3;
 }
 
@@ -606,25 +532,26 @@ tbody tr:hover {
 
 .record-info-grid small {
     display: block;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
-    margin-bottom: 5px;
+    margin-bottom: 3px;
     color: #6b778b;
 }
 
 .record-info-grid strong {
     display: block;
-    font-size: 13px;
+    font-size: 12px;
     color: #172033;
     overflow-wrap: anywhere;
 }
 
-/* =========================================
+
+/* =========================================================
    ERROR DETAILS
-========================================= */
+========================================================= */
 
 .record-error-details {
-    padding: 15px 0;
+    padding: 8px 0;
     border-bottom: 1px solid #e8edf3;
 }
 
@@ -638,53 +565,65 @@ tbody tr:hover {
 .record-error-details p {
     background: #f6f8fb;
     border: 1px solid #e8edf3;
-    padding: 12px;
+    padding: 9px;
     border-radius: 7px;
     margin: 0;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-    line-height: 1.6;
+    line-height: 1.45;
+    font-size: 12px;
 }
 
-/* =========================================
-   MY RESPONSE
-========================================= */
+
+/* =========================================================
+   RESPONSE DETAILS
+========================================================= */
 
 .my-response {
-    margin-top: 18px;
+    margin-top: 10px;
 }
 
 .my-response h3 {
-    margin-top: 0;
-    margin-bottom: 14px;
+    font-size: 14px;
+    margin: 0 0 10px;
     color: #172033;
 }
 
 .my-response form {
     display: grid;
-    gap: 14px;
+    gap: 8px;
 }
 
 .my-response label {
     display: block;
 }
 
+.my-response input,
+.my-response select,
 .my-response textarea {
-    min-height: 85px;
+    padding: 8px;
+    font-size: 12px;
+}
+
+.my-response textarea {
+    min-height: 65px;
 }
 
 .my-response form button {
     justify-self: start;
     margin-top: 3px;
+    padding: 8px 13px;
+    font-size: 12px;
 }
 
 .my-response .muted {
     margin-top: 12px;
 }
 
-/* =========================================
+
+/* =========================================================
    EMPTY DATE MESSAGE
-========================================= */
+========================================================= */
 
 #no-date-records {
     background: white;
@@ -695,56 +634,34 @@ tbody tr:hover {
     color: #6b778b;
 }
 
-/* =========================================
-   FOOTER
-========================================= */
 
-footer {
-    text-align: center;
-    color: #8994a5;
-    padding: 30px;
-    font-size: 12px;
-}
-
-/* =========================================
+/* =========================================================
    RESPONSIVE DESIGN - TABLET
-========================================= */
+========================================================= */
 
 @media (max-width: 900px) {
 
     .error-layout {
-        grid-template-columns: 220px minmax(0, 1fr);
-        gap: 14px;
+        grid-template-columns: 190px minmax(0, 1fr);
+        gap: 12px;
     }
 
     .date-sidebar {
-        padding: 13px;
+        padding: 10px;
     }
 
     .record-info-grid {
-        gap: 10px;
+        gap: 8px;
     }
 
 }
 
-/* =========================================
+
+/* =========================================================
    RESPONSIVE DESIGN - MOBILE
-========================================= */
+========================================================= */
 
 @media (max-width: 750px) {
-
-    header {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-
-    nav {
-        gap: 12px;
-    }
-
-    main {
-        margin: 18px auto;
-    }
 
     .error-layout {
         grid-template-columns: 1fr;
@@ -801,33 +718,28 @@ footer {
         width: 100%;
     }
 
-    .card {
-        padding: 15px;
+    .error-card {
+        padding: 12px;
     }
 
-    table {
+    .error-content-header .btn {
+        width: 100%;
+        text-align: center;
+    }
+
+    .tablewrap table,
+    .table-wrap table {
         min-width: 450px;
     }
 
 }
 
-/* =========================================
+
+/* =========================================================
    RESPONSIVE DESIGN - SMALL MOBILE
-========================================= */
+========================================================= */
 
 @media (max-width: 480px) {
-
-    h1 {
-        font-size: 23px;
-    }
-
-    .record-info-grid.three-columns {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .record-info-grid.two-columns {
-        grid-template-columns: 1fr;
-    }
 
     .date-list {
         grid-template-columns: 1fr;
@@ -837,122 +749,6 @@ footer {
         padding: 10px;
     }
 
-    .error-card {
-        padding: 13px;
-    }
-
-    .my-response form button {
-        width: 100%;
-    }
-
-}
-
-
-
-/* =========================================
-   COMPACT RUNNING ERROR RECORDS
-========================================= */
-
-.error-layout {
-    grid-template-columns: 210px minmax(0, 1fr);
-    gap: 14px;
-}
-
-.date-sidebar {
-    padding: 12px;
-}
-
-.date-sidebar h2 {
-    font-size: 16px;
-}
-
-.date-select-button {
-    padding: 8px 10px;
-    gap: 3px;
-}
-
-.date-select-button span {
-    font-size: 12px;
-}
-
-.error-card {
-    padding: 14px;
-    margin: 10px 0;
-}
-
-.record-pro {
-    font-size: 16px;
-    margin-bottom: 10px;
-}
-
-.record-info-grid {
-    gap: 10px;
-    padding: 9px 0;
-}
-
-.record-info-grid small {
-    font-size: 10px;
-    margin-bottom: 3px;
-}
-
-.record-info-grid strong {
-    font-size: 12px;
-}
-
-.record-error-details {
-    padding: 10px 0;
-}
-
-.record-error-details p {
-    padding: 9px;
-    font-size: 12px;
-    line-height: 1.45;
-}
-
-.my-response {
-    margin-top: 12px;
-}
-
-.my-response h3 {
-    font-size: 14px;
-    margin-bottom: 10px;
-}
-
-.my-response form {
-    gap: 10px;
-}
-
-.my-response input,
-.my-response select,
-.my-response textarea {
-    padding: 8px;
-    font-size: 12px;
-}
-
-.my-response textarea {
-    min-height: 65px;
-}
-
-.my-response form button {
-    padding: 8px 13px;
-    font-size: 12px;
-}
-
-/* =========================================
-   COMPACT MOBILE LAYOUT
-========================================= */
-
-@media (max-width: 750px) {
-    .error-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .error-card {
-        padding: 12px;
-    }
-}
-
-@media (max-width: 480px) {
     .record-info-grid.three-columns {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -960,29 +756,17 @@ footer {
     .record-info-grid.two-columns {
         grid-template-columns: 1fr;
     }
+
+    .error-card {
+        padding: 11px;
+    }
+
+    .my-response form button {
+        width: 100%;
+    }
+
+    .external-summary-values {
+        grid-template-columns: 1fr;
+    }
+
 }
-
-/* FINAL COMPACT ADJUSTMENTS */
-
-.error-card {
-    padding: 12px;
-    margin: 8px 0;
-}
-
-.record-info-grid {
-    padding: 7px 0;
-    gap: 8px;
-}
-
-.record-error-details {
-    padding: 8px 0;
-}
-
-.my-response {
-    margin-top: 10px;
-}
-
-.my-response form {
-    gap: 8px;
-}
-
