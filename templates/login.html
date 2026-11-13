@@ -55,16 +55,6 @@ Login | Billers Running Error & Accuracy System
         width: 100%;
         margin-top: 8px;
         padding: 12px;
-        background: #15966d;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        font-weight: bold;
-        cursor: pointer;
-    }
-
-    .login-button:hover {
-        background: #107b59;
     }
 
     .login-footer {
@@ -73,8 +63,19 @@ Login | Billers Running Error & Accuracy System
         color: #98a2b3;
         margin-top: 22px;
     }
+
+    @media (max-width: 480px) {
+        .login-card {
+            padding: 24px 20px;
+        }
+
+        .login-title {
+            font-size: 22px;
+        }
+    }
 </style>
 {% endblock %}
+
 
 {% block content %}
 
@@ -82,11 +83,14 @@ Login | Billers Running Error & Accuracy System
 
     <div class="login-card">
 
-        <h1 class="login-title">Welcome Back</h1>
+        <h1 class="login-title">
+            Welcome Back
+        </h1>
 
         <p class="login-subtitle">
             Sign in to your account
         </p>
+
 
         <form method="POST" action="{{ url_for('login') }}">
 
@@ -96,8 +100,14 @@ Login | Billers Running Error & Accuracy System
                 value="{{ session.get('csrf', '') }}"
             >
 
+
+            <!-- USERNAME -->
+
             <div class="form-group">
-                <label for="username">USERNAME</label>
+
+                <label for="username">
+                    USERNAME
+                </label>
 
                 <input
                     type="text"
@@ -105,13 +115,22 @@ Login | Billers Running Error & Accuracy System
                     name="username"
                     placeholder="Enter your username"
                     autocomplete="username"
+                    autocapitalize="none"
+                    spellcheck="false"
                     required
                     autofocus
                 >
+
             </div>
 
+
+            <!-- PASSWORD -->
+
             <div class="form-group">
-                <label for="password">PASSWORD</label>
+
+                <label for="password">
+                    PASSWORD
+                </label>
 
                 <input
                     type="password"
@@ -121,13 +140,21 @@ Login | Billers Running Error & Accuracy System
                     autocomplete="current-password"
                     required
                 >
+
             </div>
 
-            <button type="submit" class="login-button">
+
+            <!-- LOGIN BUTTON -->
+
+            <button
+                type="submit"
+                class="login-button"
+            >
                 LOGIN
             </button>
 
         </form>
+
 
         <div class="login-footer">
             Billers Running Error & Accuracy System
