@@ -382,7 +382,7 @@
 
                 {% for account in accounts %}
 
-                <tr>
+                <tr id="account-{{ account['id'] }}">
 
                     <!-- NAME -->
 
@@ -673,7 +673,7 @@
     const userId = button.dataset.userId;
     const displayName = button.dataset.displayName;
 
-    const assignedProjectIds = button.dataset.projectIds
+    const assignedProjectIds = (button.dataset.projectIds || "")
         .split(",")
         .filter(Boolean);
 
@@ -681,6 +681,11 @@
     const form = document.getElementById("project-update-form");
     const label = document.getElementById("editing-account");
     const projectOptions = document.getElementById("edit-project-ids");
+
+    if (!editor || !form || !label || !projectOptions) {
+        console.error("Project editor elements not found.");
+        return;
+    }
 
     form.action = "/admin/account/" +
         encodeURIComponent(userId) +
@@ -694,22 +699,11 @@
 
     editor.style.display = "block";
 
-    window.scrollTo(0, editor.offsetTop - 100);
-
+    window.scrollTo({
+        top: editor.getBoundingClientRect().top + window.scrollY - 100,
+        behavior: "auto"
+    });
 }
-
-        // Display the editor.
-
-        editor.style.display = "block";
-
-
-        editor.scrollIntoView({
-            behavior: "auto",
-            block: "start"
-        });
-
-    }
-
 
     // =====================================================
     // CLOSE PROJECT EDITOR
