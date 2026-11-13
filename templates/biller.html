@@ -1,14 +1,170 @@
-{% extends "base.html" %}{% block content %}<h1>My Biller Dashboard</h1><p class="muted">Assigned username: <b>{{ session.username }}</b>. Original audit information is view-only.</p>
-<div class="stats"><div class="stat"><small>My Running Errors</small><b>{{ response_counts.total or 0 }}</b></div><div class="stat"><small>Verified (Y)</small><b>{{ response_counts.yes_count or 0 }}</b></div><div class="stat"><small>Disputed (N)</small><b>{{ response_counts.no_count or 0 }}</b></div><div class="stat"><small>Pending</small><b>{{ (response_counts.total or 0)-(response_counts.yes_count or 0)-(response_counts.no_count or 0) }}</b></div></div>
-<section class="card"><h2>Latest accuracy</h2><div class="accuracy-grid">
-{% for key,label in [('INTERNAL','INTERNAL · ACCURACY'),('EXTERNAL','EXTERNAL · PER AUDITED ACCURACY'),('EXTERNAL_WOC','EXTERNAL · PER AUDITED ACCURACY - WOC')] %}
-<div class="accuracy"><small>{{ label }}</small>{% set a = latest.get((key.split('_')[0], 'ACCURACY' if key=='INTERNAL' else ('PER AUDITED ACCURACY' if key=='EXTERNAL' else 'PER AUDITED ACCURACY - WOC'))) %}
-<strong>{% if a and a.accuracy_value is not none %}{{ '%.2f'|format(a.accuracy_value) }}%{% else %}—{% endif %}</strong>
-<span class="muted">{{ a.weekly if a else 'No imported data' }}{% if a and a.record_date %} · {{ a.record_date }}{% endif %}</span></div>{% endfor %}</div>
-<h3>Accuracy history</h3><div class="tablewrap"><table><thead><tr><th>Sheet</th><th>Week</th><th>Date</th><th>Accuracy type</th><th>Accuracy</th><th>Audited</th><th>Error</th></tr></thead><tbody>{% for a in accuracy %}<tr><td>{{ a.sheet }}</td><td>{{ a.weekly }}</td><td>{{ a.record_date }}</td><td>{{ a.accuracy_type }}</td><td>{% if a.accuracy_value is not none %}{{ '%.2f'|format(a.accuracy_value) }}%{% endif %}</td><td>{{ a.audited }}</td><td>{{ a.errors }}</td></tr>{% else %}<tr><td colspan="7">No accuracy records found for this username.</td></tr>{% endfor %}</tbody></table></div></section>
-<section class="card"><h2>My running error records</h2><p class="muted">You can only edit VERIFIED ERROR, BILLER COMMENT, QC EXPLANATION, and QC NAME. Text fields have no application character limit.</p>
-{% for e in errors %}<article class="error-card" id="record-{{ e.record_key }}"><div class="error-head"><b>PRO# {{ e.pro }}</b><span>{{ e.billed_date }} · {{ e.week or 'Week not matched' }}</span></div>
-<div class="readonly-grid"><div><small>Source of Error</small>{{ e.source }}</div><div><small>User</small>{{ e.username }}</div><div><small>ZB Field</small>{{ e.zb_field }}</div><div><small>Auditor</small>{{ e.auditor }}</div><div><small>Audit Type</small>{{ e.audit_type }}</div><div><small>Biller Name</small>{{ e.biller_name }}</div><div class="wide"><small>Error Details</small>{{ e.error_details }}</div></div>
-<form method="post" action="{{ url_for('save_response',record_key=e.record_key) }}"><input type="hidden" name="csrf" value="{{ csrf }}"><div class="response-grid">
-<label>VERIFIED ERROR<select name="verified_error"><option value="" {% if not e.verified_error %}selected{% endif %}>Pending</option><option value="Y" {% if e.verified_error=='Y' %}selected{% endif %}>Y</option><option value="N" {% if e.verified_error=='N' %}selected{% endif %}>N</option></select></label>
-<label>BILLER COMMENT<textarea name="biller_comment" rows="3">{{ e.biller_comment or '' }}</textarea></label><label>QC EXPLANATION<textarea name="qc_explanation" rows="3">{{ e.qc_explanation or '' }}</textarea></label><label>QC NAME<input name="qc_name" value="{{ e.qc_name or '' }}"></label></div><button>Save response</button>{% if e.updated_at %}<span class="muted small">Last saved: {{ e.updated_at }}</span>{% endif %}</form></article>{% else %}<p>No running error records assigned to your username yet.</p>{% endfor %}</section>{% endblock %}
+
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1>My Biller Dashboard</h1>
+
+<p class="muted">
+    Assigned username: <b>{{ session.username }}</b>.
+    Original audit information is view-only.
+</p>
+
+<!-- RESPONSE SUMMARY -->
+<div class="stats">
+    <div class="stat">
+        <small>My Running Errors</small>
+        <b>{{ response_counts.total or 0 }}</b>
+    </div>
+
+    <div class="stat">
+        <small>Verified (Y)</small>
+        <b>{{ response_counts.yes_count or 0 }}</b>
+    </div>
+
+    <div class="stat">
+        <small>Disputed (N)</small>
+        <b>{{ response_counts.no_count or 0 }}</b>
+    </div>
+
+    <div class="stat">
+        <small>Pending</small>
+        <b>
+            {{ (response_counts.total or 0)
+               - (response_counts.yes_count or 0)
+               - (response_counts.no_count or 0) }}
+        </b>
+    </div>
+</div>
+
+
+<!-- MONTHLY ACCURACY SUMMARY -->
+<section class="card">
+
+    <h2>Monthly Accuracy Summary</h2>
+
+    <p class="muted">
+        Select a month and year to view your monthly accuracy.
+    </p>
+
+    <form method="get" action="{{ url_for('biller_dashboard') }}"
+          class="filter-form">
+
+        <label>
+            Month
+            <select name="month">
+                {% for m in month_options %}
+                    <option value="{{ m }}"
+                        {% if selected_month == m %}selected{% endif %}>
+                        {{ m }}
+                    </option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label>
+            Year
+            <select name="year">
+                {% for y in year_options %}
+                    <option value="{{ y }}"
+                        {% if selected_year == y %}selected{% endif %}>
+                        {{ y }}
+                    </option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <button type="submit">View Summary</button>
+    </form>
+
+
+    <!-- INTERNAL AND EXTERNAL SUMMARY CARDS -->
+    <div class="accuracy-grid">
+
+        <!-- INTERNAL -->
+        <div class="accuracy">
+            <small>INTERNAL</small>
+
+            <strong>
+                {% if monthly_internal is not none %}
+                    {{ '%.2f'|format(monthly_internal) }}%
+                {% else %}
+                    —
+                {% endif %}
+            </strong>
+
+            <span class="muted">Monthly Accuracy</span>
+        </div>
+
+
+        <!-- EXTERNAL -->
+        <div class="accuracy">
+            <small>EXTERNAL</small>
+
+            <div class="external-summary-values">
+
+                <div>
+                    <strong>
+                        {% if monthly_wc is not none %}
+                            {{ '%.2f'|format(monthly_wc) }}%
+                        {% else %}
+                            —
+                        {% endif %}
+                    </strong>
+                    <span class="muted">WC</span>
+                </div>
+
+                <div>
+                    <strong>
+                        {% if monthly_woc is not none %}
+                            {{ '%.2f'|format(monthly_woc) }}%
+                        {% else %}
+                            —
+                        {% endif %}
+                    </strong>
+                    <span class="muted">WOC</span>
+                </div>
+
+            </div>
+
+            <span class="muted">Monthly Accuracy</span>
+        </div>
+
+    </div>
+
+
+    <!-- ACCURACY DETAIL BUTTONS -->
+    <div class="accuracy-actions">
+
+        <a href="{{ url_for('internal_accuracy') }}"
+           class="btn">
+            INTERNAL
+        </a>
+
+        <a href="{{ url_for('external_accuracy') }}"
+           class="btn">
+            EXTERNAL
+        </a>
+
+    </div>
+
+</section>
+
+
+<!-- ERROR RECORDS LINK -->
+<section class="card">
+
+    <h2>Running Error Records</h2>
+
+    <p class="muted">
+        View and update your assigned running error records.
+        Original audit information remains view-only.
+    </p>
+
+    <a href="{{ url_for('biller_errors') }}" class="btn">
+        View Error Records
+    </a>
+
+</section>
+
+{% endblock %}
