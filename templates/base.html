@@ -1,105 +1,313 @@
-
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Billers Running Error / Accuracy</title>
+    <title>{% block title %}Billers Running Error & Accuracy System{% endblock %}</title>
 
-    <link rel="stylesheet"
-          href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        :root {
+            font-family: Arial, sans-serif;
+            color: #172033;
+            background: #f4f7fb;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+        }
+
+        header {
+            background: #172033;
+            color: white;
+            padding: 16px 24px;
+        }
+
+        .header-inner {
+            max-width: 1500px;
+            margin: auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .brand {
+            font-size: 19px;
+            font-weight: bold;
+        }
+
+        .user-info {
+            font-size: 13px;
+            color: #d7deea;
+        }
+
+        nav {
+            background: white;
+            border-bottom: 1px solid #dce3ed;
+            padding: 0 24px;
+        }
+
+        .nav-inner {
+            max-width: 1500px;
+            margin: auto;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        nav a {
+            display: inline-block;
+            padding: 15px 13px;
+            text-decoration: none;
+            color: #344054;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        nav a:hover {
+            color: #15966d;
+        }
+
+        nav a.active {
+            color: #15966d;
+            border-bottom: 3px solid #43c59e;
+        }
+
+        main {
+            max-width: 1500px;
+            margin: 25px auto;
+            padding: 0 24px;
+        }
+
+        .flash {
+            padding: 12px 15px;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .flash.success {
+            background: #e8f8f0;
+            color: #176b45;
+        }
+
+        .flash.error {
+            background: #fdecec;
+            color: #a52828;
+        }
+
+        .flash.info {
+            background: #eaf2ff;
+            color: #2456a6;
+        }
+
+        .page-title {
+            margin: 0 0 20px;
+            font-size: 24px;
+        }
+
+        .card {
+            background: white;
+            border: 1px solid #e0e6ef;
+            border-radius: 9px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        input,
+        select,
+        textarea,
+        button {
+            font: inherit;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            background: white;
+            color: #172033;
+        }
+
+        button,
+        .btn {
+            display: inline-block;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            background: #15966d;
+            color: white;
+            text-decoration: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover,
+        .btn:hover {
+            background: #107b59;
+        }
+
+        .btn-secondary {
+            background: #475467;
+        }
+
+        .btn-danger {
+            background: #c0392b;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        th,
+        td {
+            padding: 11px 12px;
+            border-bottom: 1px solid #e6ebf2;
+            text-align: left;
+            font-size: 13px;
+            vertical-align: top;
+        }
+
+        th {
+            background: #f1f5f9;
+            color: #344054;
+            white-space: nowrap;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        footer {
+            max-width: 1500px;
+            margin: 35px auto 0;
+            padding: 20px 24px;
+            color: #667085;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        @media (max-width: 700px) {
+            header {
+                padding: 14px;
+            }
+
+            nav {
+                padding: 0 10px;
+            }
+
+            main {
+                padding: 0 12px;
+            }
+
+            nav a {
+                padding: 12px 8px;
+                font-size: 11px;
+            }
+        }
+    </style>
+
+    {% block head %}{% endblock %}
 </head>
 
 <body>
 
-    <header>
-
+<header>
+    <div class="header-inner">
         <div class="brand">
-            Billers Running Error
-            <span>/ Accuracy</span>
+            Billers Running Error & Accuracy System
         </div>
 
-        {% if session.get('user_id') %}
+        {% if session.get("username") %}
+        <div class="user-info">
+            {{ session.get("display_name", session.get("username")) }}
+            |
+            {{ session.get("role", "").upper() }}
+        </div>
+        {% endif %}
+    </div>
+</header>
 
-            <nav>
+{% if session.get("username") %}
+<nav>
+    <div class="nav-inner">
 
-                <span>
-                    {{ session.get('display_name') }}
-                    ·
-                    {{ session.get('role')|upper }}
-                </span>
+        {% if session.get("role") == "admin" %}
 
-                <!-- BILLER NAVIGATION -->
-                {% if session.get('role')|lower == 'biller' %}
+            <a href="{{ url_for('admin_dashboard') }}"
+               class="{% if request.endpoint == 'admin_dashboard' %}active{% endif %}">
+                DASHBOARD
+            </a>
 
-                    <a href="{{ url_for('biller_dashboard') }}">
-                        Dashboard
-                    </a>
+            <a href="{{ url_for('admin_accounts') }}"
+               class="{% if request.endpoint == 'admin_accounts' %}active{% endif %}">
+                ACCOUNT
+            </a>
 
-                    <a href="{{ url_for('biller_internal_accuracy') }}">
-                        INTERNAL
-                    </a>
+            <a href="{{ url_for('admin_projects') }}"
+               class="{% if request.endpoint == 'admin_projects' %}active{% endif %}">
+                PROJECT
+            </a>
 
-                    <a href="{{ url_for('biller_external_accuracy') }}">
-                        EXTERNAL
-                    </a>
+            <a href="{{ url_for('admin_accuracy') }}"
+               class="{% if request.endpoint == 'admin_accuracy' %}active{% endif %}">
+                ACCURACY
+            </a>
 
-                    <a href="{{ url_for('biller_errors') }}">
-                        Error Records
-                    </a>
+            <a href="{{ url_for('admin_errors') }}"
+               class="{% if request.endpoint == 'admin_errors' %}active{% endif %}">
+                ERROR DETAILS
+            </a>
 
-                <!-- QC NAVIGATION -->
-                {% elif session.get('role')|lower == 'qc' %}
+        {% elif session.get("role") == "qc" %}
 
-                    <a href="{{ url_for('qc_errors') }}">
-                        QC Error Records
-                    </a>
+            <a href="{{ url_for('qc_dashboard') }}">ERROR DETAILS</a>
+            <a href="{{ url_for('qc_accuracy') }}">ACCURACY</a>
 
-                <!-- ADMIN NAVIGATION -->
-                {% elif session.get('role')|lower == 'admin' %}
+        {% elif session.get("role") == "biller" %}
 
-                    <a href="{{ url_for('index') }}">
-                        Dashboard
-                    </a>
-
-                {% endif %}
-
-                <a href="{{ url_for('logout') }}">
-                    Logout
-                </a>
-
-            </nav>
+            <a href="{{ url_for('biller_dashboard') }}">MY ERROR RECORDS</a>
 
         {% endif %}
 
-    </header>
+        <a href="{{ url_for('logout') }}">LOGOUT</a>
 
+    </div>
+</nav>
+{% endif %}
 
-    <main>
+<main>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
             {% for category, message in messages %}
-
                 <div class="flash {{ category }}">
                     {{ message }}
                 </div>
-
             {% endfor %}
+        {% endif %}
+    {% endwith %}
 
-        {% endwith %}
+    {% block content %}{% endblock %}
 
-        {% block content %}{% endblock %}
+</main>
 
-    </main>
+<footer>
+    Billers Running Error & Accuracy System
+</footer>
 
-
-    <footer>
-        Internal QC tool · Source data is read-only for Billers
-    </footer>
+{% block scripts %}{% endblock %}
 
 </body>
-
 </html>
