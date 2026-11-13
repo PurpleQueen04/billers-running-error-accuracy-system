@@ -12,6 +12,7 @@
 
 <!-- RESPONSE SUMMARY -->
 <div class="stats">
+
     <div class="stat">
         <small>My Running Errors</small>
         <b>{{ response_counts.total or 0 }}</b>
@@ -35,6 +36,7 @@
                - (response_counts.no_count or 0) }}
         </b>
     </div>
+
 </div>
 
 
@@ -47,87 +49,76 @@
         Select a month and year to view your monthly accuracy.
     </p>
 
-    <form method="get" action="{{ url_for('biller_dashboard') }}"
+    <form method="get"
+          action="{{ url_for('biller_dashboard') }}"
           class="filter-form">
 
         <label>
-            Month
-            <select name="month">
-                {% for m in month_options %}
+            Month / Year
+
+            <select name="month" onchange="this.form.submit()">
+
+                {% for m in months %}
                     <option value="{{ m }}"
                         {% if selected_month == m %}selected{% endif %}>
                         {{ m }}
                     </option>
                 {% endfor %}
+
             </select>
         </label>
 
-        <label>
-            Year
-            <select name="year">
-                {% for y in year_options %}
-                    <option value="{{ y }}"
-                        {% if selected_year == y %}selected{% endif %}>
-                        {{ y }}
-                    </option>
-                {% endfor %}
-            </select>
-        </label>
-
-        <button type="submit">View Summary</button>
     </form>
 
 
-    <!-- INTERNAL AND EXTERNAL SUMMARY CARDS -->
+    <!-- ACCURACY SUMMARY CARDS -->
     <div class="accuracy-grid">
 
         <!-- INTERNAL -->
         <div class="accuracy">
+
             <small>INTERNAL</small>
 
             <strong>
-                {% if monthly_internal is not none %}
-                    {{ '%.2f'|format(monthly_internal) }}%
-                {% else %}
-                    —
-                {% endif %}
+                {{ format_accuracy(internal_summary.accuracy) }}
             </strong>
 
-            <span class="muted">Monthly Accuracy</span>
+            <span class="muted">
+                Monthly Accuracy
+            </span>
+
         </div>
 
 
         <!-- EXTERNAL -->
         <div class="accuracy">
+
             <small>EXTERNAL</small>
 
             <div class="external-summary-values">
 
                 <div>
                     <strong>
-                        {% if monthly_wc is not none %}
-                            {{ '%.2f'|format(monthly_wc) }}%
-                        {% else %}
-                            —
-                        {% endif %}
+                        {{ format_accuracy(external_wc_summary.accuracy) }}
                     </strong>
+
                     <span class="muted">WC</span>
                 </div>
 
                 <div>
                     <strong>
-                        {% if monthly_woc is not none %}
-                            {{ '%.2f'|format(monthly_woc) }}%
-                        {% else %}
-                            —
-                        {% endif %}
+                        {{ format_accuracy(external_woc_summary.accuracy) }}
                     </strong>
+
                     <span class="muted">WOC</span>
                 </div>
 
             </div>
 
-            <span class="muted">Monthly Accuracy</span>
+            <span class="muted">
+                Monthly Accuracy
+            </span>
+
         </div>
 
     </div>
@@ -136,12 +127,12 @@
     <!-- ACCURACY DETAIL BUTTONS -->
     <div class="accuracy-actions">
 
-        <a href="{{ url_for('internal_accuracy') }}"
+        <a href="{{ url_for('biller_internal_accuracy', month=selected_month) }}"
            class="btn">
             INTERNAL
         </a>
 
-        <a href="{{ url_for('external_accuracy') }}"
+        <a href="{{ url_for('biller_external_accuracy', month=selected_month) }}"
            class="btn">
             EXTERNAL
         </a>
@@ -151,7 +142,7 @@
 </section>
 
 
-<!-- ERROR RECORDS LINK -->
+<!-- ERROR RECORDS -->
 <section class="card">
 
     <h2>Running Error Records</h2>
