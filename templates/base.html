@@ -5,499 +5,334 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>{% block title %}Billers Running Error & Accuracy System{% endblock %}</title>
+    <title>{% block title %}Dashboard{% endblock %} | Billers Running Error</title>
 
-    <link
-        rel="stylesheet"
-        href="{{ url_for('static', filename='style.css') }}"
-    >
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
 
-    <style>
-        :root {
-            font-family: Arial, sans-serif;
-            color: #172033;
-            background: #f4f7fb;
-        }
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            min-height: 100vh;
-        }
-
-        /* HEADER */
-
-        header {
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            background: #172033;
-            color: white;
-            padding: 16px 24px;
-        }
-
-        .header-inner {
-            max-width: 1500px;
-            margin: auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 16px;
-            flex-wrap: wrap;
-        }
-
-        .brand {
-            font-size: 19px;
-            font-weight: bold;
-        }
-
-        .user-info {
-            font-size: 13px;
-            color: #d7deea;
-        }
-
-        /* NAVIGATION */
-
-        nav {
-            position: sticky;
-            top: 66px;
-            z-index: 999;
-            background: white;
-            border-bottom: 1px solid #dce3ed;
-            padding: 0 24px;
-        }
-
-        .nav-inner {
-            max-width: 1500px;
-            margin: auto;
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-
-        nav a {
-            display: inline-block;
-            padding: 15px 13px;
-            text-decoration: none;
-            color: #344054;
-            font-size: 12px;
-            font-weight: bold;
-            border-bottom: 3px solid transparent;
-        }
-
-        nav a:hover {
-            color: #15966d;
-        }
-
-        nav a.active {
-            color: #15966d;
-            border-bottom-color: #43c59e;
-        }
-
-        /* LOGOUT BUTTON */
-
-        .logout-button {
-            display: inline-block;
-            padding: 15px 13px;
-            border: none;
-            border-bottom: 3px solid transparent;
-            border-radius: 0;
-            background: transparent;
-            color: #344054;
-            font-size: 12px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        .logout-button:hover {
-            background: transparent;
-            color: #c0392b;
-        }
-
-        .logout-button:focus-visible {
-            outline: 2px solid #43c59e;
-            outline-offset: 3px;
-        }
-
-        /* MAIN CONTENT */
-
-        main {
-            max-width: 1500px;
-            min-height: 65vh;
-            margin: 25px auto;
-            padding: 0 24px;
-        }
-
-        /* FLASH MESSAGES */
-
-        .flash {
-            padding: 12px 15px;
-            margin-bottom: 15px;
-            border-radius: 6px;
-            font-size: 14px;
-        }
-
-        .flash.success {
-            background: #e8f8f0;
-            color: #176b45;
-        }
-
-        .flash.error {
-            background: #fdecec;
-            color: #a52828;
-        }
-
-        .flash.info {
-            background: #eaf2ff;
-            color: #2456a6;
-        }
-
-        .flash.warning {
-            background: #fff4df;
-            color: #8a5700;
-        }
-
-        /* COMMON ELEMENTS */
-
-        .page-title {
-            margin: 0 0 20px;
-            font-size: 24px;
-        }
-
-        .card {
-            background: white;
-            border: 1px solid #e0e6ef;
-            border-radius: 9px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        input,
-        select,
-        textarea,
-        button {
-            font: inherit;
-        }
-
-        input,
-        select,
-        textarea {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            background: white;
-            color: #172033;
-        }
-
-        input:focus,
-        select:focus,
-        textarea:focus {
-            outline: 2px solid #43c59e;
-            outline-offset: 1px;
-            border-color: #15966d;
-        }
-
-        textarea {
-            resize: vertical;
-            min-height: 90px;
-        }
-
-        button,
-        .btn {
-            display: inline-block;
-            padding: 10px 16px;
-            border: none;
-            border-radius: 6px;
-            background: #15966d;
-            color: white;
-            text-decoration: none;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 13px;
-        }
-
-        button:hover,
-        .btn:hover {
-            background: #107b59;
-        }
-
-        button:focus-visible,
-        .btn:focus-visible,
-        nav a:focus-visible {
-            outline: 2px solid #43c59e;
-            outline-offset: 3px;
-        }
-
-        .btn-secondary,
-        .btn.secondary {
-            background: #475467;
-        }
-
-        .btn-secondary:hover,
-        .btn.secondary:hover {
-            background: #344054;
-        }
-
-        .btn-danger {
-            background: #c0392b;
-        }
-
-        .btn-danger:hover {
-            background: #962d22;
-        }
-
-        /* TABLES */
-
-        .table-wrap {
-            width: 100%;
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-        }
-
-        th,
-        td {
-            padding: 11px 12px;
-            border-bottom: 1px solid #e6ebf2;
-            text-align: left;
-            font-size: 13px;
-            vertical-align: top;
-        }
-
-        th {
-            background: #f1f5f9;
-            color: #344054;
-            white-space: nowrap;
-        }
-
-        /* FOOTER */
-
-        footer {
-            max-width: 1500px;
-            margin: 35px auto 0;
-            padding: 20px 24px;
-            color: #667085;
-            font-size: 12px;
-            text-align: center;
-        }
-
-        /* MOBILE */
-
-        @media (max-width: 700px) {
-            header {
-                padding: 14px;
-            }
-
-            .brand {
-                font-size: 16px;
-            }
-
-            nav {
-                padding: 0 10px;
-            }
-
-            .nav-inner {
-                gap: 2px;
-            }
-
-            nav a {
-                padding: 12px 8px;
-                font-size: 10px;
-            }
-
-            .logout-button {
-                padding: 12px 8px;
-                font-size: 10px;
-            }
-
-            main {
-                padding: 0 12px;
-            }
-
-            .card {
-                padding: 15px;
-            }
-
-            th,
-            td {
-                padding: 9px;
-                font-size: 12px;
-            }
-        }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+          rel="stylesheet">
 
     {% block head %}{% endblock %}
 </head>
 
 <body>
 
-{% set role = session.get("role", "")|lower %}
+{% set current_role = session.get('role', '')|lower %}
+{% set display_name = session.get('full_name') or session.get('username') or 'User' %}
 
-<!-- =====================================================
-     HEADER
-====================================================== -->
+<div class="app-layout">
 
-<header>
-    <div class="header-inner">
+    <!-- =================================================
+         SIDEBAR
+    ================================================== -->
 
-        <div class="brand">
-            Billers Running Error & Accuracy System
+    <aside class="sidebar" id="sidebar">
+
+        <!-- BRAND -->
+
+        <div class="sidebar-brand">
+
+            <div class="brand-icon">
+                <svg viewBox="0 0 24 24"
+                     fill="none"
+                     stroke="currentColor"
+                     stroke-width="2"
+                     stroke-linecap="round"
+                     stroke-linejoin="round">
+                    <path d="M3 3v18h18"/>
+                    <path d="m19 9-5 5-4-4-5 5"/>
+                </svg>
+            </div>
+
+            <div class="brand-text">
+                <div class="brand-name">BILLERS RUNNING ERROR</div>
+                <div class="brand-subtitle">ERROR & ACCURACY SYSTEM</div>
+            </div>
+
         </div>
 
-        {% if session.get("username") %}
-        <div class="user-info">
-            {{ session.get("display_name", session.get("username")) }}
-            |
-            {{ role.upper() }}
-        </div>
-        {% endif %}
 
-    </div>
-</header>
+        <!-- NAVIGATION -->
 
+        <nav class="sidebar-nav">
 
-<!-- =====================================================
-     NAVIGATION
-====================================================== -->
+            {% if current_role == 'admin' %}
 
-{% if session.get("username") %}
+                <div class="nav-section-label">MAIN MENU</div>
 
-<nav>
-    <div class="nav-inner">
+                <a href="/admin"
+                   class="nav-link {% if request.path == '/admin' %}active{% endif %}">
+                    <span class="nav-icon">▦</span>
+                    <span>Dashboard</span>
+                </a>
 
-        {% if role == "admin" %}
+                <a href="/admin/projects"
+                   class="nav-link {% if '/projects' in request.path %}active{% endif %}">
+                    <span class="nav-icon">▣</span>
+                    <span>Projects</span>
+                </a>
 
-            <a
-                href="{{ url_for('admin_dashboard') }}"
-                class="{% if request.endpoint == 'admin_dashboard' %}active{% endif %}"
-            >
-                DASHBOARD
-            </a>
+                <a href="/admin/accounts"
+                   class="nav-link {% if '/accounts' in request.path %}active{% endif %}">
+                    <span class="nav-icon">♙</span>
+                    <span>Accounts</span>
+                </a>
 
-            <a
-                href="{{ url_for('admin_accounts') }}"
-                class="{% if request.endpoint == 'admin_accounts' %}active{% endif %}"
-            >
-                ACCOUNT
-            </a>
+                <div class="nav-section-label">MONITORING</div>
 
-            <a
-                href="{{ url_for('admin_projects') }}"
-                class="{% if request.endpoint == 'admin_projects' %}active{% endif %}"
-            >
-                PROJECT
-            </a>
+                <a href="/admin/errors"
+                   class="nav-link {% if '/errors' in request.path %}active{% endif %}">
+                    <span class="nav-icon">⚑</span>
+                    <span>Error Records</span>
+                </a>
 
-            <a
-                href="{{ url_for('admin_accuracy') }}"
-                class="{% if request.endpoint == 'admin_accuracy' %}active{% endif %}"
-            >
-                ACCURACY
-            </a>
+                <a href="/admin/accuracy"
+                   class="nav-link {% if '/accuracy' in request.path %}active{% endif %}">
+                    <span class="nav-icon">↗</span>
+                    <span>Accuracy Monitoring</span>
+                </a>
 
-            <a
-                href="{{ url_for('admin_error_details') }}"
-                class="{% if request.endpoint == 'admin_error_details' %}active{% endif %}"
-            >
-                ERROR DETAILS
-            </a>
+                <div class="nav-section-label">SYSTEM</div>
 
-        {% elif role == "qc" %}
+                <a href="/admin/import-history"
+                   class="nav-link {% if '/import-history' in request.path %}active{% endif %}">
+                    <span class="nav-icon">⇧</span>
+                    <span>Import History</span>
+                </a>
 
-            <a
-                href="{{ url_for('qc_dashboard') }}"
-                class="{% if request.endpoint == 'qc_dashboard' %}active{% endif %}"
-            >
-                ERROR DETAILS
-            </a>
-
-            <a
-                href="{{ url_for('qc_accuracy') }}"
-                class="{% if request.endpoint == 'qc_accuracy' %}active{% endif %}"
-            >
-                ACCURACY
-            </a>
-
-        {% elif role == "biller" %}
-
-            <a
-                href="{{ url_for('biller_dashboard') }}"
-                class="{% if request.endpoint == 'biller_dashboard' %}active{% endif %}"
-            >
-                MY ERROR RECORDS
-            </a>
-
-        {% endif %}
-
-        <form
-            method="POST"
-            action="{{ url_for('logout') }}"
-            style="display:inline; margin:0;"
-        >
-            <input
-                type="hidden"
-                name="csrf"
-                value="{{ session.get('csrf', '') }}"
-            >
-
-            <button
-                type="submit"
-                class="logout-button"
-            >
-                LOGOUT
-            </button>
-        </form>
-
-    </div>
-</nav>
-
-{% endif %}
+                <a href="/admin/activity-logs"
+                   class="nav-link {% if '/activity-logs' in request.path %}active{% endif %}">
+                    <span class="nav-icon">◷</span>
+                    <span>Activity Logs</span>
+                </a>
 
 
-<!-- =====================================================
-     MAIN CONTENT
-====================================================== -->
+            {% elif current_role == 'qc' %}
 
-<main>
+                <div class="nav-section-label">QC WORKSPACE</div>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
+                <a href="/qc"
+                   class="nav-link {% if request.path == '/qc' %}active{% endif %}">
+                    <span class="nav-icon">▦</span>
+                    <span>Dashboard</span>
+                </a>
 
-        {% if messages %}
+                <a href="/qc/projects"
+                   class="nav-link {% if '/projects' in request.path %}active{% endif %}">
+                    <span class="nav-icon">▣</span>
+                    <span>My Projects</span>
+                </a>
 
-            {% for category, message in messages %}
+                <div class="nav-section-label">MONITORING</div>
 
-                <div class="flash {{ category }}">
-                    {{ message }}
+                <a href="/qc/errors"
+                   class="nav-link {% if '/errors' in request.path %}active{% endif %}">
+                    <span class="nav-icon">⚑</span>
+                    <span>Error Verification</span>
+                </a>
+
+                <a href="/qc/accuracy"
+                   class="nav-link {% if '/accuracy' in request.path %}active{% endif %}">
+                    <span class="nav-icon">↗</span>
+                    <span>Accuracy Monitoring</span>
+                </a>
+
+                <a href="/qc/import-history"
+                   class="nav-link {% if '/import-history' in request.path %}active{% endif %}">
+                    <span class="nav-icon">⇧</span>
+                    <span>Import History</span>
+                </a>
+
+
+            {% elif current_role == 'biller' %}
+
+                <div class="nav-section-label">MY WORKSPACE</div>
+
+                <a href="/biller"
+                   class="nav-link {% if request.path == '/biller' %}active{% endif %}">
+                    <span class="nav-icon">▦</span>
+                    <span>My Dashboard</span>
+                </a>
+
+                <div class="nav-section-label">MY RECORDS</div>
+
+                <a href="/biller/errors"
+                   class="nav-link {% if '/errors' in request.path %}active{% endif %}">
+                    <span class="nav-icon">⚑</span>
+                    <span>My Error Records</span>
+                </a>
+
+                <a href="/biller/accuracy"
+                   class="nav-link {% if '/accuracy' in request.path %}active{% endif %}">
+                    <span class="nav-icon">↗</span>
+                    <span>My Accuracy</span>
+                </a>
+
+                <a href="/biller/responses"
+                   class="nav-link {% if '/responses' in request.path %}active{% endif %}">
+                    <span class="nav-icon">☷</span>
+                    <span>My Responses</span>
+                </a>
+
+            {% endif %}
+
+        </nav>
+
+
+        <!-- USER PROFILE / LOGOUT -->
+
+        <div class="sidebar-bottom">
+
+            <div class="sidebar-user">
+
+                <div class="user-avatar">
+                    {{ display_name[0]|upper }}
                 </div>
 
-            {% endfor %}
+                <div class="user-details">
+                    <div class="user-name">{{ display_name }}</div>
+                    <div class="user-role">{{ current_role|upper }}</div>
+                </div>
 
-        {% endif %}
+            </div>
 
-    {% endwith %}
+            <a href="/logout" class="logout-link">
+                <span class="nav-icon">⇥</span>
+                <span>Logout</span>
+            </a>
 
-    {% block content %}{% endblock %}
+        </div>
 
-</main>
+    </aside>
+
+
+    <!-- =================================================
+         MAIN CONTENT
+    ================================================== -->
+
+    <main class="main-area">
+
+        <!-- TOP HEADER -->
+
+        <header class="topbar">
+
+            <div class="topbar-left">
+
+                <button type="button"
+                        class="sidebar-toggle"
+                        id="sidebarToggle"
+                        aria-label="Toggle navigation">
+                    ☰
+                </button>
+
+                <div class="breadcrumb">
+                    <span>Workspace</span>
+                    <span class="breadcrumb-divider">/</span>
+                    <strong>{% block page_heading %}Dashboard{% endblock %}</strong>
+                </div>
+
+            </div>
+
+            <div class="topbar-right">
+
+                <div class="topbar-date">
+                    {{ now.strftime('%B %d, %Y') if now is defined else '' }}
+                </div>
+
+                <div class="topbar-profile">
+                    <div class="topbar-avatar">
+                        {{ display_name[0]|upper }}
+                    </div>
+                    <div class="topbar-profile-name">
+                        {{ display_name }}
+                    </div>
+                </div>
+
+            </div>
+
+        </header>
+
+
+        <!-- PAGE CONTENT -->
+
+        <section class="page-content">
+
+            <!-- FLASH MESSAGES -->
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-container">
+
+                        {% for category, message in messages %}
+
+                            <div class="flash-message flash-{{ category }}">
+                                <span>{{ message }}</span>
+                            </div>
+
+                        {% endfor %}
+
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+
+            <!-- MAIN PAGE BLOCK -->
+
+            {% block content %}{% endblock %}
+
+        </section>
+
+
+        <!-- FOOTER -->
+
+        <footer class="app-footer">
+            <span>BILLERS RUNNING ERROR & ACCURACY SYSTEM</span>
+            <span>Authorized Access Only</span>
+        </footer>
+
+    </main>
+
+</div>
 
 
 <!-- =====================================================
-     FOOTER
+     SIDEBAR MOBILE TOGGLE
 ====================================================== -->
 
-<footer>
-    Billers Running Error & Accuracy System
-</footer>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
 
+    const toggle = document.getElementById("sidebarToggle");
+    const sidebar = document.getElementById("sidebar");
+
+    if (toggle && sidebar) {
+
+        toggle.addEventListener("click", function () {
+            sidebar.classList.toggle("sidebar-open");
+        });
+
+    }
+
+    document.addEventListener("click", function (event) {
+
+        if (
+            window.innerWidth <= 900 &&
+            sidebar &&
+            toggle &&
+            !sidebar.contains(event.target) &&
+            !toggle.contains(event.target)
+        ) {
+            sidebar.classList.remove("sidebar-open");
+        }
+
+    });
+
+});
+</script>
 
 {% block scripts %}{% endblock %}
 
