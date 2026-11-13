@@ -1,21 +1,11 @@
 
 {% extends "base.html" %}
 
-{% block title %}
-Admin Dashboard | Billers Running Error & Accuracy System
-{% endblock %}
+{% block title %}Admin Dashboard | Billers Running Error & Accuracy System{% endblock %}
 
 {% block head %}
 <style>
-
-    /* DASHBOARD HEADER */
-
     .dashboard-heading {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 12px;
         margin-bottom: 22px;
     }
 
@@ -28,396 +18,250 @@ Admin Dashboard | Billers Running Error & Accuracy System
     .dashboard-heading p {
         color: #667085;
         font-size: 13px;
-        margin: 7px 0 0;
+        margin-top: 7px;
     }
 
-
-    /* STATISTICS */
-
-    .dashboard-grid {
+    .stats-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 16px;
         margin-bottom: 22px;
     }
 
     .stat-card {
-        background: white;
+        background: #fff;
         border: 1px solid #e0e6ef;
         border-radius: 9px;
         padding: 20px;
     }
 
-    .stat-label {
+    .stat-card h3 {
+        margin: 0;
         color: #667085;
         font-size: 12px;
-        font-weight: bold;
         text-transform: uppercase;
-        line-height: 1.5;
     }
 
     .stat-value {
-        font-size: 29px;
+        margin-top: 12px;
+        font-size: 30px;
         font-weight: bold;
-        margin-top: 10px;
         color: #172033;
-        overflow-wrap: anywhere;
     }
 
+    .stat-description {
+        margin-top: 6px;
+        color: #98a2b3;
+        font-size: 12px;
+    }
 
-    /* SECTIONS */
+    .dashboard-section {
+        margin-top: 22px;
+    }
 
     .section-title {
-        font-size: 17px;
         margin: 0 0 16px;
         color: #172033;
+        font-size: 17px;
     }
 
-    .section-description {
-        color: #667085;
-        font-size: 13px;
-        line-height: 1.6;
-        margin-bottom: 16px;
+    .table-wrap {
+        overflow-x: auto;
     }
 
-    .section-actions {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        margin-top: 15px;
+    .dashboard-table {
+        width: 100%;
+        min-width: 650px;
+        border-collapse: collapse;
     }
 
-
-    /* ACTION LINKS */
-
-    .action-link {
-        display: inline-block;
-        padding: 11px 17px;
-        border-radius: 6px;
-        background: #15966d;
-        color: white;
-        text-decoration: none;
+    .dashboard-table th,
+    .dashboard-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #eaecf0;
         font-size: 12px;
+    }
+
+    .dashboard-table th {
+        color: #475467;
+        background: #f8fafc;
         font-weight: bold;
     }
 
-    .action-link:hover {
-        background: #107b59;
+    .dashboard-table td {
+        color: #344054;
     }
 
-    .action-link.secondary {
-        background: #475467;
+    .empty-state {
+        text-align: center !important;
+        padding: 25px !important;
+        color: #667085 !important;
     }
 
-    .action-link.secondary:hover {
-        background: #344054;
+    .quick-links {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
     }
 
-
-    /* UPLOAD */
-
-    .upload-input {
+    .quick-link {
         display: block;
-        width: 100%;
-        padding: 12px;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
+        padding: 16px;
+        border: 1px solid #e0e6ef;
+        border-radius: 8px;
+        color: #172033;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: bold;
         background: #fff;
     }
 
-    .upload-button {
-        background: #15966d;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        padding: 11px 20px;
-        font-weight: bold;
-        cursor: pointer;
+    .quick-link:hover {
+        border-color: #43c59e;
+        background: #f6fffb;
     }
 
-    .upload-button:hover {
-        background: #107b59;
+    @media (max-width: 800px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .quick-links {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
     }
 
-    .upload-note {
-        color: #667085;
-        font-size: 12px;
-        margin-top: 10px;
-    }
-
-
-    /* TABLE */
-
-    .empty-state {
-        color: #667085;
-        text-align: center;
-        padding: 25px;
-    }
-
-    .history-table {
-        min-width: 650px;
-    }
-
-    .history-table td {
-        overflow-wrap: anywhere;
-    }
-
-
-    /* MOBILE */
-
-    @media (max-width: 600px) {
+    @media (max-width: 500px) {
+        .stats-grid,
+        .quick-links {
+            grid-template-columns: 1fr;
+        }
 
         .dashboard-heading h1 {
             font-size: 21px;
         }
-
-        .stat-value {
-            font-size: 25px;
-        }
-
-        .stat-card {
-            padding: 16px;
-        }
-
-        .action-link {
-            text-align: center;
-        }
-
     }
-
 </style>
 {% endblock %}
 
-
 {% block content %}
 
-<!-- =====================================================
-     DASHBOARD HEADER
-====================================================== -->
-
 <div class="dashboard-heading">
+    <h1>Admin Dashboard</h1>
+    <p>Overview of running error records, biller responses, and workbook imports.</p>
+</div>
 
-    <div>
-        <h1>Admin Dashboard</h1>
+<!-- DASHBOARD COUNTS -->
 
-        <p>
-            Running Errors and Accuracy Monitoring Overview
-        </p>
+<div class="stats-grid">
+
+    <div class="stat-card">
+        <h3>Total Error Records</h3>
+        <div class="stat-value">{{ counts.errors }}</div>
+        <div class="stat-description">All imported error records</div>
+    </div>
+
+    <div class="stat-card">
+        <h3>Active Billers</h3>
+        <div class="stat-value">{{ counts.billers }}</div>
+        <div class="stat-description">Currently active Biller accounts</div>
+    </div>
+
+    <div class="stat-card">
+        <h3>Verified Errors</h3>
+        <div class="stat-value">{{ counts.verified }}</div>
+        <div class="stat-description">Records marked VERIFIED ERROR = Y</div>
+    </div>
+
+    <div class="stat-card">
+        <h3>Disputed Errors</h3>
+        <div class="stat-value">{{ counts.disputed }}</div>
+        <div class="stat-description">Records marked VERIFIED ERROR = N</div>
+    </div>
+
+    <div class="stat-card">
+        <h3>Pending Responses</h3>
+        <div class="stat-value">{{ counts.pending }}</div>
+        <div class="stat-description">Records awaiting Biller response</div>
+    </div>
+
+    <div class="stat-card">
+        <h3>Total Imports</h3>
+        <div class="stat-value">{{ counts.imports }}</div>
+        <div class="stat-description">Workbook import history entries</div>
     </div>
 
 </div>
 
+<!-- QUICK LINKS -->
 
-<!-- =====================================================
-     DASHBOARD STATISTICS
-====================================================== -->
+<div class="card dashboard-section">
 
-<div class="dashboard-grid">
+    <h2 class="section-title">Quick Access</h2>
 
-    <div class="stat-card">
+    <div class="quick-links">
 
-        <div class="stat-label">
-            Upload Source of Workbook
-        </div>
+        <a href="{{ url_for('admin_accounts') }}" class="quick-link">
+            Manage Accounts
+        </a>
 
-        <div class="stat-value">
-            {{ counts.get('imports', 0) }}
-        </div>
+        <a href="{{ url_for('admin_projects') }}" class="quick-link">
+            Manage Projects
+        </a>
 
-    </div>
+        <a href="{{ url_for('admin_accuracy') }}" class="quick-link">
+            Accuracy Monitoring
+        </a>
 
+        <a href="{{ url_for('admin_error_details') }}" class="quick-link">
+            Error Details
+        </a>
 
-    <div class="stat-card">
-
-        <div class="stat-label">
-            Running Errors
-        </div>
-
-        <div class="stat-value">
-            {{ counts.get('errors', 0) }}
-        </div>
-
-    </div>
-
-
-    <div class="stat-card">
-
-        <div class="stat-label">
-            Active Billers
-        </div>
-
-        <div class="stat-value">
-            {{ counts.get('billers', 0) }}
-        </div>
-
-    </div>
-
-
-    <div class="stat-card">
-
-        <div class="stat-label">
-            Verified
-        </div>
-
-        <div class="stat-value">
-            {{ counts.get('verified', 0) }}
-        </div>
-
-    </div>
-
-
-    <div class="stat-card">
-
-        <div class="stat-label">
-            Disputed
-        </div>
-
-        <div class="stat-value">
-            {{ counts.get('disputed', 0) }}
-        </div>
-
-    </div>
-
-
-    <div class="stat-card">
-
-        <div class="stat-label">
-            Pending
-        </div>
-
-        <div class="stat-value">
-            {{ counts.get('pending', 0) }}
-        </div>
+        <a href="{{ url_for('admin_errors') }}" class="quick-link">
+            Running Error Records
+        </a>
 
     </div>
 
 </div>
 
+<!-- RECENT IMPORTS -->
 
-<!-- =====================================================
-     UPLOAD SOURCE OF WORKBOOK
-====================================================== -->
+<div class="card dashboard-section">
 
-<div class="card">
-
-    <h2 class="section-title">
-        Upload Source of Workbook
-    </h2>
-
-    <p class="section-description">
-        Upload the updated workbook containing the ERROR,
-        INTERNAL and EXTERNAL sheets.
-
-        The PROJECT column should match the project names
-        saved in the Project section.
-    </p>
-
-
-    <form
-        method="POST"
-        action="{{ url_for('upload_workbook') }}"
-        enctype="multipart/form-data"
-        onsubmit="return confirmWorkbookUpload();"
-    >
-
-        <input
-            type="hidden"
-            name="csrf"
-            value="{{ session.get('csrf', '') }}"
-        >
-
-
-        <input
-            class="upload-input"
-            type="file"
-            id="workbook-file"
-            name="file"
-            accept=".xlsx,.xls,.ods,.csv"
-            required
-        >
-
-
-        <p class="upload-note">
-            Supported formats: XLSX, XLS, ODS and CSV.
-            Make sure your workbook contains the required columns.
-        </p>
-
-
-        <div class="section-actions">
-
-            <button
-                class="upload-button"
-                type="submit"
-            >
-                UPLOAD WORKBOOK
-            </button>
-
-        </div>
-
-    </form>
-
-</div>
-
-
-<!-- =====================================================
-     RECENT IMPORTS
-====================================================== -->
-
-<div class="card">
-
-    <h2 class="section-title">
-        Recent Imports
-    </h2>
-
+    <h2 class="section-title">Recent Imports</h2>
 
     <div class="table-wrap">
 
-        <table class="history-table">
+        <table class="dashboard-table">
 
             <thead>
-
                 <tr>
-                    <th>DATE</th>
-                    <th>FILE NAME</th>
+                    <th>FILENAME</th>
                     <th>UPLOADED BY</th>
                     <th>RECORDS IMPORTED</th>
+                    <th>IMPORTED AT</th>
                 </tr>
-
             </thead>
-
 
             <tbody>
 
                 {% for item in history %}
 
                 <tr>
-
-                    <td>
-                        {{ item['imported_at'] }}
-                    </td>
-
-                    <td>
-                        {{ item['filename'] }}
-                    </td>
-
-                    <td>
-                        {{ item['uploaded_by'] }}
-                    </td>
-
-                    <td>
-                        {{ item['records_imported'] }}
-                    </td>
-
+                    <td>{{ item.filename or '—' }}</td>
+                    <td>{{ item.uploaded_by or '—' }}</td>
+                    <td>{{ item.records_imported or 0 }}</td>
+                    <td>{{ item.imported_at or '—' }}</td>
                 </tr>
 
                 {% else %}
 
                 <tr>
-
                     <td colspan="4" class="empty-state">
                         No import history available.
                     </td>
-
                 </tr>
 
                 {% endfor %}
@@ -429,92 +273,5 @@ Admin Dashboard | Billers Running Error & Accuracy System
     </div>
 
 </div>
-
-
-<!-- =====================================================
-     ADMINISTRATIONS
-====================================================== -->
-
-<div class="card">
-
-    <h2 class="section-title">
-        Administrations
-    </h2>
-
-    <p class="section-description">
-        Manage system accounts, projects, accuracy monitoring,
-        error details and activity logs.
-    </p>
-
-
-    <div class="section-actions">
-
-        <a
-            class="action-link"
-            href="{{ url_for('admin_accounts') }}"
-        >
-            ACCOUNT
-        </a>
-
-
-        <a
-            class="action-link"
-            href="{{ url_for('admin_projects') }}"
-        >
-            PROJECT
-        </a>
-
-
-        <a
-            class="action-link"
-            href="{{ url_for('admin_accuracy') }}"
-        >
-            ACCURACY
-        </a>
-
-
-        <a
-            class="action-link"
-            href="{{ url_for('admin_errors') }}"
-        >
-            ERROR DETAILS
-        </a>
-
-
-        <a
-            class="action-link secondary"
-            href="{{ url_for('admin_logs') }}"
-        >
-            ACTIVITY LOGS
-        </a>
-
-    </div>
-
-</div>
-
-
-<!-- =====================================================
-     UPLOAD CONFIRMATION
-====================================================== -->
-
-<script>
-
-function confirmWorkbookUpload() {
-
-    const fileInput = document.getElementById("workbook-file");
-
-    if (!fileInput.files || fileInput.files.length === 0) {
-        alert("Please select a workbook first.");
-        return false;
-    }
-
-    return confirm(
-        "Are you sure you want to upload this workbook?\n\n" +
-        "Please make sure the PROJECT column and required data are correct."
-    );
-
-}
-
-</script>
 
 {% endblock %}
