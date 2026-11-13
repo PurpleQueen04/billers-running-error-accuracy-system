@@ -1,0 +1,331 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- PAGE HEADER -->
+<div class="page-header">
+    <div>
+        <h1>Account Management</h1>
+        <p>View user accounts, roles, and project assignments.</p>
+    </div>
+
+    <span class="section-tag">
+        {{ accounts|length }} Accounts
+    </span>
+</div>
+
+
+<!-- SUMMARY CARDS -->
+<div class="stats-grid">
+
+    <div class="stat-card">
+        <div class="stat-card-top">
+            <span class="stat-label">Total Accounts</span>
+            <span class="stat-icon">
+                <i class="fa-solid fa-users"></i>
+            </span>
+        </div>
+
+        <div class="stat-value">{{ accounts|length }}</div>
+
+        <div class="stat-description">
+            All registered accounts
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-card-top">
+            <span class="stat-label">Active Accounts</span>
+            <span class="stat-icon">
+                <i class="fa-solid fa-user-check"></i>
+            </span>
+        </div>
+
+        <div class="stat-value">
+            {{ accounts|selectattr('active')|list|length }}
+        </div>
+
+        <div class="stat-description">
+            Currently active accounts
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-card-top">
+            <span class="stat-label">Inactive Accounts</span>
+            <span class="stat-icon warning">
+                <i class="fa-solid fa-user-slash"></i>
+            </span>
+        </div>
+
+        <div class="stat-value">
+            {{ accounts|rejectattr('active')|list|length }}
+        </div>
+
+        <div class="stat-description">
+            Deactivated accounts
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-card-top">
+            <span class="stat-label">QC Accounts</span>
+            <span class="stat-icon">
+                <i class="fa-solid fa-user-shield"></i>
+            </span>
+        </div>
+
+        <div class="stat-value">
+            {{ accounts|selectattr('role', 'equalto', 'QC')|list|length }}
+        </div>
+
+        <div class="stat-description">
+            Registered QC accounts
+        </div>
+    </div>
+
+</div>
+
+
+<!-- ACCOUNT LIST -->
+<div class="content-card">
+
+    <div class="section-heading">
+        <div>
+            <h2>Registered Accounts</h2>
+            <p>
+                View account details and assigned projects.
+                One QC account may have multiple project assignments.
+            </p>
+        </div>
+    </div>
+
+
+    <!-- FILTERS -->
+    <div class="filter-bar">
+
+        <div class="filter-group search-group">
+            <label for="accountSearch">Search Accounts</label>
+
+            <input
+                type="search"
+                id="accountSearch"
+                placeholder="Search name, username, or project..."
+                autocomplete="off"
+            >
+        </div>
+
+        <div class="filter-group">
+            <label for="roleFilter">Account Role</label>
+
+            <select id="roleFilter">
+                <option value="all">All Roles</option>
+                <option value="admin">Admin</option>
+                <option value="qc">QC</option>
+                <option value="biller">Biller</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="accountStatus">Account Status</label>
+
+            <select id="accountStatus">
+                <option value="all">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+            </select>
+        </div>
+
+    </div>
+
+
+    {% if accounts %}
+
+        <div class="table-container">
+
+            <table class="data-table" id="accountsTable">
+
+                <thead>
+                    <tr>
+                        <th>ACCOUNT ID</th>
+                        <th>NAME</th>
+                        <th>USERNAME</th>
+                        <th>ROLE</th>
+                        <th>ASSIGNED PROJECTS</th>
+                        <th>STATUS</th>
+                        <th>DATE CREATED</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for account in accounts %}
+
+                        <tr
+                            data-role="{{ account.role|lower }}"
+                            data-status="{{ 'active' if account.active else 'inactive' }}"
+                        >
+
+                            <td>
+                                #{{ account.id }}
+                            </td>
+
+                            <td>
+                                <strong>
+                                    {{ account.display_name }}
+                                </strong>
+                            </td>
+
+                            <td>
+                                {{ account.username }}
+                            </td>
+
+                            <td>
+                                {% if account.role == 'ADMIN' %}
+                                    <span class="status-badge status-info">
+                                        ADMIN
+                                    </span>
+                                {% elif account.role == 'QC' %}
+                                    <span class="status-badge status-success">
+                                        QC
+                                    </span>
+                                {% else %}
+                                    <span class="status-badge status-neutral">
+                                        BILLER
+                                    </span>
+                                {% endif %}
+                            </td>
+
+                            <td class="comment-cell">
+                                {{ account.projects }}
+                            </td>
+
+                            <td>
+                                {% if account.active %}
+                                    <span class="status-badge status-success">
+                                        Active
+                                    </span>
+                                {% else %}
+                                    <span class="status-badge status-danger">
+                                        Inactive
+                                    </span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {{ account.created_at or '—' }}
+                            </td>
+
+                        </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        <div class="table-footer">
+            <span id="accountResultCount">
+                Showing {{ accounts|length }} accounts
+            </span>
+        </div>
+
+    {% else %}
+
+        <div class="empty-state">
+
+            <div class="empty-state-icon">
+                <i class="fa-solid fa-users"></i>
+            </div>
+
+            <h3>No Accounts Found</h3>
+
+            <p>
+                There are currently no registered accounts.
+            </p>
+
+        </div>
+
+    {% endif %}
+
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const searchInput = document.getElementById("accountSearch");
+    const roleFilter = document.getElementById("roleFilter");
+    const statusFilter = document.getElementById("accountStatus");
+    const table = document.getElementById("accountsTable");
+    const resultCount = document.getElementById("accountResultCount");
+
+    if (!table) return;
+
+    const rows = Array.from(
+        table.querySelectorAll("tbody tr")
+    );
+
+    function filterAccounts() {
+
+        const searchValue = searchInput.value
+            .toLowerCase()
+            .trim();
+
+        const selectedRole = roleFilter.value;
+        const selectedStatus = statusFilter.value;
+
+        let visibleCount = 0;
+
+        rows.forEach(function (row) {
+
+            const rowText = row.innerText.toLowerCase();
+            const rowRole = row.dataset.role;
+            const rowStatus = row.dataset.status;
+
+            const matchesSearch =
+                rowText.includes(searchValue);
+
+            const matchesRole =
+                selectedRole === "all" ||
+                rowRole === selectedRole;
+
+            const matchesStatus =
+                selectedStatus === "all" ||
+                rowStatus === selectedStatus;
+
+            const visible =
+                matchesSearch &&
+                matchesRole &&
+                matchesStatus;
+
+            row.style.display = visible ? "" : "none";
+
+            if (visible) {
+                visibleCount++;
+            }
+
+        });
+
+        if (resultCount) {
+            resultCount.textContent =
+                "Showing " + visibleCount +
+                " of " + rows.length + " accounts";
+        }
+    }
+
+    searchInput.addEventListener("input", filterAccounts);
+    roleFilter.addEventListener("change", filterAccounts);
+    statusFilter.addEventListener("change", filterAccounts);
+
+});
+</script>
+
+{% endblock %}
