@@ -11,9 +11,7 @@
 
 <div class="error-layout">
 
-    <!-- =====================================================
-         LEFT SIDE: DATE SELECTION
-    ====================================================== -->
+    <!-- LEFT SIDE: DATE SELECTION -->
 
     <aside class="date-sidebar">
 
@@ -28,9 +26,7 @@
     </aside>
 
 
-    <!-- =====================================================
-         RIGHT SIDE: SELECTED DATE RECORDS
-    ====================================================== -->
+    <!-- RIGHT SIDE: SELECTED DATE RECORDS -->
 
     <section class="error-content">
 
@@ -45,9 +41,6 @@
                 <p class="muted" id="selected-date-count"></p>
 
             </div>
-
-
-            <!-- BACK TO DASHBOARD -->
 
             {% if role == 'biller' %}
 
@@ -81,8 +74,6 @@
         </div>
 
 
-        <!-- NO RECORDS FOR SELECTED DATE -->
-
         <div
             id="no-date-records"
             class="card"
@@ -92,9 +83,7 @@
         </div>
 
 
-        <!-- =====================================================
-             ERROR RECORD CARDS
-        ====================================================== -->
+        <!-- ERROR RECORD CARDS -->
 
         {% for e in errors %}
 
@@ -102,8 +91,6 @@
             class="error-card date-error-card"
             data-billed-date="{{ e.billed_date or '' }}"
         >
-
-            <!-- PRO NUMBER -->
 
             <h3 class="record-pro">
                 PRO# {{ e.pro or '—' }}
@@ -127,40 +114,23 @@
             </div>
 
 
-            <!-- BILLED DATE / WEEK / SOURCE -->
+            <!-- DATE / WEEK / SOURCE -->
 
             <div class="record-info-grid three-columns">
 
                 <div>
-
                     <small>BILLED DATE:</small>
-
-                    <strong>
-                        {{ e.billed_date or '—' }}
-                    </strong>
-
+                    <strong>{{ e.billed_date or '—' }}</strong>
                 </div>
 
-
                 <div>
-
                     <small>WEEK:</small>
-
-                    <strong>
-                        {{ e.week or '—' }}
-                    </strong>
-
+                    <strong>{{ e.week or '—' }}</strong>
                 </div>
 
-
                 <div>
-
                     <small>SOURCE:</small>
-
-                    <strong>
-                        {{ e.source or '—' }}
-                    </strong>
-
+                    <strong>{{ e.source or '—' }}</strong>
                 </div>
 
             </div>
@@ -171,35 +141,18 @@
             <div class="record-info-grid three-columns">
 
                 <div>
-
                     <small>USERNAME:</small>
-
-                    <strong>
-                        {{ e.username or '—' }}
-                    </strong>
-
+                    <strong>{{ e.username or '—' }}</strong>
                 </div>
 
-
                 <div>
-
                     <small>AUDITOR:</small>
-
-                    <strong>
-                        {{ e.auditor or '—' }}
-                    </strong>
-
+                    <strong>{{ e.auditor or '—' }}</strong>
                 </div>
 
-
                 <div>
-
                     <small>AUDIT TYPE:</small>
-
-                    <strong>
-                        {{ e.audit_type or '—' }}
-                    </strong>
-
+                    <strong>{{ e.audit_type or '—' }}</strong>
                 </div>
 
             </div>
@@ -210,24 +163,13 @@
             <div class="record-info-grid two-columns">
 
                 <div>
-
                     <small>BILLERS NAME:</small>
-
-                    <strong>
-                        {{ e.biller_name or '—' }}
-                    </strong>
-
+                    <strong>{{ e.biller_name or '—' }}</strong>
                 </div>
 
-
                 <div>
-
                     <small>ZB FIELD:</small>
-
-                    <strong>
-                        {{ e.zb_field or '—' }}
-                    </strong>
-
+                    <strong>{{ e.zb_field or '—' }}</strong>
                 </div>
 
             </div>
@@ -239,25 +181,19 @@
 
                 <strong>ERROR DETAILS:</strong>
 
-                <p>
-                    {{ e.error_details or '—' }}
-                </p>
+                <p>{{ e.error_details or '—' }}</p>
 
             </div>
 
 
-            <!-- =====================================================
-                 RESPONSE DETAILS
-            ====================================================== -->
+            <!-- RESPONSE DETAILS -->
 
             <div class="my-response">
 
                 <h3>RESPONSE DETAILS</h3>
 
 
-                <!-- =================================================
-                     BILLER VIEW AND RESPONSE
-                ================================================== -->
+                <!-- BILLER VIEW -->
 
                 {% if role == 'biller' %}
 
@@ -272,17 +208,11 @@
                         value="{{ csrf|default(session.get('csrf', '')) }}"
                     >
 
-
-                    <!-- VERIFIED ERROR -->
-
                     <label>
 
                         VERIFIED ERROR
 
-                        <select
-                            name="verified_error"
-                            required
-                        >
+                        <select name="verified_error" required>
 
                             <option
                                 value=""
@@ -291,14 +221,12 @@
                                 Pending
                             </option>
 
-
                             <option
                                 value="Y"
                                 {% if e.verified_error == 'Y' %}selected{% endif %}
                             >
                                 Y
                             </option>
-
 
                             <option
                                 value="N"
@@ -311,8 +239,6 @@
 
                     </label>
 
-
-                    <!-- BILLER EXPLANATION -->
 
                     <label>
 
@@ -327,21 +253,14 @@
                     </label>
 
 
-                    <!-- QC EXPLANATION - READ ONLY -->
-
                     <label>
 
                         QC EXPLANATION
 
-                        <textarea
-                            rows="3"
-                            readonly
-                        >{{ e.qc_explanation or '' }}</textarea>
+                        <textarea rows="3" readonly>{{ e.qc_explanation or '' }}</textarea>
 
                     </label>
 
-
-                    <!-- QC NAME - READ ONLY -->
 
                     <label>
 
@@ -363,9 +282,7 @@
                 </form>
 
 
-                <!-- =================================================
-                     QC VIEW AND RESPONSE
-                ================================================== -->
+                <!-- QC VIEW -->
 
                 {% elif role == 'qc' %}
 
@@ -380,9 +297,6 @@
                         value="{{ csrf|default(session.get('csrf', '')) }}"
                     >
 
-
-                    <!-- VERIFIED ERROR - READ ONLY -->
-
                     <label>
 
                         VERIFIED ERROR
@@ -396,21 +310,14 @@
                     </label>
 
 
-                    <!-- BILLER EXPLANATION - READ ONLY -->
-
                     <label>
 
                         BILLER EXPLANATION
 
-                        <textarea
-                            rows="3"
-                            readonly
-                        >{{ e.biller_comment or '' }}</textarea>
+                        <textarea rows="3" readonly>{{ e.biller_comment or '' }}</textarea>
 
                     </label>
 
-
-                    <!-- QC EXPLANATION -->
 
                     <label>
 
@@ -427,17 +334,12 @@
 
                         {% else %}
 
-                            <textarea
-                                rows="3"
-                                readonly
-                            >{{ e.qc_explanation or '' }}</textarea>
+                            <textarea rows="3" readonly>{{ e.qc_explanation or '' }}</textarea>
 
                         {% endif %}
 
                     </label>
 
-
-                    <!-- QC NAME FROM LOGGED-IN ACCOUNT -->
 
                     <label>
 
@@ -451,8 +353,6 @@
 
                     </label>
 
-
-                    <!-- SUBMIT ONLY WHEN VERIFIED ERROR = N -->
 
                     {% if e.verified_error == 'N' %}
 
@@ -472,15 +372,11 @@
                 </form>
 
 
-                <!-- =================================================
-                     ADMIN VIEW ONLY
-                ================================================== -->
+                <!-- ADMIN VIEW -->
 
                 {% elif role == 'admin' %}
 
                 <div>
-
-                    <!-- VERIFIED ERROR -->
 
                     <label>
 
@@ -495,35 +391,23 @@
                     </label>
 
 
-                    <!-- BILLER EXPLANATION -->
-
                     <label>
 
                         BILLER EXPLANATION
 
-                        <textarea
-                            rows="3"
-                            readonly
-                        >{{ e.biller_comment or '' }}</textarea>
+                        <textarea rows="3" readonly>{{ e.biller_comment or '' }}</textarea>
 
                     </label>
 
-
-                    <!-- QC EXPLANATION -->
 
                     <label>
 
                         QC EXPLANATION
 
-                        <textarea
-                            rows="3"
-                            readonly
-                        >{{ e.qc_explanation or '' }}</textarea>
+                        <textarea rows="3" readonly>{{ e.qc_explanation or '' }}</textarea>
 
                     </label>
 
-
-                    <!-- QC NAME -->
 
                     <label>
 
@@ -541,8 +425,6 @@
 
                 {% endif %}
 
-
-                <!-- LAST UPDATED -->
 
                 {% if e.updated_at %}
 
@@ -563,9 +445,7 @@
 </div>
 
 
-<!-- =====================================================
-     DATE SELECTION FUNCTIONALITY
-====================================================== -->
+<!-- DATE SELECTION FUNCTIONALITY -->
 
 <script>
 
@@ -584,9 +464,14 @@ document.addEventListener("DOMContentLoaded", function () {
     const emptyMessage = document.getElementById("no-date-records");
 
 
-    // =====================================================
-    // COUNT RECORDS PER DATE
-    // =====================================================
+    // ALL DATES PROVIDED BY THE BACKEND
+
+    const dates = {{ dates|tojson }};
+
+    const selectedDate = {{ selected_date|tojson }};
+
+
+    // COUNT RECORDS CURRENTLY LOADED
 
     const dateCounts = {};
 
@@ -601,9 +486,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
 
-    // =====================================================
     // PARSE DATE
-    // =====================================================
 
     function parseDate(value) {
 
@@ -616,7 +499,6 @@ document.addEventListener("DOMContentLoaded", function () {
             const month = Number(parts[1]) - 1;
 
             const day = Number(parts[2]);
-
 
             if (
                 year &&
@@ -632,7 +514,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
         }
 
-
         const parsed = new Date(value);
 
         return isNaN(parsed.getTime()) ? null : parsed;
@@ -640,9 +521,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
 
-    // =====================================================
     // FORMAT DATE
-    // =====================================================
 
     function formatDate(value) {
 
@@ -653,9 +532,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return parsed.toLocaleDateString("en-US", {
 
             year: "numeric",
-
             month: "long",
-
             day: "numeric"
 
         });
@@ -663,16 +540,13 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
 
-    // =====================================================
-    // SORT DATES - NEWEST FIRST
-    // =====================================================
+    // SORT ALL DATABASE DATES
 
-    const dates = Object.keys(dateCounts).sort(function (a, b) {
+    dates.sort(function (a, b) {
 
         const dateA = parseDate(a);
 
         const dateB = parseDate(b);
-
 
         if (!dateA || !dateB) {
 
@@ -685,65 +559,21 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
 
-    // =====================================================
-    // SELECT DATE
-    // =====================================================
+    // SELECT DATE BUTTON
 
-    function selectDate(selectedDate) {
+    function selectDate(date) {
 
-        let visibleCount = 0;
+        if (!date) return;
 
-
-        cards.forEach(function (card) {
-
-            const matches =
-                card.dataset.billedDate.trim() === selectedDate;
-
-
-            card.style.display = matches ? "block" : "none";
-
-
-            if (matches) {
-
-                visibleCount++;
-
-            }
-
-        });
-
-
-        title.textContent =
-            "BILLED DATE: " + formatDate(selectedDate);
-
-
-        count.textContent =
-            visibleCount +
-            (visibleCount === 1 ? " error record" : " error records");
-
-
-        emptyMessage.style.display =
-            visibleCount === 0 ? "block" : "none";
-
-
-        dateList.querySelectorAll(".date-select-button")
-            .forEach(function (button) {
-
-                button.classList.toggle(
-
-                    "active",
-
-                    button.dataset.date === selectedDate
-
-                );
-
-            });
+        window.location.href =
+            window.location.pathname +
+            "?date=" +
+            encodeURIComponent(date);
 
     }
 
 
-    // =====================================================
     // CREATE DATE BUTTONS
-    // =====================================================
 
     dates.forEach(function (date) {
 
@@ -763,10 +593,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const recordCount = document.createElement("small");
 
-        recordCount.textContent =
-            dateCounts[date] +
-            " error" +
-            (dateCounts[date] === 1 ? "" : "s");
+        if (dateCounts[date]) {
+
+            recordCount.textContent =
+                dateCounts[date] +
+                (dateCounts[date] === 1 ? " error" : " errors");
+
+        } else {
+
+            recordCount.textContent = "View records";
+
+        }
 
 
         button.appendChild(dateText);
@@ -776,9 +613,20 @@ document.addEventListener("DOMContentLoaded", function () {
 
         button.addEventListener("click", function () {
 
-            selectDate(date);
+            if (date !== selectedDate) {
+
+                selectDate(date);
+
+            }
 
         });
+
+
+        if (date === selectedDate) {
+
+            button.classList.add("active");
+
+        }
 
 
         dateList.appendChild(button);
@@ -786,13 +634,42 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
 
-    // =====================================================
-    // INITIAL DISPLAY
-    // =====================================================
+    // DISPLAY SELECTED DATE
 
-    if (dates.length > 0) {
+    const activeDate = selectedDate || dates[0] || "";
 
-        selectDate(dates[0]);
+
+    if (activeDate) {
+
+        let visibleCount = 0;
+
+        cards.forEach(function (card) {
+
+            const matches =
+                card.dataset.billedDate.trim() === activeDate;
+
+            card.style.display = matches ? "block" : "none";
+
+            if (matches) {
+
+                visibleCount++;
+
+            }
+
+        });
+
+
+        title.textContent =
+            "BILLED DATE: " + formatDate(activeDate);
+
+
+        count.textContent =
+            visibleCount +
+            (visibleCount === 1 ? " error record" : " error records");
+
+
+        emptyMessage.style.display =
+            visibleCount === 0 ? "block" : "none";
 
     } else {
 
