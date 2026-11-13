@@ -1,0 +1,235 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- PAGE HEADER -->
+<div class="page-header">
+    <div>
+        <h1>All Error Records</h1>
+        <p>Review error records across all projects, including unassigned records.</p>
+    </div>
+
+    <span class="section-tag">
+        {{ records|length }} Records
+    </span>
+</div>
+
+
+<!-- SUMMARY -->
+<div class="stats-grid">
+
+    <div class="stat-card">
+        <div class="stat-card-top">
+            <span class="stat-label">Records Displayed</span>
+            <span class="stat-icon">
+                <i class="fa-solid fa-file-circle-exclamation"></i>
+            </span>
+        </div>
+
+        <div class="stat-value">{{ records|length }}</div>
+
+        <div class="stat-description">
+            Latest records retrieved
+        </div>
+    </div>
+
+</div>
+
+
+<!-- RECORD TABLE -->
+<div class="content-card">
+
+    <div class="section-heading">
+        <div>
+            <h2>Error Record List</h2>
+            <p>
+                Admin can view all imported records regardless of project assignment.
+            </p>
+        </div>
+    </div>
+
+
+    <!-- SEARCH -->
+    <div class="filter-bar">
+
+        <div class="filter-group search-group">
+            <label for="recordSearch">Search Records</label>
+
+            <input
+                type="search"
+                id="recordSearch"
+                placeholder="Search biller, username, PRO, project, or record key..."
+                autocomplete="off"
+            >
+        </div>
+
+    </div>
+
+
+    {% if records %}
+
+        <div class="table-container">
+
+            <table class="data-table" id="adminErrorsTable">
+
+                <thead>
+                    <tr>
+                        <th>RECORD KEY</th>
+                        <th>BILLED DATE</th>
+                        <th>WEEK</th>
+                        <th>BILLER NAME</th>
+                        <th>USERNAME</th>
+                        <th>PRO</th>
+                        <th>SOURCE</th>
+                        <th>AUDITOR</th>
+                        <th>AUDIT TYPE</th>
+                        <th>PROJECT ID</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for record in records %}
+
+                        <tr>
+
+                            <td>
+                                <span class="text-muted">
+                                    {{ record.record_key or '—' }}
+                                </span>
+                            </td>
+
+                            <td>
+                                {{ record.billed_date or '—' }}
+                            </td>
+
+                            <td>
+                                {{ record.week or '—' }}
+                            </td>
+
+                            <td>
+                                <strong>
+                                    {{ record.biller_name or '—' }}
+                                </strong>
+                            </td>
+
+                            <td>
+                                {{ record.username or '—' }}
+                            </td>
+
+                            <td>
+                                {{ record.pro or '—' }}
+                            </td>
+
+                            <td>
+                                {{ record.source or '—' }}
+                            </td>
+
+                            <td>
+                                {{ record.auditor or '—' }}
+                            </td>
+
+                            <td>
+                                {{ record.audit_type or '—' }}
+                            </td>
+
+                            <td>
+                                {% if record.project_id %}
+                                    {{ record.project_id }}
+                                {% else %}
+                                    <span class="status-badge status-warning">
+                                        Unassigned
+                                    </span>
+                                {% endif %}
+                            </td>
+
+                        </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        <div class="table-footer">
+            <span id="recordResultCount">
+                Showing {{ records|length }} records
+            </span>
+        </div>
+
+    {% else %}
+
+        <div class="empty-state">
+
+            <div class="empty-state-icon">
+                <i class="fa-solid fa-folder-open"></i>
+            </div>
+
+            <h3>No Error Records Found</h3>
+
+            <p>
+                There are currently no error records available.
+            </p>
+
+        </div>
+
+    {% endif %}
+
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const searchInput = document.getElementById("recordSearch");
+    const table = document.getElementById("adminErrorsTable");
+    const resultCount = document.getElementById("recordResultCount");
+
+    if (!searchInput || !table) return;
+
+    const rows = Array.from(
+        table.querySelectorAll("tbody tr")
+    );
+
+    function filterRecords() {
+
+        const searchValue = searchInput.value
+            .toLowerCase()
+            .trim();
+
+        let visibleCount = 0;
+
+        rows.forEach(function (row) {
+
+            const rowText = row.innerText.toLowerCase();
+
+            const visible = rowText.includes(searchValue);
+
+            row.style.display = visible ? "" : "none";
+
+            if (visible) {
+                visibleCount++;
+            }
+
+        });
+
+        if (resultCount) {
+            resultCount.textContent =
+                "Showing " + visibleCount +
+                " of " + rows.length + " records";
+        }
+    }
+
+    searchInput.addEventListener("input", filterRecords);
+
+});
+</script>
+
+{% endblock %}
