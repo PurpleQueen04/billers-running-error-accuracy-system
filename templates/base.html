@@ -70,6 +70,7 @@
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
+            align-items: center;
         }
 
         nav a {
@@ -89,6 +90,31 @@
         nav a.active {
             color: #15966d;
             border-bottom-color: #43c59e;
+        }
+
+        /* LOGOUT BUTTON */
+
+        .logout-button {
+            display: inline-block;
+            padding: 15px 13px;
+            border: none;
+            border-bottom: 3px solid transparent;
+            border-radius: 0;
+            background: transparent;
+            color: #344054;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .logout-button:hover {
+            background: transparent;
+            color: #c0392b;
+        }
+
+        .logout-button:focus-visible {
+            outline: 2px solid #43c59e;
+            outline-offset: 3px;
         }
 
         /* MAIN CONTENT */
@@ -282,6 +308,11 @@
                 font-size: 10px;
             }
 
+            .logout-button {
+                padding: 12px 8px;
+                font-size: 10px;
+            }
+
             main {
                 padding: 0 12px;
             }
@@ -401,9 +432,24 @@
 
         {% endif %}
 
-        <a href="{{ url_for('logout') }}">
-            LOGOUT
-        </a>
+        <form
+            method="POST"
+            action="{{ url_for('logout') }}"
+            style="display:inline; margin:0;"
+        >
+            <input
+                type="hidden"
+                name="csrf"
+                value="{{ session.get('csrf', '') }}"
+            >
+
+            <button
+                type="submit"
+                class="logout-button"
+            >
+                LOGOUT
+            </button>
+        </form>
 
     </div>
 </nav>
