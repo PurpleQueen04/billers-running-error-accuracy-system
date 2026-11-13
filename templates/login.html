@@ -1,3 +1,140 @@
-{% extends "base.html" %}{% block content %}<section class="login card"><h1>Sign in</h1><p class="muted">Access your running error and accuracy records.</p>
-<form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><label>Username</label><input name="username" required autofocus><label>Password</label><input type="password" name="password" required><button>Login</button></form>
-<p class="muted small">First setup default: admin / Admin@12345. Change this password before team use.</p></section>{% endblock %}
+
+{% extends "base.html" %}
+
+{% block title %}
+Login | Billers Running Error & Accuracy System
+{% endblock %}
+
+{% block head %}
+<style>
+    .login-page {
+        min-height: 65vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 30px 15px;
+    }
+
+    .login-card {
+        width: 100%;
+        max-width: 420px;
+        background: white;
+        border: 1px solid #e0e6ef;
+        border-radius: 12px;
+        padding: 30px;
+        box-shadow: 0 8px 25px rgba(23, 32, 51, 0.07);
+    }
+
+    .login-title {
+        text-align: center;
+        margin: 0 0 8px;
+        font-size: 24px;
+        color: #172033;
+    }
+
+    .login-subtitle {
+        text-align: center;
+        color: #667085;
+        font-size: 13px;
+        margin-bottom: 25px;
+    }
+
+    .form-group {
+        margin-bottom: 18px;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 13px;
+        font-weight: bold;
+        margin-bottom: 7px;
+        color: #344054;
+    }
+
+    .login-button {
+        width: 100%;
+        margin-top: 8px;
+        padding: 12px;
+        background: #15966d;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .login-button:hover {
+        background: #107b59;
+    }
+
+    .login-footer {
+        text-align: center;
+        font-size: 12px;
+        color: #98a2b3;
+        margin-top: 22px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="login-page">
+
+    <div class="login-card">
+
+        <h1 class="login-title">Welcome Back</h1>
+
+        <p class="login-subtitle">
+            Sign in to your account
+        </p>
+
+        <form method="POST" action="{{ url_for('login') }}">
+
+            <input
+                type="hidden"
+                name="csrf"
+                value="{{ session.get('csrf', '') }}"
+            >
+
+            <div class="form-group">
+                <label for="username">USERNAME</label>
+
+                <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    placeholder="Enter your username"
+                    autocomplete="username"
+                    required
+                    autofocus
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="password">PASSWORD</label>
+
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    placeholder="Enter your password"
+                    autocomplete="current-password"
+                    required
+                >
+            </div>
+
+            <button type="submit" class="login-button">
+                LOGIN
+            </button>
+
+        </form>
+
+        <div class="login-footer">
+            Billers Running Error & Accuracy System
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
