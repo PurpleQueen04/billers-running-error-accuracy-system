@@ -1,0 +1,259 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1>EXTERNAL Accuracy</h1>
+
+<p class="muted">
+    Monthly EXTERNAL accuracy based on your imported audit records.
+</p>
+
+
+<!-- MONTHLY SUMMARY -->
+<section class="card">
+
+    <h2>Monthly EXTERNAL Summary</h2>
+
+    <div class="accuracy-grid">
+
+        <!-- WC -->
+        <div class="accuracy">
+
+            <small>WC</small>
+
+            <strong>
+                {{ format_accuracy(wc_summary.accuracy) }}
+            </strong>
+
+            <span class="muted">
+                Monthly Accuracy
+            </span>
+
+        </div>
+
+
+        <!-- WOC -->
+        <div class="accuracy">
+
+            <small>WOC</small>
+
+            <strong>
+                {{ format_accuracy(woc_summary.accuracy) }}
+            </strong>
+
+            <span class="muted">
+                Monthly Accuracy
+            </span>
+
+        </div>
+
+    </div>
+
+
+    <!-- SUMMARY DETAILS -->
+    <div class="readonly-grid">
+
+        <div>
+            <small>Total Audited</small>
+            <strong>{{ wc_summary.audited }}</strong>
+        </div>
+
+        <div>
+            <small>WC Errors</small>
+            <strong>{{ wc_summary.errors }}</strong>
+        </div>
+
+        <div>
+            <small>WOC Errors</small>
+            <strong>{{ woc_summary.errors }}</strong>
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ACCURACY DETAILS -->
+<section class="card">
+
+    <h2>EXTERNAL Accuracy Details</h2>
+
+
+    <!-- FILTERS -->
+    <form method="get"
+          action="{{ url_for('biller_external_accuracy') }}"
+          class="filter-form">
+
+        <label>
+            Month / Year
+
+            <select name="month" onchange="this.form.submit()">
+
+                {% for m in months %}
+                    <option value="{{ m }}"
+                        {% if selected_month == m %}selected{% endif %}>
+                        {{ m }}
+                    </option>
+                {% endfor %}
+
+            </select>
+        </label>
+
+
+        <label>
+            View Period
+
+            <select name="period" onchange="this.form.submit()">
+
+                <option value="DAILY"
+                    {% if period == 'DAILY' %}selected{% endif %}>
+                    DAILY
+                </option>
+
+                <option value="WEEKLY"
+                    {% if period == 'WEEKLY' %}selected{% endif %}>
+                    WEEKLY
+                </option>
+
+            </select>
+        </label>
+
+    </form>
+
+
+    <!-- DAILY TABLE -->
+    {% if period == 'DAILY' %}
+
+        <h3>Daily EXTERNAL Accuracy</h3>
+
+        <div class="tablewrap">
+
+            <table>
+
+                <thead>
+                    <tr>
+                        <th>DATE</th>
+                        <th>WC</th>
+                        <th>WOC</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for row in rows %}
+
+                        <tr>
+
+                            <td>{{ row.label }}</td>
+
+                            <td>
+                                {% if row.wc is not none %}
+                                    {{ format_accuracy(row.wc) }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if row.woc is not none %}
+                                    {{ format_accuracy(row.woc) }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+
+                        </tr>
+
+                    {% else %}
+
+                        <tr>
+                            <td colspan="3">
+                                No EXTERNAL accuracy records found.
+                            </td>
+                        </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+
+    <!-- WEEKLY TABLE -->
+    {% else %}
+
+        <h3>Weekly EXTERNAL Accuracy</h3>
+
+        <div class="tablewrap">
+
+            <table>
+
+                <thead>
+                    <tr>
+                        <th>WEEK</th>
+                        <th>WC</th>
+                        <th>WOC</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for row in rows %}
+
+                        <tr>
+
+                            <td>{{ row.label }}</td>
+
+                            <td>
+                                {% if row.wc is not none %}
+                                    {{ format_accuracy(row.wc) }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if row.woc is not none %}
+                                    {{ format_accuracy(row.woc) }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+
+                        </tr>
+
+                    {% else %}
+
+                        <tr>
+                            <td colspan="3">
+                                No EXTERNAL accuracy records found.
+                            </td>
+                        </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    {% endif %}
+
+</section>
+
+
+<!-- BACK BUTTON -->
+<div class="accuracy-actions">
+
+    <a href="{{ url_for('biller_dashboard', month=selected_month) }}"
+       class="btn">
+        Back to Dashboard
+    </a>
+
+</div>
+
+{% endblock %}
