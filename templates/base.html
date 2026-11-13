@@ -21,7 +21,6 @@
             <span>/ Accuracy</span>
         </div>
 
-
         {% if session.get('user_id') %}
 
             <nav>
@@ -32,8 +31,8 @@
                     {{ session.get('role')|upper }}
                 </span>
 
-
-                {% if session.get('role')|upper == 'BILLER' %}
+                <!-- BILLER NAVIGATION -->
+                {% if session.get('role')|lower == 'biller' %}
 
                     <a href="{{ url_for('biller_dashboard') }}">
                         Dashboard
@@ -51,14 +50,21 @@
                         Error Records
                     </a>
 
-                {% else %}
+                <!-- QC NAVIGATION -->
+                {% elif session.get('role')|lower == 'qc' %}
+
+                    <a href="{{ url_for('qc_errors') }}">
+                        QC Error Records
+                    </a>
+
+                <!-- ADMIN NAVIGATION -->
+                {% elif session.get('role')|lower == 'admin' %}
 
                     <a href="{{ url_for('index') }}">
                         Dashboard
                     </a>
 
                 {% endif %}
-
 
                 <a href="{{ url_for('logout') }}">
                     Logout
@@ -84,7 +90,6 @@
             {% endfor %}
 
         {% endwith %}
-
 
         {% block content %}{% endblock %}
 
