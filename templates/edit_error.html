@@ -1,7 +1,0 @@
-{% extends "base.html" %}{% block content %}<h1>Edit audit record</h1><section class="card"><form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><div class="response-grid">
-<label>DATE<input name="billed_date" value="{{ record.billed_date }}"></label><label>WEEK<input name="week" value="{{ record.week }}"></label>
-<label>Source of Error<input name="source" value="{{ record.source }}"></label><label>Audit Type<input name="audit_type" value="{{ record.audit_type }}"></label>
-<label>Biller Name<input name="biller_name" value="{{ record.biller_name }}"></label><label>User<input name="username" value="{{ record.username }}"></label>
-<label>ID#<input name="id_number" value="{{ record.id_number }}"></label><label>Auditor<input name="auditor" value="{{ record.auditor }}"></label>
-<label>PRO#<input name="pro" value="{{ record.pro }}"></label><label>ZB Field<input name="zb_field" value="{{ record.zb_field }}"></label>
-<label class="wide">Error Details<textarea name="error_details" rows="5">{{ record.error_details }}</textarea></label></div><button>Save changes</button> <a href="{{ url_for('admin_errors') }}">Cancel</a></form></section>{% endblock %}
