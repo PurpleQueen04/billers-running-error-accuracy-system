@@ -3,6 +3,8 @@
 
 {% block content %}
 
+{% set role = session.get('role', '')|lower %}
+
 <h1>Running Error Records</h1>
 
 <div class="error-layout">
@@ -16,9 +18,7 @@
             Select a billed date to view its error records.
         </p>
 
-        <div id="date-list" class="date-list">
-            <!-- Dates are generated from the available records. -->
-        </div>
+        <div id="date-list" class="date-list"></div>
 
     </aside>
 
@@ -27,18 +27,30 @@
     <section class="error-content">
 
         <div class="error-content-header">
+
             <div>
                 <h2 id="selected-date-title">Running Error Records</h2>
                 <p class="muted" id="selected-date-count"></p>
             </div>
 
-            <a href="{{ url_for('biller_dashboard') }}" class="btn secondary">
-                Back to Dashboard
-            </a>
+            {% if role == 'biller' %}
+                <a href="{{ url_for('biller_dashboard') }}"
+                   class="btn secondary">
+                    Back to Dashboard
+                </a>
+            {% elif role == 'admin' %}
+                <a href="{{ url_for('index') }}"
+                   class="btn secondary">
+                    Back to Dashboard
+                </a>
+            {% endif %}
+
         </div>
 
 
-        <div id="no-date-records" class="card" style="display:none;">
+        <div id="no-date-records"
+             class="card"
+             style="display:none;">
             No error records found for this date.
         </div>
 
@@ -134,61 +146,125 @@
                            name="csrf"
                            value="{{ csrf }}">
 
+
+                    <!-- VERIFIED ERROR -->
                     <label>
                         VERIFIED ERROR
 
-                        <select name="verified_error">
+                        {% if role == 'biller' or role == 'admin' %}
 
-                            <option value=""
-                                {% if not e.verified_error %}selected{% endif %}>
-                                Pending
-                            </option>
+                            <select name="verified_error">
 
-                            <option value="Y"
-                                {% if e.verified_error == 'Y' %}selected{% endif %}>
-                                Y
-                            </option>
+                                <option value=""
+                                    {% if not e.verified_error %}selected{% endif %}>
+                                    Pending
+                                </option>
 
-                            <option value="N"
-                                {% if e.verified_error == 'N' %}selected{% endif %}>
-                                N
-                            </option>
+                                <option value="Y"
+                                    {% if e.verified_error == 'Y' %}selected{% endif %}>
+                                    Y
+                                </option>
 
-                        </select>
+                                <option value="N"
+                                    {% if e.verified_error == 'N' %}selected{% endif %}>
+                                    N
+                                </option>
+
+                            </select>
+
+                        {% else %}
+
+                            <input type="text"
+                                   value="{{ e.verified_error or 'Pending' }}"
+                                   readonly>
+
+                        {% endif %}
 
                     </label>
 
 
+                    <!-- BILLER COMMENT -->
                     <label>
                         BILLER COMMENT
 
-                        <textarea name="biller_comment"
-                                  rows="3">{{ e.biller_comment or '' }}</textarea>
+                        {% if role == 'biller' or role == 'admin' %}
+
+                            <textarea name="biller_comment"
+                                      rows="3">{{ e.biller_comment or '' }}</textarea>
+
+                        {% else %}
+
+                            <textarea rows="3" readonly>{{ e.biller_comment or '' }}</textarea>
+
+                        {% endif %}
+
                     </label>
 
 
+                    <!-- QC EXPLANATION -->
                     <label>
                         QC EXPLANATION
 
-                        <textarea name="qc_explanation"
-                                  rows="3">{{ e.qc_explanation or '' }}</textarea>
+                        {% if role == 'qc' and e.verified_error == 'N' %}
+
+                            <textarea name="qc_explanation"
+                                      rows="3"
+                                      placeholder="Enter QC explanation..."
+                                      required>{{ e.qc_explanation or '' }}</textarea>
+
+                        {% elif role == 'admin' %}
+
+                            <textarea name="qc_explanation"
+                                      rows="3">{{ e.qc_explanation or '' }}</textarea>
+
+                        {% else %}
+
+                            <textarea rows="3"
+                                      readonly>{{ e.qc_explanation or '' }}</textarea>
+
+                        {% endif %}
+
                     </label>
 
 
+                    <!-- QC NAME -->
                     <label>
                         QC NAME
 
-                        <input type="text"
-                               name="qc_name"
-                               value="{{ e.qc_name or '' }}">
+                        {% if role == 'qc' %}
+
+                            <input type="text"
+                                   value="{{ session.get('display_name', '') }}"
+                                   readonly>
+
+                        {% else %}
+
+                            <input type="text"
+                                   value="{{ e.qc_name or '' }}"
+                                   readonly>
+
+                        {% endif %}
+
                     </label>
 
 
-                    <button type="submit">
-                        Save Response
-                    </button>
+                    <!-- SAVE BUTTON -->
+                    {% if role == 'biller' or role == 'admin' %}
+
+                        <button type="submit">
+                            Save Response
+                        </button>
+
+                    {% elif role == 'qc' and e.verified_error == 'N' %}
+
+                        <button type="submit">
+                            Submit QC Explanation
+                        </button>
+
+                    {% endif %}
 
                 </form>
+
 
                 {% if e.updated_at %}
                     <p class="muted small">
@@ -226,9 +302,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const date = card.dataset.billedDate.trim();
 
-        if (!date) {
-            return;
-        }
+        if (!date) return;
 
         dateCounts[date] = (dateCounts[date] || 0) + 1;
 
@@ -262,9 +336,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const parsed = parseDate(value);
 
-        if (!parsed) {
-            return value;
-        }
+        if (!parsed) return value;
 
         return parsed.toLocaleDateString("en-US", {
             year: "numeric",
@@ -300,19 +372,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
             card.style.display = matches ? "block" : "none";
 
-            if (matches) {
-                visibleCount++;
-            }
+            if (matches) visibleCount++;
 
         });
 
 
-        title.textContent = "BILLED DATE: " + formatDate(selectedDate);
+        title.textContent =
+            "BILLED DATE: " + formatDate(selectedDate);
 
         count.textContent =
-            visibleCount + (visibleCount === 1
-                ? " error record"
-                : " error records");
+            visibleCount +
+            (visibleCount === 1 ? " error record" : " error records");
 
 
         emptyMessage.style.display =
@@ -322,10 +392,10 @@ document.addEventListener("DOMContentLoaded", function () {
         dateList.querySelectorAll(".date-select-button")
             .forEach(function (button) {
 
-                const active =
-                    button.dataset.date === selectedDate;
-
-                button.classList.toggle("active", active);
+                button.classList.toggle(
+                    "active",
+                    button.dataset.date === selectedDate
+                );
 
             });
 
@@ -344,8 +414,10 @@ document.addEventListener("DOMContentLoaded", function () {
         dateText.textContent = formatDate(date);
 
         const recordCount = document.createElement("small");
+
         recordCount.textContent =
-            dateCounts[date] + " error" +
+            dateCounts[date] +
+            " error" +
             (dateCounts[date] === 1 ? "" : "s");
 
         button.appendChild(dateText);
@@ -362,7 +434,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (dates.length > 0) {
 
-        // Automatically show the newest billed date.
         selectDate(dates[0]);
 
     } else {
