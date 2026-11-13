@@ -1585,7 +1585,7 @@ def admin_dashboard():
 
         qc_users = con.execute(
             """
-            SELECT id,username,display_name,active
+            SELECT id, username, display_name, active
             FROM users
             WHERE role='qc'
             ORDER BY username
@@ -1593,15 +1593,14 @@ def admin_dashboard():
         ).fetchall()
 
     return render_template(
-    "admin.html",
-    counts=counts,
-    history=history,
-    **{
-        "billers": billers,
-        "qc_users": qc_users,
-    },
-)
-
+        "admin.html",
+        counts=counts,
+        history=history,
+        **{
+            "billers": billers,
+            "qc_users": qc_users,
+        },
+    )
 
 # =========================================================
 # ADMIN SOURCE UPLOAD
