@@ -1,0 +1,922 @@
+
+{% extends "base.html" %}
+
+{% block title %}Accuracy Monitoring | Billers Running Error & Accuracy System{% endblock %}
+
+{% block head %}
+<style>
+
+    /* PAGE HEADER */
+
+    .page-heading {
+        margin-bottom: 22px;
+    }
+
+    .page-heading h1 {
+        margin: 0;
+        font-size: 25px;
+        color: #172033;
+    }
+
+    .page-heading p {
+        color: #667085;
+        font-size: 13px;
+        margin-top: 7px;
+        line-height: 1.6;
+    }
+
+
+    /* FILTERS */
+
+    .filter-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+        align-items: end;
+    }
+
+    .form-group {
+        margin-bottom: 12px;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 12px;
+        font-weight: bold;
+        margin-bottom: 7px;
+        color: #344054;
+    }
+
+    .filter-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-top: 10px;
+    }
+
+
+    /* SUMMARY CARDS */
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+        margin-bottom: 22px;
+    }
+
+    .summary-card {
+        background: #fff;
+        border: 1px solid #e0e6ef;
+        border-radius: 9px;
+        padding: 20px;
+    }
+
+    .summary-card h3 {
+        margin: 0;
+        font-size: 13px;
+        color: #667085;
+        text-transform: uppercase;
+    }
+
+    .accuracy-value {
+        font-size: 29px;
+        font-weight: bold;
+        color: #172033;
+        margin-top: 12px;
+    }
+
+    .summary-details {
+        margin-top: 12px;
+        font-size: 12px;
+        line-height: 1.8;
+        color: #667085;
+    }
+
+
+    /* SECTIONS */
+
+    .section-title {
+        font-size: 17px;
+        color: #172033;
+        margin: 0 0 16px;
+    }
+
+    .section-description {
+        font-size: 12px;
+        color: #667085;
+        line-height: 1.6;
+        margin: -7px 0 16px;
+    }
+
+    .section-spacing {
+        margin-top: 22px;
+    }
+
+
+    /* TABLES */
+
+    .accuracy-table {
+        min-width: 750px;
+    }
+
+    .accuracy-table td,
+    .accuracy-table th {
+        vertical-align: middle;
+    }
+
+    .biller-name {
+        font-weight: bold;
+        color: #172033;
+    }
+
+    .project-name {
+        color: #667085;
+        font-size: 12px;
+    }
+
+    .accuracy-number {
+        font-weight: bold;
+        white-space: nowrap;
+    }
+
+    .below-target {
+        color: #b42318;
+        font-weight: bold;
+    }
+
+    .meeting-target {
+        color: #176b45;
+        font-weight: bold;
+    }
+
+
+    /* IMPROVEMENT NOTES */
+
+    .improvement-status {
+        display: inline-block;
+        padding: 5px 9px;
+        border-radius: 20px;
+        font-size: 10px;
+        font-weight: bold;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .improvement-status.improved {
+        background: #e8f8f0;
+        color: #176b45;
+    }
+
+    .improvement-status.declined {
+        background: #fdecec;
+        color: #a52828;
+    }
+
+    .improvement-status.no-change {
+        background: #f2f4f7;
+        color: #475467;
+    }
+
+    .improvement-status.new-record {
+        background: #eaf2ff;
+        color: #175cd3;
+    }
+
+    .improvement-note {
+        min-width: 220px;
+        line-height: 1.6;
+        font-size: 12px;
+    }
+
+
+    /* EMPTY STATE */
+
+    .empty-state {
+        text-align: center;
+        padding: 25px;
+        color: #667085;
+        font-size: 13px;
+    }
+
+
+    /* RESPONSIVE */
+
+    @media (max-width: 800px) {
+
+        .summary-grid {
+            grid-template-columns: 1fr;
+        }
+
+    }
+
+    @media (max-width: 600px) {
+
+        .filter-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .page-heading h1 {
+            font-size: 21px;
+        }
+
+        .accuracy-value {
+            font-size: 25px;
+        }
+
+    }
+
+</style>
+{% endblock %}
+
+
+{% block content %}
+
+<!-- =====================================================
+     PAGE HEADER
+====================================================== -->
+
+<div class="page-heading">
+
+    <h1>Accuracy Monitoring</h1>
+
+    <p>
+        Monitor Internal and External Accuracy performance,
+        identify Billers below 90%, and track accuracy improvements.
+    </p>
+
+</div>
+
+
+<!-- =====================================================
+     FILTERS
+====================================================== -->
+
+<div class="card">
+
+    <h2 class="section-title">
+        Accuracy Filters
+    </h2>
+
+    <form
+        method="GET"
+        action="{% if session.get('role', '')|lower == 'qc' %}{{ url_for('qc_accuracy') }}{% else %}{{ url_for('admin_accuracy') }}{% endif %}"
+    >
+
+        <div class="filter-grid">
+
+            <!-- PROJECT FILTER -->
+
+            <div class="form-group">
+
+                <label for="project_id">
+                    PROJECT
+                </label>
+
+                <select
+                    id="project_id"
+                    name="project_id"
+                >
+
+                    {% if session.get('role', '')|lower == 'admin' %}
+
+                        <option value="all"
+                            {% if selected_project_id|string == 'all' %}
+                                selected
+                            {% endif %}
+                        >
+                            ALL PROJECTS
+                        </option>
+
+                    {% endif %}
+
+
+                    {% for project in projects %}
+
+                        <option
+                            value="{{ project['id'] }}"
+                            {% if selected_project_id|string == project['id']|string %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ project['project_name'] }}
+                        </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+
+            <!-- PERIOD FILTER -->
+
+            <div class="form-group">
+
+                <label for="period">
+                    PERIOD
+                </label>
+
+                <select
+                    id="period"
+                    name="period"
+                    required
+                >
+
+                    <option
+                        value="daily"
+                        {% if period == 'daily' %}selected{% endif %}
+                    >
+                        DAILY
+                    </option>
+
+                    <option
+                        value="weekly"
+                        {% if period == 'weekly' %}selected{% endif %}
+                    >
+                        WEEKLY
+                    </option>
+
+                    <option
+                        value="monthly"
+                        {% if period == 'monthly' %}selected{% endif %}
+                    >
+                        MONTHLY
+                    </option>
+
+                </select>
+
+            </div>
+
+        </div>
+
+
+        <div class="filter-actions">
+
+            <button type="submit">
+                APPLY FILTER
+            </button>
+
+        </div>
+
+    </form>
+
+</div>
+
+
+<!-- =====================================================
+     ACCURACY SUMMARY
+====================================================== -->
+
+<div class="card section-spacing">
+
+    <h2 class="section-title">
+        Accuracy Summary
+    </h2>
+
+    <p class="section-description">
+        Weighted accuracy based on total audited records and total errors
+        for the selected period and project.
+    </p>
+
+
+    <div class="summary-grid">
+
+        <!-- INTERNAL -->
+
+        <div class="summary-card">
+
+            <h3>INTERNAL ACCURACY</h3>
+
+            <div class="accuracy-value">
+
+                {% if summary.get('internal', {}).get('accuracy') is not none %}
+
+                    {{ "%.2f"|format(summary.get('internal', {}).get('accuracy')) }}%
+
+                {% else %}
+
+                    N/A
+
+                {% endif %}
+
+            </div>
+
+            <div class="summary-details">
+
+                Audited:
+                <strong>
+                    {{ summary.get('internal', {}).get('audited', 0) }}
+                </strong>
+
+                <br>
+
+                Errors:
+                <strong>
+                    {{ summary.get('internal', {}).get('errors', 0) }}
+                </strong>
+
+            </div>
+
+        </div>
+
+
+        <!-- EXTERNAL WC -->
+
+        <div class="summary-card">
+
+            <h3>EXTERNAL WC ACCURACY</h3>
+
+            <div class="accuracy-value">
+
+                {% if summary.get('external_wc', {}).get('accuracy') is not none %}
+
+                    {{ "%.2f"|format(summary.get('external_wc', {}).get('accuracy')) }}%
+
+                {% else %}
+
+                    N/A
+
+                {% endif %}
+
+            </div>
+
+            <div class="summary-details">
+
+                Audited:
+                <strong>
+                    {{ summary.get('external_wc', {}).get('audited', 0) }}
+                </strong>
+
+                <br>
+
+                Errors:
+                <strong>
+                    {{ summary.get('external_wc', {}).get('errors', 0) }}
+                </strong>
+
+            </div>
+
+        </div>
+
+
+        <!-- EXTERNAL WOC -->
+
+        <div class="summary-card">
+
+            <h3>EXTERNAL WOC ACCURACY</h3>
+
+            <div class="accuracy-value">
+
+                {% if summary.get('external_woc', {}).get('accuracy') is not none %}
+
+                    {{ "%.2f"|format(summary.get('external_woc', {}).get('accuracy')) }}%
+
+                {% else %}
+
+                    N/A
+
+                {% endif %}
+
+            </div>
+
+            <div class="summary-details">
+
+                Audited:
+                <strong>
+                    {{ summary.get('external_woc', {}).get('audited', 0) }}
+                </strong>
+
+                <br>
+
+                Errors:
+                <strong>
+                    {{ summary.get('external_woc', {}).get('errors', 0) }}
+                </strong>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     BILLERS BELOW 90% - INTERNAL
+====================================================== -->
+
+<div class="card section-spacing">
+
+    <h2 class="section-title">
+        Billers Below 90% – Internal Accuracy
+    </h2>
+
+    <p class="section-description">
+        Billers whose Internal Accuracy is below the 90% target
+        for the selected period.
+    </p>
+
+
+    <div class="table-wrap">
+
+        <table class="accuracy-table">
+
+            <thead>
+
+                <tr>
+                    <th>BILLER</th>
+                    <th>PROJECT</th>
+                    <th>ACCURACY</th>
+                    <th>AUDITED</th>
+                    <th>ERRORS</th>
+                </tr>
+
+            </thead>
+
+
+            <tbody>
+
+                {% for item in below_90_internal %}
+
+                <tr>
+
+                    <td>
+                        <span class="biller-name">
+                            {{ item['biller_name'] }}
+                        </span>
+                    </td>
+
+                    <td>
+                        {{ item['project_name'] }}
+                    </td>
+
+                    <td class="below-target">
+                        {{ "%.2f"|format(item['accuracy']) }}%
+                    </td>
+
+                    <td>
+                        {{ item['audited'] }}
+                    </td>
+
+                    <td>
+                        {{ item['errors'] }}
+                    </td>
+
+                </tr>
+
+                {% else %}
+
+                <tr>
+
+                    <td colspan="5" class="empty-state">
+                        No Billers below 90% Internal Accuracy.
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     BILLERS BELOW 90% - EXTERNAL WC
+====================================================== -->
+
+<div class="card section-spacing">
+
+    <h2 class="section-title">
+        Billers Below 90% – External WC Accuracy
+    </h2>
+
+    <p class="section-description">
+        Billers whose External WC Accuracy is below the 90% target
+        for the selected period.
+    </p>
+
+
+    <div class="table-wrap">
+
+        <table class="accuracy-table">
+
+            <thead>
+
+                <tr>
+                    <th>BILLER</th>
+                    <th>PROJECT</th>
+                    <th>ACCURACY</th>
+                    <th>AUDITED</th>
+                    <th>ERRORS</th>
+                </tr>
+
+            </thead>
+
+
+            <tbody>
+
+                {% for item in below_90_external_wc %}
+
+                <tr>
+
+                    <td>
+                        <span class="biller-name">
+                            {{ item['biller_name'] }}
+                        </span>
+                    </td>
+
+                    <td>
+                        {{ item['project_name'] }}
+                    </td>
+
+                    <td class="below-target">
+                        {{ "%.2f"|format(item['accuracy']) }}%
+                    </td>
+
+                    <td>
+                        {{ item['audited'] }}
+                    </td>
+
+                    <td>
+                        {{ item['errors'] }}
+                    </td>
+
+                </tr>
+
+                {% else %}
+
+                <tr>
+
+                    <td colspan="5" class="empty-state">
+                        No Billers below 90% External WC Accuracy.
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     BILLERS BELOW 90% - EXTERNAL WOC
+====================================================== -->
+
+<div class="card section-spacing">
+
+    <h2 class="section-title">
+        Billers Below 90% – External WOC Accuracy
+    </h2>
+
+    <p class="section-description">
+        Billers whose External WOC Accuracy is below the 90% target
+        for the selected period.
+    </p>
+
+
+    <div class="table-wrap">
+
+        <table class="accuracy-table">
+
+            <thead>
+
+                <tr>
+                    <th>BILLER</th>
+                    <th>PROJECT</th>
+                    <th>ACCURACY</th>
+                    <th>AUDITED</th>
+                    <th>ERRORS</th>
+                </tr>
+
+            </thead>
+
+
+            <tbody>
+
+                {% for item in below_90_external_woc %}
+
+                <tr>
+
+                    <td>
+                        <span class="biller-name">
+                            {{ item['biller_name'] }}
+                        </span>
+                    </td>
+
+                    <td>
+                        {{ item['project_name'] }}
+                    </td>
+
+                    <td class="below-target">
+                        {{ "%.2f"|format(item['accuracy']) }}%
+                    </td>
+
+                    <td>
+                        {{ item['audited'] }}
+                    </td>
+
+                    <td>
+                        {{ item['errors'] }}
+                    </td>
+
+                </tr>
+
+                {% else %}
+
+                <tr>
+
+                    <td colspan="5" class="empty-state">
+                        No Billers below 90% External WOC Accuracy.
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     ACCURACY IMPROVEMENT MONITORING
+====================================================== -->
+
+<div class="card section-spacing">
+
+    <h2 class="section-title">
+        Accuracy Improvement Monitoring
+    </h2>
+
+    <p class="section-description">
+        Compare each Biller's accuracy with the previous
+        corresponding period.
+
+        Daily compares with the previous day.
+        Weekly compares with the previous week.
+        Monthly compares with the previous month.
+    </p>
+
+
+    <div class="table-wrap">
+
+        <table class="accuracy-table">
+
+            <thead>
+
+                <tr>
+                    <th>BILLER</th>
+                    <th>PROJECT</th>
+                    <th>ACCURACY TYPE</th>
+                    <th>PREVIOUS ACCURACY</th>
+                    <th>CURRENT ACCURACY</th>
+                    <th>CHANGE</th>
+                    <th>STATUS</th>
+                    <th>IMPROVEMENT NOTE</th>
+                </tr>
+
+            </thead>
+
+
+            <tbody>
+
+                {% for item in improvement_notes %}
+
+                <tr>
+
+                    <td>
+                        <span class="biller-name">
+                            {{ item['biller_name'] }}
+                        </span>
+                    </td>
+
+
+                    <td>
+                        {{ item['project_name'] }}
+                    </td>
+
+
+                    <td>
+                        {{ item['accuracy_type'] }}
+                    </td>
+
+
+                    <td>
+
+                        {% if item['previous_accuracy'] is not none %}
+
+                            {{ "%.2f"|format(item['previous_accuracy']) }}%
+
+                        {% else %}
+
+                            N/A
+
+                        {% endif %}
+
+                    </td>
+
+
+                    <td class="accuracy-number">
+
+                        {% if item['current_accuracy'] is not none %}
+
+                            {{ "%.2f"|format(item['current_accuracy']) }}%
+
+                        {% else %}
+
+                            N/A
+
+                        {% endif %}
+
+                    </td>
+
+
+                    <td>
+
+                        {% if item['change'] is not none %}
+
+                            {% if item['change'] > 0 %}
+
+                                <span class="meeting-target">
+                                    +{{ "%.2f"|format(item['change']) }}%
+                                </span>
+
+                            {% elif item['change'] < 0 %}
+
+                                <span class="below-target">
+                                    {{ "%.2f"|format(item['change']) }}%
+                                </span>
+
+                            {% else %}
+
+                                0.00%
+
+                            {% endif %}
+
+                        {% else %}
+
+                            N/A
+
+                        {% endif %}
+
+                    </td>
+
+
+                    <td>
+
+                        {% set status = item['status']|lower|replace(' ', '-') %}
+
+                        <span class="improvement-status {{ status }}">
+                            {{ item['status'] }}
+                        </span>
+
+                    </td>
+
+
+                    <td class="improvement-note">
+                        {{ item['note'] }}
+                    </td>
+
+                </tr>
+
+
+                {% else %}
+
+                <tr>
+
+                    <td colspan="8" class="empty-state">
+                        No accuracy improvement records available
+                        for the selected period.
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+
+{% endblock %}
