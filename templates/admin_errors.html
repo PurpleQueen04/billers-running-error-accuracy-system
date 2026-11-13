@@ -1,1 +1,70 @@
-{% extends "base.html" %}{% block content %}<h1>Manage Audit Details</h1><section class="card"><p class="muted">Admin-only. Billers cannot edit these original source fields. Showing latest 250 imported records.</p><div class="tablewrap"><table><thead><tr><th>Date</th><th>Week</th><th>Biller</th><th>User</th><th>PRO#</th><th>Source</th><th>Auditor</th><th>Action</th></tr></thead><tbody>{% for r in rows %}<tr><td>{{ r.billed_date }}</td><td>{{ r.week }}</td><td>{{ r.biller_name }}</td><td>{{ r.username }}</td><td>{{ r.pro }}</td><td>{{ r.source }}</td><td>{{ r.auditor }}</td><td><a href="{{ url_for('edit_error',record_key=r.record_key) }}">Edit details</a></td></tr>{% else %}<tr><td colspan="8">No records imported yet.</td></tr>{% endfor %}</tbody></table></div></section>{% endblock %}
+
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1>Manage Audit Details</h1>
+
+<section class="card">
+
+    <p class="muted">
+        Admin-only. Billers cannot edit these original source fields.
+        Showing latest 250 imported records.
+    </p>
+
+    <div class="tablewrap">
+
+        <table>
+
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Week</th>
+                    <th>Biller</th>
+                    <th>User</th>
+                    <th>PRO#</th>
+                    <th>Source</th>
+                    <th>Auditor</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for r in records %}
+
+                <tr>
+                    <td>{{ r.billed_date }}</td>
+                    <td>{{ r.week }}</td>
+                    <td>{{ r.biller_name }}</td>
+                    <td>{{ r.username }}</td>
+                    <td>{{ r.pro }}</td>
+                    <td>{{ r.source }}</td>
+                    <td>{{ r.auditor }}</td>
+
+                    <td>
+                        <a href="{{ url_for('edit_error', record_key=r.record_key) }}">
+                            Edit details
+                        </a>
+                    </td>
+                </tr>
+
+                {% else %}
+
+                <tr>
+                    <td colspan="8">
+                        No records imported yet.
+                    </td>
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+
+{% endblock %}
