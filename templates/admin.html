@@ -1,371 +1,355 @@
 
 {% extends "base.html" %}
 
+{% block title %}Admin Dashboard | Billers Running Error & Accuracy System{% endblock %}
+
+{% block head %}
+<style>
+    .dashboard-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 22px;
+    }
+
+    .dashboard-heading h1 {
+        margin: 0;
+        font-size: 25px;
+        color: #172033;
+    }
+
+    .dashboard-heading p {
+        color: #667085;
+        font-size: 13px;
+        margin: 7px 0 0;
+    }
+
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 16px;
+        margin-bottom: 22px;
+    }
+
+    .stat-card {
+        background: white;
+        border: 1px solid #e0e6ef;
+        border-radius: 9px;
+        padding: 20px;
+    }
+
+    .stat-label {
+        color: #667085;
+        font-size: 12px;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+
+    .stat-value {
+        font-size: 29px;
+        font-weight: bold;
+        margin-top: 10px;
+        color: #172033;
+    }
+
+    .section-title {
+        font-size: 17px;
+        margin: 0 0 16px;
+        color: #172033;
+    }
+
+    .section-description {
+        color: #667085;
+        font-size: 13px;
+        line-height: 1.6;
+        margin-bottom: 16px;
+    }
+
+    .section-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 15px;
+    }
+
+    .action-link {
+        display: inline-block;
+        padding: 11px 17px;
+        border-radius: 6px;
+        background: #15966d;
+        color: white;
+        text-decoration: none;
+        font-size: 12px;
+        font-weight: bold;
+    }
+
+    .action-link:hover {
+        background: #107b59;
+    }
+
+    .action-link.secondary {
+        background: #475467;
+    }
+
+    .empty-state {
+        color: #667085;
+        text-align: center;
+        padding: 25px;
+    }
+
+    .upload-input {
+        display: block;
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        background: #fff;
+    }
+
+    .upload-button {
+        background: #15966d;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 11px 20px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .upload-button:hover {
+        background: #107b59;
+    }
+
+    @media (max-width: 600px) {
+        .dashboard-heading h1 {
+            font-size: 21px;
+        }
+
+        .stat-value {
+            font-size: 25px;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 
-<h1>Admin Dashboard</h1>
+<!-- =====================================================
+     DASHBOARD HEADER
+====================================================== -->
 
-<!-- DASHBOARD STATISTICS -->
-<div class="stats">
+<div class="dashboard-heading">
+    <div>
+        <h1>Admin Dashboard</h1>
+        <p>
+            Running Errors and Accuracy Monitoring Overview
+        </p>
+    </div>
+</div>
 
-    <div class="stat">
-        <small>Running Errors</small>
-        <b>{{ counts.errors }}</b>
+
+<!-- =====================================================
+     DASHBOARD STATISTICS
+====================================================== -->
+
+<div class="dashboard-grid">
+
+    <div class="stat-card">
+        <div class="stat-label">Upload Source of Workbook</div>
+        <div class="stat-value">
+            {{ counts.get('imports', 0) }}
+        </div>
     </div>
 
-    <div class="stat">
-        <small>Active Billers</small>
-        <b>{{ counts.billers }}</b>
+    <div class="stat-card">
+        <div class="stat-label">Running Errors</div>
+        <div class="stat-value">
+            {{ counts.get('errors', 0) }}
+        </div>
     </div>
 
-    <div class="stat">
-        <small>Verified (Y)</small>
-        <b>{{ counts.verified }}</b>
+    <div class="stat-card">
+        <div class="stat-label">Active Billers</div>
+        <div class="stat-value">
+            {{ counts.get('billers', 0) }}
+        </div>
     </div>
 
-    <div class="stat">
-        <small>Disputed (N)</small>
-        <b>{{ counts.disputed }}</b>
+    <div class="stat-card">
+        <div class="stat-label">Verified</div>
+        <div class="stat-value">
+            {{ counts.get('verified', 0) }}
+        </div>
     </div>
 
-    <div class="stat">
-        <small>Pending</small>
-        <b>{{ counts.pending }}</b>
+    <div class="stat-card">
+        <div class="stat-label">Disputed</div>
+        <div class="stat-value">
+            {{ counts.get('disputed', 0) }}
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-label">Pending</div>
+        <div class="stat-value">
+            {{ counts.get('pending', 0) }}
+        </div>
     </div>
 
 </div>
 
 
-<!-- UPLOAD SOURCE WORKBOOK -->
-<section class="card">
+<!-- =====================================================
+     UPLOAD SOURCE OF WORKBOOK
+====================================================== -->
 
-    <h2>Upload Source Workbook</h2>
+<div class="card">
 
-    <p class="muted">
-        ODS/XLSX imports ERROR, INTERNAL and EXTERNAL.
-        CSV imports one selected sheet.
-        Existing Biller responses are preserved.
+    <h2 class="section-title">
+        Upload Source of Workbook
+    </h2>
+
+    <p class="section-description">
+        Upload the updated workbook containing the ERROR,
+        INTERNAL and EXTERNAL sheets. The PROJECT column
+        should match the project names saved in the Project section.
     </p>
 
-    <form method="post"
-          action="{{ url_for('upload_source') }}"
-          enctype="multipart/form-data"
-          class="inline">
+    <form
+        method="POST"
+        action="{{ url_for('upload_workbook') }}"
+        enctype="multipart/form-data"
+    >
 
-        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input
+            type="hidden"
+            name="csrf"
+            value="{{ session.get('csrf', '') }}"
+        >
 
-        <input type="file"
-               name="source_file"
-               accept=".ods,.xlsx,.xls,.csv"
-               required>
+        <input
+            class="upload-input"
+            type="file"
+            name="file"
+            accept=".xlsx,.xls,.ods"
+            required
+        >
 
-        <label>
-            CSV Sheet
-
-            <select name="csv_sheet">
-                <option>ERROR</option>
-                <option>INTERNAL</option>
-                <option>EXTERNAL</option>
-            </select>
-        </label>
-
-        <button type="submit">Upload &amp; Import</button>
-
-    </form>
-
-</section>
-
-
-<!-- BILLER ACCOUNTS -->
-<section class="card">
-
-    <div class="section-head">
-
-        <h2>Biller Accounts</h2>
-
-        <a class="button secondary"
-           href="{{ url_for('export_responses') }}">
-            Export Responses
-        </a>
-
-    </div>
-
-    <!-- CREATE BILLER -->
-    <form method="post"
-          action="{{ url_for('create_user') }}"
-          class="gridform">
-
-        <input type="hidden" name="csrf" value="{{ csrf }}">
-
-        <label>
-            Username (must match source USER)
-
-            <input name="username" required>
-        </label>
-
-        <label>
-            Biller Name
-
-            <input name="display_name">
-        </label>
-
-        <label>
-            Temporary Password (10+ characters)
-
-            <input type="password"
-                   name="password"
-                   minlength="10"
-                   required>
-        </label>
-
-        <button type="submit">Create Biller</button>
+        <div class="section-actions">
+            <button class="upload-button" type="submit">
+                UPLOAD WORKBOOK
+            </button>
+        </div>
 
     </form>
 
-    <!-- BILLER ACCOUNT LIST -->
+</div>
+
+
+<!-- =====================================================
+     RECENT IMPORTS
+====================================================== -->
+
+<div class="card">
+
+    <h2 class="section-title">
+        Recent Imports
+    </h2>
+
     <div class="table-wrap">
 
         <table>
-
             <thead>
                 <tr>
-                    <th>Username</th>
-                    <th>Display Name</th>
-                    <th>Status</th>
-                    <th>Action</th>
+                    <th>DATE</th>
+                    <th>FILE NAME</th>
+                    <th>UPLOADED BY</th>
+                    <th>RECORDS IMPORTED</th>
                 </tr>
             </thead>
 
             <tbody>
 
-                {% for u in billers %}
-
-                    <tr>
-                        <td>{{ u.username }}</td>
-                        <td>{{ u.display_name }}</td>
-
-                        <td>
-                            {{ 'Active' if u.active else 'Disabled' }}
-                        </td>
-
-                        <td>
-                            <form method="post"
-                                  action="{{ url_for('toggle_user', user_id=u.id) }}">
-
-                                <input type="hidden"
-                                       name="csrf"
-                                       value="{{ csrf }}">
-
-                                <button type="submit"
-                                        class="smallbtn secondary">
-                                    {{ 'Disable' if u.active else 'Enable' }}
-                                </button>
-
-                            </form>
-                        </td>
-                    </tr>
+                {% for item in history %}
+                <tr>
+                    <td>{{ item['imported_at'] }}</td>
+                    <td>{{ item['filename'] }}</td>
+                    <td>{{ item['uploaded_by'] }}</td>
+                    <td>{{ item['records_imported'] }}</td>
+                </tr>
 
                 {% else %}
-
-                    <tr>
-                        <td colspan="4">No biller accounts yet.</td>
-                    </tr>
-
+                <tr>
+                    <td colspan="4" class="empty-state">
+                        No import history available.
+                    </td>
+                </tr>
                 {% endfor %}
 
             </tbody>
-
         </table>
 
     </div>
 
-</section>
+</div>
 
 
-<!-- QC ACCOUNTS -->
-<section class="card">
+<!-- =====================================================
+     ADMINISTRATIONS
+====================================================== -->
 
-    <h2>QC Accounts</h2>
+<div class="card">
 
-    <p class="muted">
-        Create separate QC accounts. QC users will log in using
-        their own credentials to submit QC explanations.
+    <h2 class="section-title">
+        Administrations
+    </h2>
+
+    <p class="section-description">
+        Manage system accounts, projects, accuracy monitoring,
+        error details and activity logs.
     </p>
 
-    <!-- CREATE QC -->
-    <form method="post"
-          action="{{ url_for('create_qc_user') }}"
-          class="gridform">
+    <div class="section-actions">
 
-        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <a
+            class="action-link"
+            href="{{ url_for('admin_accounts') }}"
+        >
+            ACCOUNT
+        </a>
 
-        <label>
-            QC Username
+        <a
+            class="action-link"
+            href="{{ url_for('admin_projects') }}"
+        >
+            PROJECT
+        </a>
 
-            <input name="username"
-                   required
-                   autocomplete="off">
-        </label>
+        <a
+            class="action-link"
+            href="{{ url_for('admin_accuracy') }}"
+        >
+            ACCURACY
+        </a>
 
-        <label>
-            QC Name
+        <a
+            class="action-link"
+            href="{{ url_for('admin_errors') }}"
+        >
+            ERROR DETAILS
+        </a>
 
-            <input name="display_name"
-                   required
-                   autocomplete="off">
-        </label>
-
-        <label>
-            Temporary Password (10+ characters)
-
-            <input type="password"
-                   name="password"
-                   minlength="10"
-                   required
-                   autocomplete="new-password">
-        </label>
-
-        <button type="submit">Create QC Account</button>
-
-    </form>
-
-
-    <!-- QC ACCOUNT LIST -->
-    <div class="table-wrap">
-
-        <table>
-
-            <thead>
-                <tr>
-                    <th>Username</th>
-                    <th>QC Name</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-
-            <tbody>
-
-                {% for q in qc_users %}
-
-                    <tr>
-
-                        <td>{{ q.username }}</td>
-
-                        <td>{{ q.display_name }}</td>
-
-                        <td>
-                            {{ 'Active' if q.active else 'Disabled' }}
-                        </td>
-
-                        <td>
-
-                            <form method="post"
-                                  action="{{ url_for('toggle_qc_user', user_id=q.id) }}">
-
-                                <input type="hidden"
-                                       name="csrf"
-                                       value="{{ csrf }}">
-
-                                <button type="submit"
-                                        class="smallbtn secondary">
-
-                                    {{ 'Disable' if q.active else 'Enable' }}
-
-                                </button>
-
-                            </form>
-
-                        </td>
-
-                    </tr>
-
-                {% else %}
-
-                    <tr>
-                        <td colspan="4">No QC accounts yet.</td>
-                    </tr>
-
-                {% endfor %}
-
-            </tbody>
-
-        </table>
+        <a
+            class="action-link secondary"
+            href="{{ url_for('admin_logs') }}"
+        >
+            ACTIVITY LOGS
+        </a>
 
     </div>
 
-</section>
-
-
-<!-- RECENT IMPORTS -->
-<section class="card">
-
-    <h2>Recent Imports</h2>
-
-    <div class="table-wrap">
-
-        <table>
-
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>File</th>
-                    <th>Admin</th>
-                    <th>ERROR</th>
-                    <th>INTERNAL</th>
-                    <th>EXTERNAL</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-
-            <tbody>
-
-                {% for h in history %}
-
-                    <tr>
-                        <td>{{ h.imported_at }}</td>
-                        <td>{{ h.filename }}</td>
-                        <td>{{ h.imported_by }}</td>
-                        <td>{{ h.error_count }}</td>
-                        <td>{{ h.internal_count }}</td>
-                        <td>{{ h.external_count }}</td>
-                        <td>{{ h.status }}</td>
-                    </tr>
-
-                {% else %}
-
-                    <tr>
-                        <td colspan="7">No imports yet.</td>
-                    </tr>
-
-                {% endfor %}
-
-            </tbody>
-
-        </table>
-
-    </div>
-
-</section>
-
-
-<!-- ADMINISTRATION -->
-<section class="card">
-
-    <h2>Administration</h2>
-
-    <p>
-        <a href="{{ url_for('admin_errors') }}">
-            Manage / Edit Audit Details
-        </a>
-
-        &nbsp;·&nbsp;
-
-        <a href="{{ url_for('logs') }}">
-            View Activity Logs
-        </a>
-    </p>
-
-</section>
+</div>
 
 {% endblock %}
