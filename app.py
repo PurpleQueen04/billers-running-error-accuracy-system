@@ -3776,7 +3776,9 @@ def update_account_projects(user_id):
                     "info"
                 )
 
-                return redirect(url_for("admin_accounts"))
+                return redirect(
+                    url_for("admin_accounts") + f"#account-{user_id}"
+                )
 
             if role not in ("biller", "qc"):
                 abort(400)
@@ -3879,7 +3881,9 @@ def update_account_projects(user_id):
             "danger"
         )
 
-    return redirect(url_for("admin_accounts"))
+    return redirect(
+        url_for("admin_accounts") + f"#account-{user_id}"
+    )
 
 
 # =========================================================
