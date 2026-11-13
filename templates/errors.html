@@ -1,0 +1,193 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+
+<h1>Running Error Records</h1>
+
+<p class="muted">
+    Review your assigned running error records and submit your verification
+    and explanations. Original audit information is view-only.
+</p>
+
+
+<!-- BACK TO DASHBOARD -->
+<div class="accuracy-actions">
+    <a href="{{ url_for('biller_dashboard') }}" class="btn">
+        Back to Dashboard
+    </a>
+</div>
+
+
+<!-- ERROR RECORDS -->
+{% for e in errors %}
+
+<section class="card" id="record-{{ e.record_key }}">
+
+    <h2>
+        PRO: {{ e.pro or 'N/A' }}
+    </h2>
+
+    <p class="muted">
+        Record Key: {{ e.record_key }}
+    </p>
+
+
+    <!-- ORIGINAL AUDIT INFORMATION -->
+    <h3>Audit Information</h3>
+
+    <div class="tablewrap">
+
+        <table>
+
+            <tbody>
+
+                <tr>
+                    <th>BILLED DATE</th>
+                    <td>{{ e.billed_date or '—' }}</td>
+                </tr>
+
+                <tr>
+                    <th>WEEK</th>
+                    <td>{{ e.week or '—' }}</td>
+                </tr>
+
+                <tr>
+                    <th>SOURCE</th>
+                    <td>{{ e.source or '—' }}</td>
+                </tr>
+
+                <tr>
+                    <th>USERNAME</th>
+                    <td>{{ e.username or '—' }}</td>
+                </tr>
+
+                <tr>
+                    <th>ZB FIELD</th>
+                    <td>{{ e.zb_field or '—' }}</td>
+                </tr>
+
+                <tr>
+                    <th>AUDITOR</th>
+                    <td>{{ e.auditor or '—' }}</td>
+                </tr>
+
+                <tr>
+                    <th>AUDIT TYPE</th>
+                    <td>{{ e.audit_type or '—' }}</td>
+                </tr>
+
+                <tr>
+                    <th>BILLER NAME</th>
+                    <td>{{ e.biller_name or '—' }}</td>
+                </tr>
+
+                <tr>
+                    <th>ERROR DETAILS</th>
+                    <td>{{ e.error_details or '—' }}</td>
+                </tr>
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+
+    <!-- BILLER RESPONSE FORM -->
+    <h3>My Response</h3>
+
+    <form method="post"
+          action="{{ url_for('save_response', record_key=e.record_key) }}">
+
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+
+        <label>
+            Verified Error
+
+            <select name="verified_error">
+
+                <option value=""
+                    {% if not e.verified_error %}selected{% endif %}>
+                    Pending
+                </option>
+
+                <option value="Y"
+                    {% if e.verified_error == 'Y' %}selected{% endif %}>
+                    Y - Verified
+                </option>
+
+                <option value="N"
+                    {% if e.verified_error == 'N' %}selected{% endif %}>
+                    N - Disputed
+                </option>
+
+            </select>
+        </label>
+
+
+        <label>
+            Biller Comment
+
+            <textarea name="biller_comment"
+                      rows="3"
+                      placeholder="Enter your comment...">{{ e.biller_comment or '' }}</textarea>
+        </label>
+
+
+        <label>
+            QC Explanation
+
+            <textarea name="qc_explanation"
+                      rows="3"
+                      placeholder="Enter QC explanation...">{{ e.qc_explanation or '' }}</textarea>
+        </label>
+
+
+        <label>
+            QC Name
+
+            <input type="text"
+                   name="qc_name"
+                   value="{{ e.qc_name or '' }}"
+                   placeholder="Enter QC name">
+        </label>
+
+
+        <button type="submit" class="btn">
+            Save Response
+        </button>
+
+    </form>
+
+
+    {% if e.updated_at %}
+        <p class="muted">
+            Last Updated: {{ e.updated_at }}
+        </p>
+    {% endif %}
+
+</section>
+
+{% else %}
+
+<section class="card">
+    <h3>No Running Error Records Found</h3>
+    <p class="muted">
+        There are currently no running error records assigned to your account.
+    </p>
+</section>
+
+{% endfor %}
+
+
+<!-- BACK TO DASHBOARD -->
+<div class="accuracy-actions">
+
+    <a href="{{ url_for('biller_dashboard') }}" class="btn">
+        Back to Dashboard
+    </a>
+
+</div>
+
+{% endblock %}
