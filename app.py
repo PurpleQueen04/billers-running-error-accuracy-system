@@ -733,10 +733,10 @@ def init_db():
                     weekly TEXT,
                     record_date TEXT,
                     accuracy_type TEXT,
-                    accuracy_value REAL,
-                    bills_processed REAL,
-                    audited REAL,
-                    errors REAL,
+                    accuracy_value DOUBLE PRECISION,
+                    bills_processed TEXT,
+                    audited TEXT,
+                    errors TEXT,
                     source_row INTEGER,
                     imported_at TEXT,
                     project_id INTEGER
@@ -754,9 +754,9 @@ def init_db():
                     record_date TEXT,
                     accuracy_type TEXT,
                     accuracy_value REAL,
-                    bills_processed REAL,
-                    audited REAL,
-                    errors REAL,
+                    bills_processed TEXT,
+                    audited TEXT,
+                    errors TEXT,
                     source_row INTEGER,
                     imported_at TEXT,
                     project_id INTEGER
@@ -846,6 +846,7 @@ def init_db():
                 )
             """)
 
+        
         # -------------------------------------------------
         # SAFE ADDITION OF MISSING COLUMNS
         # -------------------------------------------------
@@ -877,6 +878,8 @@ def init_db():
                 "pro": "TEXT",
                 "zb_field": "TEXT",
                 "error_details": "TEXT",
+                "source_row": "INTEGER",
+                "imported_at": "TEXT",
                 "verified_error": "TEXT DEFAULT 'N'",
                 "biller_comment": "TEXT",
                 "qc_explanation": "TEXT",
@@ -982,43 +985,50 @@ def init_db():
         if not migration:
 
             con.execute("""
-                UPDATE error_records
-                SET
-                    verified_error = (
-                        SELECT br.verified_error
-                        FROM biller_responses br
-                        WHERE br.record_key = error_records.record_key
-                    ),
-                    biller_comment = (
-                        SELECT br.biller_comment
-                        FROM biller_responses br
-                        WHERE br.record_key = error_records.record_key
-                    ),
-                    qc_explanation = (
-                        SELECT br.qc_explanation
-                        FROM biller_responses br
-                        WHERE br.record_key = error_records.record_key
-                    ),
-                    qc_name = (
-                        SELECT br.qc_name
-                        FROM biller_responses br
-                        WHERE br.record_key = error_records.record_key
-                    ),
-                    updated_at = (
-                        SELECT br.updated_at
-                        FROM biller_responses br
-                        WHERE br.record_key = error_records.record_key
-                    ),
-                    updated_by = (
-                        SELECT br.updated_by
-                        FROM biller_responses br
-                        WHERE br.record_key = error_records.record_key
-                    )
-                WHERE EXISTS (
-                    SELECT 1
-                    FROM biller_responses br
-                    WHERE br.record_key = error_records.record_key
-                )
+                
+UPDATE error_records
+SET
+    verified_error = COALESCE(
+        (SELECT br.verified_error
+         FROM biller_responses br
+         WHERE br.record_key = error_records.record_key),
+        error_records.verified_error
+    ),
+    biller_comment = COALESCE(
+        (SELECT br.biller_comment
+         FROM biller_responses br
+         WHERE br.record_key = error_records.record_key),
+        error_records.biller_comment
+    ),
+    qc_explanation = COALESCE(
+        (SELECT br.qc_explanation
+         FROM biller_responses br
+         WHERE br.record_key = error_records.record_key),
+        error_records.qc_explanation
+    ),
+    qc_name = COALESCE(
+        (SELECT br.qc_name
+         FROM biller_responses br
+         WHERE br.record_key = error_records.record_key),
+        error_records.qc_name
+    ),
+    updated_at = COALESCE(
+        (SELECT br.updated_at
+         FROM biller_responses br
+         WHERE br.record_key = error_records.record_key),
+        error_records.updated_at
+    ),
+    updated_by = COALESCE(
+        (SELECT br.updated_by
+         FROM biller_responses br
+         WHERE br.record_key = error_records.record_key),
+        error_records.updated_by
+    )
+WHERE EXISTS (
+    SELECT 1
+    FROM biller_responses br
+    WHERE br.record_key = error_records.record_key
+)
             """)
 
             con.execute(
@@ -3116,13 +3126,16 @@ def login():
     return render_template("login.html")
 
 
+
 # =========================================================
 # LOGOUT
 # =========================================================
 
-@app.route("/logout", methods=["GET", "POST"])
+@app.route("/logout", methods=["POST"])
 @login_required
 def logout():
+
+    validate_csrf()
 
     username = session.get("username", "")
 
@@ -3140,6 +3153,7 @@ def logout():
     )
 
     return redirect(url_for("login"))
+
 
 
 # =========================================================
@@ -4527,7 +4541,6 @@ def admin_errors():
         records=records
     )
 
-
 # =========================================================
 # ADMIN ERROR DETAILS
 # Read-only view of all error records.
@@ -4568,6 +4581,11 @@ def admin_error_details():
 
             selected_date = ""
 
+        # Automatically select the latest date
+        # when Admin first opens the page.
+        if not selected_date:
+            selected_date = dates[0] if dates else ""
+
         if selected_date:
 
             rows = con.execute(
@@ -4596,51 +4614,14 @@ def admin_error_details():
                 LEFT JOIN projects p
                     ON p.id = e.project_id
                 WHERE e.billed_date = ?
-                ORDER BY e.id DESC
+                ORDER BY e.source_row DESC
                 """,
                 (selected_date,)
             ).fetchall()
 
         else:
 
-    selected_date = dates[0] if dates else ""
-
-    if selected_date:
-
-        rows = con.execute(
-            """
-            SELECT
-                e.record_key,
-                e.billed_date,
-                e.week,
-                e.source,
-                e.audit_type,
-                e.biller_name,
-                e.username,
-                e.id_number,
-                e.auditor,
-                e.pro,
-                e.zb_field,
-                e.error_details,
-                e.verified_error,
-                e.biller_comment,
-                e.qc_explanation,
-                e.qc_name,
-                e.updated_at,
-                e.project_id,
-                p.project_name
-            FROM error_records e
-            LEFT JOIN projects p
-                ON p.id = e.project_id
-            WHERE e.billed_date = ?
-            ORDER BY e.id DESC
-            """,
-            (selected_date,)
-        ).fetchall()
-
-    else:
-
-        rows = []
+            rows = []
 
     errors = [
         dict(row)
@@ -4653,7 +4634,6 @@ def admin_error_details():
         dates=dates,
         selected_date=selected_date
     )
-
 
 # =========================================================
 # ADMIN EDIT ORIGINAL ERROR RECORD DETAILS
@@ -4836,9 +4816,9 @@ def edit_error(record_key):
                 "success"
             )
 
-    return redirect(
-        url_for("admin_errors")
-    )
+            return redirect(
+                url_for("admin_errors")
+            )
 
     return render_template(
         "edit_error.html",
@@ -5998,7 +5978,6 @@ def biller_external_accuracy():
         )
     )
 
-
 # =========================================================
 # BILLER ERROR RECORDS
 # Own records and assigned projects only.
@@ -6017,6 +5996,7 @@ def biller_errors():
 
         errors = []
         dates = []
+        selected_date = ""
 
     else:
 
@@ -6051,6 +6031,10 @@ def biller_errors():
             if selected_date and selected_date not in dates:
                 selected_date = ""
 
+            # Automatically select the latest available date.
+            if not selected_date:
+                selected_date = dates[0] if dates else ""
+
             if selected_date:
 
                 rows = con.execute(
@@ -6080,7 +6064,7 @@ def biller_errors():
                     WHERE LOWER(TRIM(e.username)) = LOWER(TRIM(?))
                     AND e.project_id IN ({placeholders})
                     AND e.billed_date = ?
-                    ORDER BY e.id DESC
+                    ORDER BY e.source_row DESC
                     """,
                     (
                         username,
@@ -6091,39 +6075,7 @@ def biller_errors():
 
             else:
 
-                rows = con.execute(
-                    f"""
-                    SELECT
-                        e.record_key,
-                        e.billed_date,
-                        e.pro,
-                        e.project_id,
-                        p.project_name,
-                        e.week,
-                        e.source,
-                        e.username,
-                        e.auditor,
-                        e.audit_type,
-                        e.biller_name,
-                        e.zb_field,
-                        e.error_details,
-                        e.verified_error,
-                        e.biller_comment,
-                        e.qc_explanation,
-                        e.qc_name,
-                        e.updated_at
-                    FROM error_records e
-                    LEFT JOIN projects p
-                        ON p.id = e.project_id
-                    WHERE LOWER(TRIM(e.username)) = LOWER(TRIM(?))
-                    AND e.project_id IN ({placeholders})
-                    ORDER BY
-                        e.billed_date DESC,
-                        e.id DESC
-                    LIMIT 1000
-                    """,
-                    (username, *project_ids)
-                ).fetchall()
+                rows = []
 
         errors = [
             dict(row)
@@ -6134,13 +6086,8 @@ def biller_errors():
         "errors.html",
         errors=errors,
         dates=dates,
-        selected_date=(
-            selected_date
-            if project_ids
-            else ""
-        )
+        selected_date=selected_date
     )
-
 
 # =========================================================
 # QC DASHBOARD
@@ -6215,6 +6162,11 @@ def qc_errors():
         if selected_date and selected_date not in dates:
             selected_date = ""
 
+        # Automatically select the latest available date
+        # when QC first opens the page.
+        if not selected_date:
+            selected_date = dates[0] if dates else ""
+
         base_sql = f"""
             SELECT
                 e.record_key,
@@ -6248,7 +6200,7 @@ def qc_errors():
             rows = con.execute(
                 base_sql + """
                 AND e.billed_date = ?
-                ORDER BY e.id DESC
+                ORDER BY e.source_row DESC
                 """,
                 (
                     *project_ids,
@@ -6258,15 +6210,7 @@ def qc_errors():
 
         else:
 
-            rows = con.execute(
-                base_sql + """
-                ORDER BY
-                    e.billed_date DESC,
-                    e.id DESC
-                LIMIT 1000
-                """,
-                tuple(project_ids)
-            ).fetchall()
+            rows = []
 
     errors = [
         dict(row)
@@ -6279,7 +6223,6 @@ def qc_errors():
         dates=dates,
         selected_date=selected_date
     )
-
 
 # =========================================================
 # SAVE BILLER / QC RESPONSE
@@ -6646,7 +6589,7 @@ def export_responses():
                 ON p.id = e.project_id
             ORDER BY
                 e.billed_date DESC,
-                e.id DESC
+                e.source_row DESC
             """
         ).fetchall()
 
