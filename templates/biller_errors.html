@@ -1,0 +1,307 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- PAGE HEADER -->
+<div class="page-header">
+    <div>
+        <h1>My Error Records</h1>
+        <p>Review your error records and QC verification feedback.</p>
+    </div>
+
+    <span class="section-tag">
+        Biller Records
+    </span>
+</div>
+
+
+<!-- SUMMARY -->
+<div class="stats-grid">
+
+    <div class="stat-card">
+        <div class="stat-card-top">
+            <span class="stat-label">Total Records</span>
+            <span class="stat-icon">
+                <i class="fa-solid fa-clipboard-list"></i>
+            </span>
+        </div>
+
+        <div class="stat-value">{{ errors|length }}</div>
+
+        <div class="stat-description">
+            Records for the selected date
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-card-top">
+            <span class="stat-label">Verified Errors</span>
+            <span class="stat-icon">
+                <i class="fa-solid fa-circle-check"></i>
+            </span>
+        </div>
+
+        <div class="stat-value">
+            {{ errors|selectattr('verified_error', 'equalto', 'Y')|list|length }}
+        </div>
+
+        <div class="stat-description">
+            Marked VERIFIED ERROR = Y
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-card-top">
+            <span class="stat-label">Disputed Records</span>
+            <span class="stat-icon warning">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </span>
+        </div>
+
+        <div class="stat-value">
+            {{ errors|selectattr('verified_error', 'equalto', 'N')|list|length }}
+        </div>
+
+        <div class="stat-description">
+            Marked VERIFIED ERROR = N
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-card-top">
+            <span class="stat-label">Pending</span>
+            <span class="stat-icon">
+                <i class="fa-solid fa-clock"></i>
+            </span>
+        </div>
+
+        <div class="stat-value">
+            {{ errors|rejectattr('verified_error')|list|length }}
+        </div>
+
+        <div class="stat-description">
+            Awaiting verification
+        </div>
+    </div>
+
+</div>
+
+
+<!-- DATE FILTER -->
+<div class="content-card">
+
+    <div class="section-heading">
+        <div>
+            <h2>Record Filters</h2>
+            <p>Choose a billed date to review your records.</p>
+        </div>
+    </div>
+
+    <form method="GET"
+          action="{{ url_for('biller_errors') }}"
+          class="filter-bar">
+
+        <div class="filter-group">
+            <label for="date">Billed Date</label>
+
+            <select name="date"
+                    id="date"
+                    onchange="this.form.submit()">
+
+                {% if dates %}
+
+                    {% for date in dates %}
+                        <option value="{{ date }}"
+                            {% if date == selected_date %}selected{% endif %}>
+                            {{ date }}
+                        </option>
+                    {% endfor %}
+
+                {% else %}
+
+                    <option value="">No available dates</option>
+
+                {% endif %}
+
+            </select>
+        </div>
+
+        <noscript>
+            <button type="submit" class="btn btn-primary">
+                Apply Filter
+            </button>
+        </noscript>
+
+        {% if selected_date %}
+            <a href="{{ url_for('biller_errors') }}"
+               class="btn btn-secondary">
+                Clear Filter
+            </a>
+        {% endif %}
+
+    </form>
+
+</div>
+
+
+<!-- RECORDS TABLE -->
+<div class="content-card">
+
+    <div class="section-heading">
+        <div>
+            <h2>Error Record Details</h2>
+            <p>Review the details and verification feedback for each record.</p>
+        </div>
+
+        <span class="section-tag">
+            {{ errors|length }} Records
+        </span>
+    </div>
+
+    {% if errors %}
+
+        <div class="table-container">
+
+            <table class="data-table">
+
+                <thead>
+                    <tr>
+                        <th>PRO</th>
+                        <th>PROJECT</th>
+                        <th>BILLED DATE</th>
+                        <th>WEEK</th>
+                        <th>SOURCE</th>
+                        <th>USERNAME</th>
+                        <th>AUDITOR</th>
+                        <th>AUDIT TYPE</th>
+                        <th>BILLER NAME</th>
+                        <th>ZB FIELD</th>
+                        <th>ERROR DETAILS</th>
+                        <th>VERIFICATION STATUS</th>
+                        <th>MY COMMENT</th>
+                        <th>QC EXPLANATION</th>
+                        <th>QC NAME</th>
+                        <th>LAST UPDATED</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for error in errors %}
+
+                        {% set verification = (error.verified_error or '')|trim|upper %}
+
+                        <tr>
+
+                            <td class="text-primary">
+                                {{ error.pro or '—' }}
+                            </td>
+
+                            <td>
+                                {{ error.project_name or '—' }}
+                            </td>
+
+                            <td>
+                                {{ error.billed_date or '—' }}
+                            </td>
+
+                            <td>
+                                {{ error.week or '—' }}
+                            </td>
+
+                            <td>
+                                {{ error.source or '—' }}
+                            </td>
+
+                            <td>
+                                {{ error.username or '—' }}
+                            </td>
+
+                            <td>
+                                {{ error.auditor or '—' }}
+                            </td>
+
+                            <td>
+                                {{ error.audit_type or '—' }}
+                            </td>
+
+                            <td>
+                                {{ error.biller_name or '—' }}
+                            </td>
+
+                            <td>
+                                {{ error.zb_field or '—' }}
+                            </td>
+
+                            <td class="error-details-cell">
+                                {{ error.error_details or '—' }}
+                            </td>
+
+                            <td>
+                                {% if verification == 'Y' %}
+                                    <span class="status-badge status-success">
+                                        Verified
+                                    </span>
+                                {% elif verification == 'N' %}
+                                    <span class="status-badge status-danger">
+                                        Disputed
+                                    </span>
+                                {% else %}
+                                    <span class="status-badge status-warning">
+                                        Pending
+                                    </span>
+                                {% endif %}
+                            </td>
+
+                            <td class="comment-cell">
+                                {{ error.biller_comment or '—' }}
+                            </td>
+
+                            <td class="comment-cell">
+                                {{ error.qc_explanation or '—' }}
+                            </td>
+
+                            <td>
+                                {{ error.qc_name or '—' }}
+                            </td>
+
+                            <td>
+                                {{ error.updated_at or '—' }}
+                            </td>
+
+                        </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    {% else %}
+
+        <div class="empty-state">
+
+            <div class="empty-state-icon">
+                <i class="fa-solid fa-folder-open"></i>
+            </div>
+
+            <h3>No Error Records Found</h3>
+
+            <p>
+                {% if selected_date %}
+                    You have no error records for {{ selected_date }}.
+                {% else %}
+                    No error records are currently available for your account.
+                {% endif %}
+            </p>
+
+        </div>
+
+    {% endif %}
+
+</div>
+
+{% endblock %}
