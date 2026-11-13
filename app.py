@@ -3112,6 +3112,7 @@ def logout():
 
 
 
+
 # =========================================================
 # ADMIN DASHBOARD
 # =========================================================
@@ -3204,12 +3205,39 @@ def admin_dashboard():
             """
         ).fetchall()
 
+    # -----------------------------------------------------
+    # BILLER ACCURACY MONITORING
+    # -----------------------------------------------------
+
+    period_type = normalize_text(
+        request.args.get("period")
+    ).lower() or "monthly"
+
+    selected_project = normalize_text(
+        request.args.get("project_id")
+    ) or "all"
+
+    selected_period = normalize_text(
+        request.args.get("date")
+    )
+
+    accuracy_context = build_accuracy_context(
+        allowed_project_ids=None,
+        selected_project=selected_project,
+        period_type=period_type,
+        selected_period=selected_period
+    )
+
+    # -----------------------------------------------------
+    # RENDER ADMIN DASHBOARD
+    # -----------------------------------------------------
+
     return render_template(
         "admin.html",
         counts=counts,
-        history=history
+        history=history,
+        **accuracy_context
     )
-
 
 # =========================================================
 # ADMIN WORKBOOK UPLOAD
