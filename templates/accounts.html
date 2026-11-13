@@ -668,48 +668,35 @@
     // PROJECT ASSIGNMENT EDITOR
     // =====================================================
 
-    function openProjectEditor(button) {
+   function openProjectEditor(button) {
 
-        const userId = button.dataset.userId;
+    const userId = button.dataset.userId;
+    const displayName = button.dataset.displayName;
 
-        const displayName = button.dataset.displayName;
+    const assignedProjectIds = button.dataset.projectIds
+        .split(",")
+        .filter(Boolean);
 
-        const assignedProjectIds = button.dataset.projectIds
-            .split(",")
-            .filter(Boolean);
+    const editor = document.getElementById("project-editor");
+    const form = document.getElementById("project-update-form");
+    const label = document.getElementById("editing-account");
+    const projectOptions = document.getElementById("edit-project-ids");
 
+    form.action = "/admin/account/" +
+        encodeURIComponent(userId) +
+        "/projects";
 
-        const editor = document.getElementById("project-editor");
+    label.textContent = "Updating projects for: " + displayName;
 
-        const form = document.getElementById("project-update-form");
+    Array.from(projectOptions.options).forEach(option => {
+        option.selected = assignedProjectIds.includes(option.value);
+    });
 
-        const label = document.getElementById("editing-account");
+    editor.style.display = "block";
 
-        const projectOptions = document.getElementById("edit-project-ids");
+    window.scrollTo(0, editor.offsetTop - 100);
 
-
-        // Set the account update endpoint.
-
-        form.action =
-            "/admin/account/" +
-            encodeURIComponent(userId) +
-            "/projects";
-
-
-        // Display the selected account name.
-
-        label.textContent =
-            "Updating projects for: " + displayName;
-
-
-        // Clear previous selections.
-
-        Array.from(projectOptions.options).forEach(option => {
-
-            option.selected = assignedProjectIds.includes(option.value);
-
-        });
-
+}
 
         // Display the editor.
 
@@ -717,11 +704,8 @@
 
 
         editor.scrollIntoView({
-
-            behavior: "smooth",
-
-            block: "center"
-
+            behavior: "auto",
+            block: "start"
         });
 
     }
