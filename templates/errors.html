@@ -5,189 +5,375 @@
 
 <h1>Running Error Records</h1>
 
-<p class="muted">
-    Review your assigned running error records and submit your verification
-    and explanations. Original audit information is view-only.
-</p>
+<div class="error-layout">
 
+    <!-- LEFT SIDE: DATE SELECTION -->
+    <aside class="date-sidebar">
 
-<!-- BACK TO DASHBOARD -->
-<div class="accuracy-actions">
-    <a href="{{ url_for('biller_dashboard') }}" class="btn">
-        Back to Dashboard
-    </a>
-</div>
+        <h2>Date Selection</h2>
 
-
-<!-- ERROR RECORDS -->
-{% for e in errors %}
-
-<section class="card" id="record-{{ e.record_key }}">
-
-    <h2>
-        PRO: {{ e.pro or 'N/A' }}
-    </h2>
-
-    <p class="muted">
-        Record Key: {{ e.record_key }}
-    </p>
-
-
-    <!-- ORIGINAL AUDIT INFORMATION -->
-    <h3>Audit Information</h3>
-
-    <div class="tablewrap">
-
-        <table>
-
-            <tbody>
-
-                <tr>
-                    <th>BILLED DATE</th>
-                    <td>{{ e.billed_date or '—' }}</td>
-                </tr>
-
-                <tr>
-                    <th>WEEK</th>
-                    <td>{{ e.week or '—' }}</td>
-                </tr>
-
-                <tr>
-                    <th>SOURCE</th>
-                    <td>{{ e.source or '—' }}</td>
-                </tr>
-
-                <tr>
-                    <th>USERNAME</th>
-                    <td>{{ e.username or '—' }}</td>
-                </tr>
-
-                <tr>
-                    <th>ZB FIELD</th>
-                    <td>{{ e.zb_field or '—' }}</td>
-                </tr>
-
-                <tr>
-                    <th>AUDITOR</th>
-                    <td>{{ e.auditor or '—' }}</td>
-                </tr>
-
-                <tr>
-                    <th>AUDIT TYPE</th>
-                    <td>{{ e.audit_type or '—' }}</td>
-                </tr>
-
-                <tr>
-                    <th>BILLER NAME</th>
-                    <td>{{ e.biller_name or '—' }}</td>
-                </tr>
-
-                <tr>
-                    <th>ERROR DETAILS</th>
-                    <td>{{ e.error_details or '—' }}</td>
-                </tr>
-
-            </tbody>
-
-        </table>
-
-    </div>
-
-
-    <!-- BILLER RESPONSE FORM -->
-    <h3>My Response</h3>
-
-    <form method="post"
-          action="{{ url_for('save_response', record_key=e.record_key) }}">
-
-        <input type="hidden" name="csrf" value="{{ csrf }}">
-
-        <label>
-            Verified Error
-
-            <select name="verified_error">
-
-                <option value=""
-                    {% if not e.verified_error %}selected{% endif %}>
-                    Pending
-                </option>
-
-                <option value="Y"
-                    {% if e.verified_error == 'Y' %}selected{% endif %}>
-                    Y - Verified
-                </option>
-
-                <option value="N"
-                    {% if e.verified_error == 'N' %}selected{% endif %}>
-                    N - Disputed
-                </option>
-
-            </select>
-        </label>
-
-
-        <label>
-            Biller Comment
-
-            <textarea name="biller_comment"
-                      rows="3"
-                      placeholder="Enter your comment...">{{ e.biller_comment or '' }}</textarea>
-        </label>
-
-
-        <label>
-            QC Explanation
-
-            <textarea name="qc_explanation"
-                      rows="3"
-                      placeholder="Enter QC explanation...">{{ e.qc_explanation or '' }}</textarea>
-        </label>
-
-
-        <label>
-            QC Name
-
-            <input type="text"
-                   name="qc_name"
-                   value="{{ e.qc_name or '' }}"
-                   placeholder="Enter QC name">
-        </label>
-
-
-        <button type="submit" class="btn">
-            Save Response
-        </button>
-
-    </form>
-
-
-    {% if e.updated_at %}
-        <p class="muted">
-            Last Updated: {{ e.updated_at }}
+        <p class="muted small">
+            Select a billed date to view its error records.
         </p>
-    {% endif %}
 
-</section>
+        <div id="date-list" class="date-list">
+            <!-- Dates are generated from the available records. -->
+        </div>
 
-{% else %}
-
-<section class="card">
-    <h3>No Running Error Records Found</h3>
-    <p class="muted">
-        There are currently no running error records assigned to your account.
-    </p>
-</section>
-
-{% endfor %}
+    </aside>
 
 
-<!-- BACK TO DASHBOARD -->
-<div class="accuracy-actions">
+    <!-- RIGHT SIDE: SELECTED DATE RECORDS -->
+    <section class="error-content">
 
-    <a href="{{ url_for('biller_dashboard') }}" class="btn">
-        Back to Dashboard
-    </a>
+        <div class="error-content-header">
+            <div>
+                <h2 id="selected-date-title">Running Error Records</h2>
+                <p class="muted" id="selected-date-count"></p>
+            </div>
+
+            <a href="{{ url_for('biller_dashboard') }}" class="btn secondary">
+                Back to Dashboard
+            </a>
+        </div>
+
+
+        <div id="no-date-records" class="card" style="display:none;">
+            No error records found for this date.
+        </div>
+
+
+        {% for e in errors %}
+
+        <article class="error-card date-error-card"
+                 data-billed-date="{{ e.billed_date or '' }}">
+
+            <!-- PRO NUMBER -->
+            <h3 class="record-pro">
+                PRO# {{ e.pro or '—' }}
+            </h3>
+
+
+            <!-- BILLED DATE / WEEK / SOURCE -->
+            <div class="record-info-grid three-columns">
+
+                <div>
+                    <small>BILLED DATE:</small>
+                    <strong>{{ e.billed_date or '—' }}</strong>
+                </div>
+
+                <div>
+                    <small>WEEK:</small>
+                    <strong>{{ e.week or '—' }}</strong>
+                </div>
+
+                <div>
+                    <small>SOURCE:</small>
+                    <strong>{{ e.source or '—' }}</strong>
+                </div>
+
+            </div>
+
+
+            <!-- USERNAME / AUDITOR / AUDIT TYPE -->
+            <div class="record-info-grid three-columns">
+
+                <div>
+                    <small>USERNAME:</small>
+                    <strong>{{ e.username or '—' }}</strong>
+                </div>
+
+                <div>
+                    <small>AUDITOR:</small>
+                    <strong>{{ e.auditor or '—' }}</strong>
+                </div>
+
+                <div>
+                    <small>AUDIT TYPE:</small>
+                    <strong>{{ e.audit_type or '—' }}</strong>
+                </div>
+
+            </div>
+
+
+            <!-- BILLER NAME / ZB FIELD -->
+            <div class="record-info-grid two-columns">
+
+                <div>
+                    <small>BILLERS NAME:</small>
+                    <strong>{{ e.biller_name or '—' }}</strong>
+                </div>
+
+                <div>
+                    <small>ZB FIELD:</small>
+                    <strong>{{ e.zb_field or '—' }}</strong>
+                </div>
+
+            </div>
+
+
+            <!-- ERROR DETAILS -->
+            <div class="record-error-details">
+
+                <strong>ERROR DETAILS:</strong>
+
+                <p>{{ e.error_details or '—' }}</p>
+
+            </div>
+
+
+            <!-- MY RESPONSE -->
+            <div class="my-response">
+
+                <h3>MY RESPONSE</h3>
+
+                <form method="post"
+                      action="{{ url_for('save_response', record_key=e.record_key) }}">
+
+                    <input type="hidden"
+                           name="csrf"
+                           value="{{ csrf }}">
+
+                    <label>
+                        VERIFIED ERROR
+
+                        <select name="verified_error">
+
+                            <option value=""
+                                {% if not e.verified_error %}selected{% endif %}>
+                                Pending
+                            </option>
+
+                            <option value="Y"
+                                {% if e.verified_error == 'Y' %}selected{% endif %}>
+                                Y
+                            </option>
+
+                            <option value="N"
+                                {% if e.verified_error == 'N' %}selected{% endif %}>
+                                N
+                            </option>
+
+                        </select>
+
+                    </label>
+
+
+                    <label>
+                        BILLER COMMENT
+
+                        <textarea name="biller_comment"
+                                  rows="3">{{ e.biller_comment or '' }}</textarea>
+                    </label>
+
+
+                    <label>
+                        QC EXPLANATION
+
+                        <textarea name="qc_explanation"
+                                  rows="3">{{ e.qc_explanation or '' }}</textarea>
+                    </label>
+
+
+                    <label>
+                        QC NAME
+
+                        <input type="text"
+                               name="qc_name"
+                               value="{{ e.qc_name or '' }}">
+                    </label>
+
+
+                    <button type="submit">
+                        Save Response
+                    </button>
+
+                </form>
+
+                {% if e.updated_at %}
+                    <p class="muted small">
+                        Last updated: {{ e.updated_at }}
+                    </p>
+                {% endif %}
+
+            </div>
+
+        </article>
+
+        {% endfor %}
+
+    </section>
 
 </div>
+
+
+<!-- DATE SELECTION FUNCTIONALITY -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const cards = Array.from(
+        document.querySelectorAll(".date-error-card")
+    );
+
+    const dateList = document.getElementById("date-list");
+    const title = document.getElementById("selected-date-title");
+    const count = document.getElementById("selected-date-count");
+    const emptyMessage = document.getElementById("no-date-records");
+
+    const dateCounts = {};
+
+    cards.forEach(function (card) {
+
+        const date = card.dataset.billedDate.trim();
+
+        if (!date) {
+            return;
+        }
+
+        dateCounts[date] = (dateCounts[date] || 0) + 1;
+
+    });
+
+
+    function parseDate(value) {
+
+        const parts = value.split("-");
+
+        if (parts.length === 3) {
+
+            const year = Number(parts[0]);
+            const month = Number(parts[1]) - 1;
+            const day = Number(parts[2]);
+
+            if (year && month >= 0 && month <= 11 && day) {
+                return new Date(year, month, day);
+            }
+
+        }
+
+        const parsed = new Date(value);
+
+        return isNaN(parsed.getTime()) ? null : parsed;
+
+    }
+
+
+    function formatDate(value) {
+
+        const parsed = parseDate(value);
+
+        if (!parsed) {
+            return value;
+        }
+
+        return parsed.toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "long",
+            day: "numeric"
+        });
+
+    }
+
+
+    const dates = Object.keys(dateCounts).sort(function (a, b) {
+
+        const dateA = parseDate(a);
+        const dateB = parseDate(b);
+
+        if (!dateA || !dateB) {
+            return b.localeCompare(a);
+        }
+
+        return dateB - dateA;
+
+    });
+
+
+    function selectDate(selectedDate) {
+
+        let visibleCount = 0;
+
+        cards.forEach(function (card) {
+
+            const matches =
+                card.dataset.billedDate.trim() === selectedDate;
+
+            card.style.display = matches ? "block" : "none";
+
+            if (matches) {
+                visibleCount++;
+            }
+
+        });
+
+
+        title.textContent = "BILLED DATE: " + formatDate(selectedDate);
+
+        count.textContent =
+            visibleCount + (visibleCount === 1
+                ? " error record"
+                : " error records");
+
+
+        emptyMessage.style.display =
+            visibleCount === 0 ? "block" : "none";
+
+
+        dateList.querySelectorAll(".date-select-button")
+            .forEach(function (button) {
+
+                const active =
+                    button.dataset.date === selectedDate;
+
+                button.classList.toggle("active", active);
+
+            });
+
+    }
+
+
+    dates.forEach(function (date) {
+
+        const button = document.createElement("button");
+
+        button.type = "button";
+        button.className = "date-select-button";
+        button.dataset.date = date;
+
+        const dateText = document.createElement("span");
+        dateText.textContent = formatDate(date);
+
+        const recordCount = document.createElement("small");
+        recordCount.textContent =
+            dateCounts[date] + " error" +
+            (dateCounts[date] === 1 ? "" : "s");
+
+        button.appendChild(dateText);
+        button.appendChild(recordCount);
+
+        button.addEventListener("click", function () {
+            selectDate(date);
+        });
+
+        dateList.appendChild(button);
+
+    });
+
+
+    if (dates.length > 0) {
+
+        // Automatically show the newest billed date.
+        selectDate(dates[0]);
+
+    } else {
+
+        title.textContent = "No Billed Dates";
+        count.textContent = "No error records available.";
+        emptyMessage.style.display = "block";
+
+    }
+
+});
+</script>
 
 {% endblock %}
