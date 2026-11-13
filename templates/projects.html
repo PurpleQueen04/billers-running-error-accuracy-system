@@ -5,6 +5,7 @@
 
 {% block head %}
 <style>
+
     .page-heading {
         margin-bottom: 22px;
     }
@@ -12,6 +13,7 @@
     .page-heading h1 {
         margin: 0;
         font-size: 25px;
+        color: #172033;
     }
 
     .page-heading p {
@@ -23,6 +25,7 @@
     .section-title {
         font-size: 17px;
         margin: 0 0 18px;
+        color: #172033;
     }
 
     .form-grid {
@@ -41,6 +44,13 @@
         font-weight: bold;
         margin-bottom: 7px;
         color: #344054;
+    }
+
+    .form-group small {
+        display: block;
+        color: #667085;
+        font-size: 11px;
+        margin-top: 6px;
     }
 
     .form-actions {
@@ -81,6 +91,11 @@
         display: flex;
         gap: 7px;
         flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .action-buttons form {
+        margin: 0;
     }
 
     .btn-small {
@@ -90,6 +105,7 @@
 
     .edit-panel {
         display: none;
+        scroll-margin-top: 90px;
     }
 
     .empty-state {
@@ -99,6 +115,7 @@
     }
 
     @media (max-width: 700px) {
+
         .form-grid {
             grid-template-columns: 1fr;
         }
@@ -106,9 +123,12 @@
         .page-heading h1 {
             font-size: 21px;
         }
+
     }
+
 </style>
 {% endblock %}
+
 
 {% block content %}
 
@@ -117,10 +137,13 @@
 ====================================================== -->
 
 <div class="page-heading">
+
     <h1>Project Management</h1>
+
     <p>
         Create and manage projects and their assigned accounts.
     </p>
+
 </div>
 
 
@@ -130,7 +153,10 @@
 
 <div class="card">
 
-    <h2 class="section-title">Add New Project</h2>
+    <h2 class="section-title">
+        Add New Project
+    </h2>
+
 
     <form
         method="POST"
@@ -143,52 +169,88 @@
             value="{{ session.get('csrf', '') }}"
         >
 
+
         <div class="form-grid">
 
+            <!-- PROJECT NAME -->
+
             <div class="form-group">
-                <label for="project_name">PROJECT NAME</label>
+
+                <label for="project_name">
+                    PROJECT NAME
+                </label>
 
                 <input
                     type="text"
                     id="project_name"
                     name="project_name"
                     placeholder="Enter project name"
+                    maxlength="150"
                     required
                 >
+
             </div>
 
+
+            <!-- NAME -->
+
             <div class="form-group">
-                <label for="name">NAME</label>
+
+                <label for="name">
+                    NAME
+                </label>
 
                 <input
                     type="text"
                     id="name"
                     name="name"
                     placeholder="Enter name"
+                    maxlength="150"
                     required
                 >
+
             </div>
 
+
+            <!-- ROLE -->
+
             <div class="form-group">
-                <label for="role">ROLE</label>
+
+                <label for="role">
+                    ROLE
+                </label>
 
                 <select
                     id="role"
                     name="role"
                     required
                 >
-                    <option value="">Select Role</option>
-                    <option value="biller">BILLER</option>
-                    <option value="qc">QC</option>
+
+                    <option value="">
+                        Select Role
+                    </option>
+
+                    <option value="biller">
+                        BILLER
+                    </option>
+
+                    <option value="qc">
+                        QC
+                    </option>
+
                 </select>
+
             </div>
 
         </div>
 
+
         <div class="form-actions">
+
             <button type="submit">
                 SAVE PROJECT
             </button>
+
         </div>
 
     </form>
@@ -202,13 +264,17 @@
 
 <div class="card">
 
-    <h2 class="section-title">Project List</h2>
+    <h2 class="section-title">
+        Project List
+    </h2>
+
 
     <div class="table-wrap">
 
         <table class="project-table">
 
             <thead>
+
                 <tr>
                     <th>PROJECT NAME</th>
                     <th>NAME</th>
@@ -217,7 +283,9 @@
                     <th>STATUS</th>
                     <th>ACTIONS</th>
                 </tr>
+
             </thead>
+
 
             <tbody>
 
@@ -225,37 +293,60 @@
 
                 <tr>
 
+                    <!-- PROJECT NAME -->
+
                     <td>
+
                         <span class="project-name">
                             {{ project['project_name'] }}
                         </span>
+
                     </td>
+
+
+                    <!-- NAME -->
 
                     <td>
                         {{ project['name'] }}
                     </td>
 
+
+                    <!-- ROLE -->
+
                     <td>
-                        {{ project['role'].upper() }}
+                        {{ project['role']|upper }}
                     </td>
+
+
+                    <!-- ASSIGNED ACCOUNTS -->
 
                     <td>
                         {{ project['assigned_accounts'] or 'No assigned accounts' }}
                     </td>
 
+
+                    <!-- STATUS -->
+
                     <td>
 
                         {% if project['active'] %}
+
                             <span class="project-status active">
                                 ACTIVE
                             </span>
+
                         {% else %}
+
                             <span class="project-status inactive">
                                 INACTIVE
                             </span>
+
                         {% endif %}
 
                     </td>
+
+
+                    <!-- ACTIONS -->
 
                     <td>
 
@@ -263,21 +354,20 @@
 
                             <button
                                 type="button"
-                                class="btn-small"
-                                onclick="openEditProject(
-                                    '{{ project['id'] }}',
-                                    {{ project['project_name'] | tojson }},
-                                    {{ project['name'] | tojson }},
-                                    '{{ project['role'] }}'
-                                )"
+                                class="btn-small edit-project-button"
+                                data-project-id="{{ project['id'] }}"
+                                data-project-name="{{ project['project_name'] }}"
+                                data-name="{{ project['name'] }}"
+                                data-role="{{ project['role']|lower }}"
                             >
                                 EDIT
                             </button>
 
+
                             <form
                                 method="POST"
                                 action="{{ url_for('toggle_project', project_id=project['id']) }}"
-                                onsubmit="return confirm('Are you sure you want to change this project status?');"
+                                onsubmit="return confirmProjectStatus();"
                             >
 
                                 <input
@@ -286,20 +376,25 @@
                                     value="{{ session.get('csrf', '') }}"
                                 >
 
+
                                 {% if project['active'] %}
+
                                     <button
                                         type="submit"
                                         class="btn-small btn-danger"
                                     >
                                         DEACTIVATE
                                     </button>
+
                                 {% else %}
+
                                     <button
                                         type="submit"
                                         class="btn-small"
                                     >
                                         ACTIVATE
                                     </button>
+
                                 {% endif %}
 
                             </form>
@@ -310,12 +405,15 @@
 
                 </tr>
 
+
                 {% else %}
 
                 <tr>
+
                     <td colspan="6" class="empty-state">
                         No projects have been created yet.
                     </td>
+
                 </tr>
 
                 {% endfor %}
@@ -333,9 +431,15 @@
      EDIT PROJECT
 ====================================================== -->
 
-<div id="edit-project-panel" class="card edit-panel">
+<div
+    id="edit-project-panel"
+    class="card edit-panel"
+>
 
-    <h2 class="section-title">Edit Project</h2>
+    <h2 class="section-title">
+        Edit Project
+    </h2>
+
 
     <form
         id="edit-project-form"
@@ -348,9 +452,13 @@
             value="{{ session.get('csrf', '') }}"
         >
 
+
         <div class="form-grid">
 
+            <!-- PROJECT NAME -->
+
             <div class="form-group">
+
                 <label for="edit_project_name">
                     PROJECT NAME
                 </label>
@@ -359,11 +467,17 @@
                     type="text"
                     id="edit_project_name"
                     name="project_name"
+                    maxlength="150"
                     required
                 >
+
             </div>
 
+
+            <!-- NAME -->
+
             <div class="form-group">
+
                 <label for="edit_name">
                     NAME
                 </label>
@@ -372,11 +486,17 @@
                     type="text"
                     id="edit_name"
                     name="name"
+                    maxlength="150"
                     required
                 >
+
             </div>
 
+
+            <!-- ROLE -->
+
             <div class="form-group">
+
                 <label for="edit_role">
                     ROLE
                 </label>
@@ -386,18 +506,28 @@
                     name="role"
                     required
                 >
-                    <option value="biller">BILLER</option>
-                    <option value="qc">QC</option>
+
+                    <option value="biller">
+                        BILLER
+                    </option>
+
+                    <option value="qc">
+                        QC
+                    </option>
+
                 </select>
+
             </div>
 
         </div>
+
 
         <div class="form-actions">
 
             <button type="submit">
                 UPDATE PROJECT
             </button>
+
 
             <button
                 type="button"
@@ -424,30 +554,82 @@
     // EDIT PROJECT
     // =====================================================
 
-    function openEditProject(id, projectName, name, role) {
+    document.querySelectorAll(".edit-project-button").forEach(button => {
 
-        const panel = document.getElementById("edit-project-panel");
-        const form = document.getElementById("edit-project-form");
+        button.addEventListener("click", function() {
 
-        form.action = "/admin/project/" + encodeURIComponent(id) + "/edit";
+            const id = this.dataset.projectId;
 
-        document.getElementById("edit_project_name").value = projectName;
-        document.getElementById("edit_name").value = name;
-        document.getElementById("edit_role").value = role;
+            const projectName = this.dataset.projectName;
 
-        panel.style.display = "block";
+            const name = this.dataset.name;
 
-        panel.scrollIntoView({
-            behavior: "smooth",
-            block: "center"
+            const role = this.dataset.role;
+
+
+            const panel = document.getElementById("edit-project-panel");
+
+            const form = document.getElementById("edit-project-form");
+
+
+            // Set the update endpoint.
+
+            form.action =
+                "/admin/project/" +
+                encodeURIComponent(id) +
+                "/edit";
+
+
+            // Populate project information.
+
+            document.getElementById("edit_project_name").value =
+                projectName;
+
+            document.getElementById("edit_name").value =
+                name;
+
+            document.getElementById("edit_role").value =
+                role;
+
+
+            // Display edit panel.
+
+            panel.style.display = "block";
+
+
+            panel.scrollIntoView({
+
+                behavior: "smooth",
+
+                block: "center"
+
+            });
+
         });
 
-    }
+    });
 
+
+    // =====================================================
+    // CLOSE EDIT PANEL
+    // =====================================================
 
     function closeEditProject() {
 
         document.getElementById("edit-project-panel").style.display = "none";
+
+    }
+
+
+    // =====================================================
+    // PROJECT STATUS CONFIRMATION
+    // =====================================================
+
+    function confirmProjectStatus() {
+
+        return confirm(
+            "Are you sure you want to change this project status?"
+        );
 
     }
 
