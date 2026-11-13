@@ -1635,8 +1635,9 @@ def get_accuracy_columns(dataframe):
     }
 
 
+
 # =========================================================
-# ERROR RECORD IMPORT
+# ERROR RECORD IMPORT - BATCH UPSERT
 # =========================================================
 
 def import_error_sheet(con, dataframe):
@@ -1653,6 +1654,49 @@ def import_error_sheet(con, dataframe):
 
     imported = 0
     occurrences = {}
+
+    # Cache project lookups to avoid repeated SELECT queries.
+    project_cache = {}
+
+    batch = []
+
+    upsert_sql = """
+        INSERT INTO error_records (
+            record_key,
+            billed_date,
+            week,
+            source,
+            audit_type,
+            biller_name,
+            username,
+            id_number,
+            auditor,
+            pro,
+            zb_field,
+            error_details,
+            project_id,
+            verified_error
+        )
+        VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'N'
+        )
+        ON CONFLICT (record_key) DO UPDATE SET
+            billed_date = EXCLUDED.billed_date,
+            week = EXCLUDED.week,
+            source = EXCLUDED.source,
+            audit_type = EXCLUDED.audit_type,
+            biller_name = EXCLUDED.biller_name,
+            username = EXCLUDED.username,
+            id_number = EXCLUDED.id_number,
+            auditor = EXCLUDED.auditor,
+            pro = EXCLUDED.pro,
+            zb_field = EXCLUDED.zb_field,
+            error_details = EXCLUDED.error_details,
+            project_id = COALESCE(
+                EXCLUDED.project_id,
+                error_records.project_id
+            )
+    """
 
     for _, row in dataframe.iterrows():
 
@@ -1674,22 +1718,24 @@ def import_error_sheet(con, dataframe):
             columns["project"]
         )
 
-        # Blank PROJECT does not erase an existing assignment.
         project_id = None
 
         if project_name:
 
-            project_id = get_import_project_id(
-                con,
+            cache_key = normalize_text(
                 project_name
-            )
+            ).casefold()
 
-            if project_id is None:
-                raise ValueError(
-                    f"Project '{project_name}' was not found "
-                    "in Admin > PROJECT. Please check the "
-                    "PROJECT name in the source workbook."
+            if cache_key not in project_cache:
+
+                project_cache[cache_key] = (
+                    get_import_project_id(
+                        con,
+                        project_name
+                    )
                 )
+
+            project_id = project_cache[cache_key]
 
         billed_date = parse_date(
             val(row, columns["billed_date"])
@@ -1740,8 +1786,6 @@ def import_error_sheet(con, dataframe):
             billed_date_text
         )
 
-        # Project ID is intentionally excluded
-        # from the record fingerprint.
         fingerprint_parts = [
             billed_date_text,
             source,
@@ -1772,108 +1816,48 @@ def import_error_sheet(con, dataframe):
             occurrence=occurrence
         )
 
-        existing = con.execute(
-            """
-            SELECT record_key, project_id
-            FROM error_records
-            WHERE record_key = ?
-            """,
-            (record_key,)
-        ).fetchone()
-
-        if existing:
-
-            final_project_id = (
-                project_id
-                if project_id is not None
-                else existing["project_id"]
-            )
-
-            # Update source fields only.
-            # Preserve Biller and QC responses.
-            con.execute(
-                """
-                UPDATE error_records
-                SET
-                    billed_date = ?,
-                    week = ?,
-                    source = ?,
-                    audit_type = ?,
-                    biller_name = ?,
-                    username = ?,
-                    id_number = ?,
-                    auditor = ?,
-                    pro = ?,
-                    zb_field = ?,
-                    error_details = ?,
-                    project_id = ?
-                WHERE record_key = ?
-                """,
-                (
-                    billed_date_text,
-                    week,
-                    source,
-                    audit_type,
-                    biller_name,
-                    username,
-                    id_number,
-                    auditor,
-                    pro,
-                    zb_field,
-                    error_details,
-                    final_project_id,
-                    record_key
-                )
-            )
-
-        else:
-
-            con.execute(
-                """
-                INSERT INTO error_records (
-                    record_key,
-                    billed_date,
-                    week,
-                    source,
-                    audit_type,
-                    biller_name,
-                    username,
-                    id_number,
-                    auditor,
-                    pro,
-                    zb_field,
-                    error_details,
-                    project_id,
-                    verified_error
-                )
-                VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'N'
-                )
-                """,
-                (
-                    record_key,
-                    billed_date_text,
-                    week,
-                    source,
-                    audit_type,
-                    biller_name,
-                    username,
-                    id_number,
-                    auditor,
-                    pro,
-                    zb_field,
-                    error_details,
-                    project_id
-                )
-            )
+        batch.append((
+            record_key,
+            billed_date_text,
+            week,
+            source,
+            audit_type,
+            biller_name,
+            username,
+            id_number,
+            auditor,
+            pro,
+            zb_field,
+            error_details,
+            project_id
+        ))
 
         imported += 1
+
+        # Execute in manageable batches.
+        if len(batch) >= 500:
+
+            con.executemany(
+                upsert_sql,
+                batch
+            )
+
+            batch.clear()
+
+    # Process remaining records.
+    if batch:
+
+        con.executemany(
+            upsert_sql,
+            batch
+        )
 
     return imported
 
 
+
 # =========================================================
-# ACCURACY RECORD IMPORT
+# ACCURACY RECORD IMPORT - BATCH UPSERT
 # INTERNAL:
 #   ACCURACY
 #
@@ -1949,7 +1933,59 @@ def import_accuracy_sheet(
             )
         ]
 
+    # -----------------------------------------------------
+    # Batch UPSERT
+    # -----------------------------------------------------
+
     imported = 0
+    project_cache = {}
+    batch = []
+
+    imported_at = datetime.now().isoformat(
+        timespec="seconds"
+    )
+
+    upsert_sql = """
+        INSERT INTO accuracy_records (
+            sheet,
+            username,
+            biller_name,
+            month,
+            weekly,
+            record_date,
+            accuracy_type,
+            accuracy_value,
+            bills_processed,
+            audited,
+            errors,
+            source_row,
+            imported_at,
+            project_id
+        )
+        VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        )
+        ON CONFLICT (
+            sheet,
+            username,
+            record_date,
+            accuracy_type,
+            source_row
+        )
+        DO UPDATE SET
+            biller_name = EXCLUDED.biller_name,
+            month = EXCLUDED.month,
+            weekly = EXCLUDED.weekly,
+            accuracy_value = EXCLUDED.accuracy_value,
+            bills_processed = EXCLUDED.bills_processed,
+            audited = EXCLUDED.audited,
+            errors = EXCLUDED.errors,
+            imported_at = EXCLUDED.imported_at,
+            project_id = COALESCE(
+                EXCLUDED.project_id,
+                accuracy_records.project_id
+            )
+    """
 
     for source_row, (_, row) in enumerate(
         dataframe.iterrows(),
@@ -1977,17 +2013,21 @@ def import_accuracy_sheet(
         project_id = None
 
         if project_name:
-            project_id = get_import_project_id(
-                con,
-                project_name
-            )
 
-            if project_id is None:
-                raise ValueError(
-                    f"Project '{project_name}' "
-                    "does not exist. "
-                    "Please check the PROJECT column."
+            cache_key = normalize_text(
+                project_name
+            ).casefold()
+
+            if cache_key not in project_cache:
+
+                project_cache[cache_key] = (
+                    get_import_project_id(
+                        con,
+                        project_name
+                    )
                 )
+
+            project_id = project_cache[cache_key]
 
         record_date = parse_date(
             val(row, columns["date"])
@@ -1999,21 +2039,16 @@ def import_accuracy_sheet(
             else ""
         )
 
-        month = dataframe_value(
-            row,
-            columns["month"]
+ 
+        month = (
+            record_date.strftime("%Y-%m")
+            if record_date
+            else ""
         )
 
-        if not month and record_date:
-            month = record_date.strftime("%Y-%m")
-
-        weekly = dataframe_value(
-            row,
-            columns["weekly"]
+        weekly = week_for_billed_date(
+            record_date
         )
-
-        if not weekly and record_date:
-            weekly = week_for_billed_date(record_date)
 
         audited = number_value(
             val(row, columns["audited"])
@@ -2025,14 +2060,6 @@ def import_accuracy_sheet(
 
         if audited is None:
             audited = 0
-
-        imported_at = datetime.now().isoformat(
-            timespec="seconds"
-        )
-
-        # -------------------------------------------------
-        # Process each accuracy type separately
-        # -------------------------------------------------
 
         for (
             accuracy_type,
@@ -2060,113 +2087,42 @@ def import_accuracy_sheet(
             if errors is None:
                 errors = 0
 
-            # -------------------------------------------------
-            # Find existing record using original unique key
-            # -------------------------------------------------
-
-            existing = con.execute(
-                """
-                SELECT id, project_id
-                FROM accuracy_records
-                WHERE sheet = ?
-                AND username = ?
-                AND record_date = ?
-                AND accuracy_type = ?
-                AND source_row = ?
-                """,
-                (
-                    sheet_name,
-                    username,
-                    date_text,
-                    accuracy_type,
-                    source_row
-                )
-            ).fetchone()
-
-    
-            if existing:
-
-                final_project_id = (
-                    project_id
-                    if project_id is not None
-                    else existing["project_id"]
-                )
-
-                con.execute(
-                    """
-                    UPDATE accuracy_records
-                    SET
-                        biller_name = ?,
-                        month = ?,
-                        weekly = ?,
-                        accuracy_value = ?,
-                        bills_processed = ?,
-                        audited = ?,
-                        errors = ?,
-                        imported_at = ?,
-                        project_id = ?
-                    WHERE id = ?
-                    """,
-                    (
-                        biller_name,
-                        month,
-                        weekly,
-                        accuracy_value,
-                        bills_processed,
-                        audited,
-                        errors,
-                        imported_at,
-                        final_project_id,
-                        existing["id"]
-                    )
-                )
-
-            else:
-
-                con.execute(
-                    """
-                    INSERT INTO accuracy_records (
-                        sheet,
-                        username,
-                        biller_name,
-                        month,
-                        weekly,
-                        record_date,
-                        accuracy_type,
-                        accuracy_value,
-                        bills_processed,
-                        audited,
-                        errors,
-                        source_row,
-                        imported_at,
-                        project_id
-                    )
-                    VALUES (
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-                    )
-                    """,
-                    (
-                        sheet_name,
-                        username,
-                        biller_name,
-                        month,
-                        weekly,
-                        date_text,
-                        accuracy_type,
-                        accuracy_value,
-                        bills_processed,
-                        audited,
-                        errors,
-                        source_row,
-                        imported_at,
-                        project_id
-                    )
-                )
+            batch.append((
+                sheet_name,
+                username,
+                biller_name,
+                month,
+                weekly,
+                date_text,
+                accuracy_type,
+                accuracy_value,
+                bills_processed,
+                audited,
+                errors,
+                source_row,
+                imported_at,
+                project_id
+            ))
 
             imported += 1
 
-    return imported
+            if len(batch) >= 500:
 
+                con.executemany(
+                    upsert_sql,
+                    batch
+                )
+
+                batch.clear()
+
+    if batch:
+
+        con.executemany(
+            upsert_sql,
+            batch
+        )
+
+    return imported
 
 # =========================================================
 # COMPLETE WORKBOOK IMPORT
