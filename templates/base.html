@@ -157,6 +157,14 @@
             color: #172033;
         }
 
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: 2px solid #43c59e;
+            outline-offset: 1px;
+            border-color: #15966d;
+        }
+
         textarea {
             resize: vertical;
             min-height: 90px;
@@ -181,12 +189,29 @@
             background: #107b59;
         }
 
-        .btn-secondary {
+        button:focus-visible,
+        .btn:focus-visible,
+        nav a:focus-visible {
+            outline: 2px solid #43c59e;
+            outline-offset: 3px;
+        }
+
+        .btn-secondary,
+        .btn.secondary {
             background: #475467;
+        }
+
+        .btn-secondary:hover,
+        .btn.secondary:hover {
+            background: #344054;
         }
 
         .btn-danger {
             background: #c0392b;
+        }
+
+        .btn-danger:hover {
+            background: #962d22;
         }
 
         /* TABLES */
@@ -273,6 +298,8 @@
 
 <body>
 
+{% set role = session.get("role", "")|lower %}
+
 <!-- =====================================================
      HEADER
 ====================================================== -->
@@ -288,7 +315,7 @@
         <div class="user-info">
             {{ session.get("display_name", session.get("username")) }}
             |
-            {{ session.get("role", "").upper() }}
+            {{ role.upper() }}
         </div>
         {% endif %}
 
@@ -305,7 +332,7 @@
 <nav>
     <div class="nav-inner">
 
-        {% if session.get("role") == "admin" %}
+        {% if role == "admin" %}
 
             <a
                 href="{{ url_for('admin_dashboard') }}"
@@ -342,19 +369,28 @@
                 ERROR DETAILS
             </a>
 
-        {% elif session.get("role") == "qc" %}
+        {% elif role == "qc" %}
 
-            <a href="{{ url_for('qc_dashboard') }}">
+            <a
+                href="{{ url_for('qc_dashboard') }}"
+                class="{% if request.endpoint == 'qc_dashboard' %}active{% endif %}"
+            >
                 ERROR DETAILS
             </a>
 
-            <a href="{{ url_for('qc_accuracy') }}">
+            <a
+                href="{{ url_for('qc_accuracy') }}"
+                class="{% if request.endpoint == 'qc_accuracy' %}active{% endif %}"
+            >
                 ACCURACY
             </a>
 
-        {% elif session.get("role") == "biller" %}
+        {% elif role == "biller" %}
 
-            <a href="{{ url_for('biller_dashboard') }}">
+            <a
+                href="{{ url_for('biller_dashboard') }}"
+                class="{% if request.endpoint == 'biller_dashboard' %}active{% endif %}"
+            >
                 MY ERROR RECORDS
             </a>
 
