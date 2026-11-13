@@ -280,12 +280,24 @@
 
                     {% if session.get('role', '')|lower == 'admin' %}
 
-                        <option value="all"
+                        <option
+                            value="all"
                             {% if selected_project_id|string == 'all' %}
                                 selected
                             {% endif %}
                         >
                             ALL PROJECTS
+                        </option>
+
+                    {% elif session.get('role', '')|lower == 'qc' %}
+
+                        <option
+                            value="all"
+                            {% if selected_project_id|string == 'all' %}
+                                selected
+                            {% endif %}
+                        >
+                            ALL ASSIGNED PROJECTS
                         </option>
 
                     {% endif %}
