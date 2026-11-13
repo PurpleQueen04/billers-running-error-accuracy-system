@@ -282,7 +282,7 @@
 
                         <option
                             value="all"
-                            {% if selected_project_id|string == 'all' %}
+                            {% if selected_project|string == 'all' %}
                                 selected
                             {% endif %}
                         >
@@ -293,7 +293,7 @@
 
                         <option
                             value="all"
-                            {% if selected_project_id|string == 'all' %}
+                            {% if selected_project|string == 'all' %}
                                 selected
                             {% endif %}
                         >
@@ -307,7 +307,7 @@
 
                         <option
                             value="{{ project['id'] }}"
-                            {% if selected_project_id|string == project['id']|string %}
+                            {% if selected_project|string == project['id']|string %}
                                 selected
                             {% endif %}
                         >
@@ -337,21 +337,21 @@
 
                     <option
                         value="daily"
-                        {% if period == 'daily' %}selected{% endif %}
+                        {% if period_type == 'daily' %}selected{% endif %}
                     >
                         DAILY
                     </option>
 
                     <option
                         value="weekly"
-                        {% if period == 'weekly' %}selected{% endif %}
+                        {% if period_type == 'weekly' %}selected{% endif %}
                     >
                         WEEKLY
                     </option>
 
                     <option
                         value="monthly"
-                        {% if period == 'monthly' %}selected{% endif %}
+                        {% if period_type == 'monthly' %}selected{% endif %}
                     >
                         MONTHLY
                     </option>
@@ -376,6 +376,7 @@
 </div>
 
 
+
 <!-- =====================================================
      ACCURACY SUMMARY
 ====================================================== -->
@@ -391,7 +392,6 @@
         for the selected period and project.
     </p>
 
-
     <div class="summary-grid">
 
         <!-- INTERNAL -->
@@ -401,33 +401,23 @@
             <h3>INTERNAL ACCURACY</h3>
 
             <div class="accuracy-value">
-
-                {% if summary.get('internal', {}).get('accuracy') is not none %}
-
-                    {{ "%.2f"|format(summary.get('internal', {}).get('accuracy')) }}%
-
+                {% if summary.get('INTERNAL', {}).get('accuracy') is not none %}
+                    {{ "%.2f"|format(summary.get('INTERNAL', {}).get('accuracy')) }}%
                 {% else %}
-
                     N/A
-
                 {% endif %}
-
             </div>
 
             <div class="summary-details">
-
                 Audited:
                 <strong>
-                    {{ summary.get('internal', {}).get('audited', 0) }}
+                    {{ summary.get('INTERNAL', {}).get('audited', 0) }}
                 </strong>
-
                 <br>
-
                 Errors:
                 <strong>
-                    {{ summary.get('internal', {}).get('errors', 0) }}
+                    {{ summary.get('INTERNAL', {}).get('errors', 0) }}
                 </strong>
-
             </div>
 
         </div>
@@ -440,33 +430,23 @@
             <h3>EXTERNAL WC ACCURACY</h3>
 
             <div class="accuracy-value">
-
-                {% if summary.get('external_wc', {}).get('accuracy') is not none %}
-
-                    {{ "%.2f"|format(summary.get('external_wc', {}).get('accuracy')) }}%
-
+                {% if summary.get('EXTERNAL_WC', {}).get('accuracy') is not none %}
+                    {{ "%.2f"|format(summary.get('EXTERNAL_WC', {}).get('accuracy')) }}%
                 {% else %}
-
                     N/A
-
                 {% endif %}
-
             </div>
 
             <div class="summary-details">
-
                 Audited:
                 <strong>
-                    {{ summary.get('external_wc', {}).get('audited', 0) }}
+                    {{ summary.get('EXTERNAL_WC', {}).get('audited', 0) }}
                 </strong>
-
                 <br>
-
                 Errors:
                 <strong>
-                    {{ summary.get('external_wc', {}).get('errors', 0) }}
+                    {{ summary.get('EXTERNAL_WC', {}).get('errors', 0) }}
                 </strong>
-
             </div>
 
         </div>
@@ -479,33 +459,23 @@
             <h3>EXTERNAL WOC ACCURACY</h3>
 
             <div class="accuracy-value">
-
-                {% if summary.get('external_woc', {}).get('accuracy') is not none %}
-
-                    {{ "%.2f"|format(summary.get('external_woc', {}).get('accuracy')) }}%
-
+                {% if summary.get('EXTERNAL_WOC', {}).get('accuracy') is not none %}
+                    {{ "%.2f"|format(summary.get('EXTERNAL_WOC', {}).get('accuracy')) }}%
                 {% else %}
-
                     N/A
-
                 {% endif %}
-
             </div>
 
             <div class="summary-details">
-
                 Audited:
                 <strong>
-                    {{ summary.get('external_woc', {}).get('audited', 0) }}
+                    {{ summary.get('EXTERNAL_WOC', {}).get('audited', 0) }}
                 </strong>
-
                 <br>
-
                 Errors:
                 <strong>
-                    {{ summary.get('external_woc', {}).get('errors', 0) }}
+                    {{ summary.get('EXTERNAL_WOC', {}).get('errors', 0) }}
                 </strong>
-
             </div>
 
         </div>
@@ -513,6 +483,7 @@
     </div>
 
 </div>
+
 
 
 <!-- =====================================================
@@ -550,7 +521,7 @@
 
             <tbody>
 
-                {% for item in below_90_internal %}
+                {% for item in below_90.get('INTERNAL', []) %}
 
                 <tr>
 
@@ -634,7 +605,7 @@
 
             <tbody>
 
-                {% for item in below_90_external_wc %}
+                {% for item in below_90.get('EXTERNAL_WC', []) %}
 
                 <tr>
 
@@ -718,7 +689,7 @@
 
             <tbody>
 
-                {% for item in below_90_external_woc %}
+                {% for item in below_90.get('EXTERNAL_WOC', []) %}
 
                 <tr>
 
@@ -809,7 +780,7 @@
 
             <tbody>
 
-                {% for item in improvement_notes %}
+                {% for item in improvements %}
 
                 <tr>
 
