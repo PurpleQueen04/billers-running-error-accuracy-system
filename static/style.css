@@ -199,7 +199,7 @@ button:hover,
     flex-wrap: wrap;
 }
 
-.inline input[type=file] {
+.inline input[type="file"] {
     max-width: 420px;
 }
 
@@ -242,7 +242,8 @@ button:hover,
 }
 
 /* TABLES */
-.tablewrap {
+.tablewrap,
+.table-wrap {
     width: 100%;
     overflow-x: auto;
     margin-top: 12px;
@@ -392,13 +393,14 @@ tbody tr:hover {
     grid-column: 1 / -1;
 }
 
-/* ERROR RESPONSE FORM */
-.card form {
+/* ERROR RESPONSE FORMS
+   Exclude inline upload forms and accuracy filters. */
+.card form:not(.filter-form):not(.inline) {
     display: grid;
     gap: 14px;
 }
 
-.card form button {
+.card form:not(.filter-form):not(.inline) button {
     justify-self: start;
 }
 
@@ -416,6 +418,10 @@ footer {
     header {
         align-items: flex-start;
         flex-direction: column;
+    }
+
+    nav {
+        gap: 12px;
     }
 
     main {
@@ -440,6 +446,15 @@ footer {
     .filter-form select {
         width: 100%;
         max-width: none;
+    }
+
+    .inline {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .inline input[type="file"] {
+        max-width: 100%;
     }
 
     .accuracy-actions {
