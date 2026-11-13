@@ -846,3 +846,143 @@ footer {
     }
 
 }
+
+
+
+/* =========================================
+   COMPACT RUNNING ERROR RECORDS
+========================================= */
+
+.error-layout {
+    grid-template-columns: 210px minmax(0, 1fr);
+    gap: 14px;
+}
+
+.date-sidebar {
+    padding: 12px;
+}
+
+.date-sidebar h2 {
+    font-size: 16px;
+}
+
+.date-select-button {
+    padding: 8px 10px;
+    gap: 3px;
+}
+
+.date-select-button span {
+    font-size: 12px;
+}
+
+.error-card {
+    padding: 14px;
+    margin: 10px 0;
+}
+
+.record-pro {
+    font-size: 16px;
+    margin-bottom: 10px;
+}
+
+.record-info-grid {
+    gap: 10px;
+    padding: 9px 0;
+}
+
+.record-info-grid small {
+    font-size: 10px;
+    margin-bottom: 3px;
+}
+
+.record-info-grid strong {
+    font-size: 12px;
+}
+
+.record-error-details {
+    padding: 10px 0;
+}
+
+.record-error-details p {
+    padding: 9px;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.my-response {
+    margin-top: 12px;
+}
+
+.my-response h3 {
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+.my-response form {
+    gap: 10px;
+}
+
+.my-response input,
+.my-response select,
+.my-response textarea {
+    padding: 8px;
+    font-size: 12px;
+}
+
+.my-response textarea {
+    min-height: 65px;
+}
+
+.my-response form button {
+    padding: 8px 13px;
+    font-size: 12px;
+}
+
+/* =========================================
+   COMPACT MOBILE LAYOUT
+========================================= */
+
+@media (max-width: 750px) {
+    .error-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .error-card {
+        padding: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .record-info-grid.three-columns {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .record-info-grid.two-columns {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* FINAL COMPACT ADJUSTMENTS */
+
+.error-card {
+    padding: 12px;
+    margin: 8px 0;
+}
+
+.record-info-grid {
+    padding: 7px 0;
+    gap: 8px;
+}
+
+.record-error-details {
+    padding: 8px 0;
+}
+
+.my-response {
+    margin-top: 10px;
+}
+
+.my-response form {
+    gap: 8px;
+}
+
