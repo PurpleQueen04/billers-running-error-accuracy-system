@@ -20,21 +20,17 @@
 
     <div class="stat">
         <small>Verified (Y)</small>
-        <b>{{ response_counts.yes_count or 0 }}</b>
+        <b>{{ response_counts.verified or 0 }}</b>
     </div>
 
     <div class="stat">
         <small>Disputed (N)</small>
-        <b>{{ response_counts.no_count or 0 }}</b>
+        <b>{{ response_counts.disputed or 0 }}</b>
     </div>
 
     <div class="stat">
         <small>Pending</small>
-        <b>
-            {{ (response_counts.total or 0)
-               - (response_counts.yes_count or 0)
-               - (response_counts.no_count or 0) }}
-        </b>
+        <b>{{ response_counts.pending or 0 }}</b>
     </div>
 
 </div>
