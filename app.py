@@ -3454,15 +3454,12 @@ def admin_dashboard():
     # RENDER ADMIN DASHBOARD
     # -----------------------------------------------------
 
-    return (
-    f"ADMIN DASHBOARD DIAGNOSTIC<br>"
-    f"Errors: {counts['errors']}<br>"
-    f"Billers: {counts['billers']}<br>"
-    f"Verified: {counts['verified']}<br>"
-    f"Disputed: {counts['disputed']}<br>"
-    f"Pending: {counts['pending']}<br>"
-    f"Imports: {counts['imports']}"
-)
+    return render_template(
+        "admin.html",
+        counts=counts,
+        history=history,
+        **accuracy_context
+    )
 
 # =========================================================
 # ADMIN WORKBOOK UPLOAD
@@ -5980,8 +5977,8 @@ def build_accuracy_context(
     if selected_period not in period_keys:
 
         selected_period = (
-            sorted_period[-1]
-            if sorted_period
+            sorted_periods[-1]
+            if sorted_periods
             else ""
         )
 
@@ -6380,18 +6377,12 @@ def build_accuracy_context(
             and bool(con_value(row, "active", 1))
         ]
 
-    return {
-        "period_type": period_type,
-        "selected_period": selected_period,
-        "previous_period": previous_period,
-        "periods": sorted_periods,
-        "selected_project": str(selected_project),
-        "projects": visible_projects,
-        "summary": summary,
-        "below_90": below_90,
-        "improvements": improvements,
-        "format_accuracy": format_accuracy
-    }
+    return render_template(
+        "admin.html",
+        counts=counts,
+        history=history,
+        **accuracy_context
+    )
 
 
 # =========================================================
