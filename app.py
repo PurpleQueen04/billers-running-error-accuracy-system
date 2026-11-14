@@ -1584,16 +1584,18 @@ def csrf_token():
 def validate_csrf():
 
     submitted = request.form.get("csrf_token", "")
-
     stored = session.get("csrf_token", "")
 
-    if not submitted or not stored:
+    if not submitted:
+        app.logger.error("CSRF ERROR: Submitted token is missing")
         abort(400)
 
-    if not secrets.compare_digest(
-        submitted,
-        stored
-    ):
+    if not stored:
+        app.logger.error("CSRF ERROR: Session token is missing")
+        abort(400)
+
+    if not secrets.compare_digest(submitted, stored):
+        app.logger.error("CSRF ERROR: Tokens do not match")
         abort(400)
 
 
