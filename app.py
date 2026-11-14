@@ -16,6 +16,7 @@ from flask import (
     Flask,
     render_template,
     request,
+    Response,
     redirect,
     url_for,
     session,
@@ -54,12 +55,29 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
+# -------------------------------------------------
+# REQUIRE POSTGRESQL IN PRODUCTION
+# -------------------------------------------------
+
+if (
+    os.environ.get("RENDER", "").lower() == "true"
+    and not DATABASE_URL
+):
+    raise RuntimeError(
+        "DATABASE_URL is required in production. "
+        "SQLite fallback is not allowed on Render."
+    )
+    
 app = Flask(__name__)
 
-app.secret_key = (
-    os.environ.get("SECRET_KEY")
-    or secrets.token_hex(32)
-)
+SECRET_KEY = os.environ.get("SECRET_KEY")
+
+if not SECRET_KEY and os.environ.get("RENDER", "").lower() == "true":
+    raise RuntimeError(
+        "SECRET_KEY environment variable is required in production."
+    )
+
+app.secret_key = SECRET_KEY or secrets.token_hex(32)
 
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -149,14 +167,115 @@ def is_postgres():
     return bool(DATABASE_URL)
 
 
+
 def convert_placeholders(sql):
     """
     Convert SQLite-style ? placeholders to PostgreSQL %s.
+
+    Ignore question marks inside:
+    - Single-quoted strings
+    - Double-quoted identifiers
+    - SQL line comments
+    - SQL block comments
     """
+
     if not is_postgres():
         return sql
 
-    return sql.replace("?", "%s")
+    result = []
+    i = 0
+    length = len(sql)
+
+    in_single_quote = False
+    in_double_quote = False
+    in_line_comment = False
+    in_block_comment = False
+
+    while i < length:
+
+        char = sql[i]
+        next_char = sql[i + 1] if i + 1 < length else ""
+
+        if in_line_comment:
+            result.append(char)
+
+            if char == "\n":
+                in_line_comment = False
+
+            i += 1
+            continue
+
+        if in_block_comment:
+            result.append(char)
+
+            if char == "*" and next_char == "/":
+                result.append(next_char)
+                i += 2
+                in_block_comment = False
+                continue
+
+            i += 1
+            continue
+
+        if in_single_quote:
+            result.append(char)
+
+            if char == "'" and next_char == "'":
+                result.append(next_char)
+                i += 2
+                continue
+
+            if char == "'":
+                in_single_quote = False
+
+            i += 1
+            continue
+
+        if in_double_quote:
+            result.append(char)
+
+            if char == '"' and next_char == '"':
+                result.append(next_char)
+                i += 2
+                continue
+
+            if char == '"':
+                in_double_quote = False
+
+            i += 1
+            continue
+
+        if char == "'":
+            in_single_quote = True
+            result.append(char)
+
+        elif char == '"':
+            in_double_quote = True
+            result.append(char)
+
+        elif char == "-" and next_char == "-":
+            in_line_comment = True
+            result.append(char)
+            result.append(next_char)
+            i += 2
+            continue
+
+        elif char == "/" and next_char == "*":
+            in_block_comment = True
+            result.append(char)
+            result.append(next_char)
+            i += 2
+            continue
+
+        elif char == "?":
+            result.append("%s")
+
+        else:
+            result.append(char)
+
+        i += 1
+
+    return "".join(result)
 
 
 class DatabaseCursor:
@@ -248,12 +367,16 @@ class DatabaseConnection:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        if exc_type is None:
-            self.commit()
-        else:
-            self.rollback()
 
-        self.close()
+        try:
+            if exc_type is None:
+                self.commit()
+            else:
+                self.rollback()
+    
+        finally:
+            self.close()
+    
         return False
 
 
@@ -332,8 +455,10 @@ def table_exists(con, table_name):
 
     return row is not None
 
-
 def table_columns(con, table_name):
+
+    if not table_name or not table_name.isidentifier():
+        raise ValueError("Invalid table name.")
 
     if not table_exists(con, table_name):
         return set()
@@ -364,7 +489,6 @@ def table_columns(con, table_name):
         for row in rows
     }
 
-
 def add_column_if_missing(
     con,
     table_name,
@@ -372,18 +496,43 @@ def add_column_if_missing(
     column_definition
 ):
 
+    allowed_tables = {
+        "users",
+        "projects",
+        "user_projects",
+        "error_records",
+        "accuracy_records",
+        "biller_responses",
+        "import_history",
+        "activity_logs",
+        "schema_migrations"
+    }
+
+    if table_name not in allowed_tables:
+        raise ValueError(
+            f"Invalid database table: {table_name}"
+        )
+
+    if not table_name.isidentifier():
+        raise ValueError("Invalid table name.")
+
+    if not column_name.isidentifier():
+        raise ValueError("Invalid column name.")
+
+    if not column_definition:
+        raise ValueError("Column definition is required.")
+
     columns = table_columns(con, table_name)
 
     if column_name in columns:
         return
 
     con.execute(
-        f"""
+        f'''
         ALTER TABLE "{table_name}"
         ADD COLUMN "{column_name}" {column_definition}
-        """
+        '''
     )
-
 
 # =========================================================
 # GENERAL HELPERS
@@ -971,6 +1120,7 @@ def init_db():
             )
         """)
 
+        
         migration_name = "copy_biller_responses_to_error_records_v1"
 
         migration = con.execute(
@@ -985,50 +1135,61 @@ def init_db():
         if not migration:
 
             con.execute("""
-                
-UPDATE error_records
-SET
-    verified_error = COALESCE(
-        (SELECT br.verified_error
-         FROM biller_responses br
-         WHERE br.record_key = error_records.record_key),
-        error_records.verified_error
-    ),
-    biller_comment = COALESCE(
-        (SELECT br.biller_comment
-         FROM biller_responses br
-         WHERE br.record_key = error_records.record_key),
-        error_records.biller_comment
-    ),
-    qc_explanation = COALESCE(
-        (SELECT br.qc_explanation
-         FROM biller_responses br
-         WHERE br.record_key = error_records.record_key),
-        error_records.qc_explanation
-    ),
-    qc_name = COALESCE(
-        (SELECT br.qc_name
-         FROM biller_responses br
-         WHERE br.record_key = error_records.record_key),
-        error_records.qc_name
-    ),
-    updated_at = COALESCE(
-        (SELECT br.updated_at
-         FROM biller_responses br
-         WHERE br.record_key = error_records.record_key),
-        error_records.updated_at
-    ),
-    updated_by = COALESCE(
-        (SELECT br.updated_by
-         FROM biller_responses br
-         WHERE br.record_key = error_records.record_key),
-        error_records.updated_by
-    )
-WHERE EXISTS (
-    SELECT 1
-    FROM biller_responses br
-    WHERE br.record_key = error_records.record_key
-)
+                UPDATE error_records
+                SET
+                    verified_error = COALESCE(
+                        error_records.verified_error,
+                        (
+                            SELECT br.verified_error
+                            FROM biller_responses br
+                            WHERE br.record_key = error_records.record_key
+                        )
+                    ),
+                    biller_comment = COALESCE(
+                        error_records.biller_comment,
+                        (
+                            SELECT br.biller_comment
+                            FROM biller_responses br
+                            WHERE br.record_key = error_records.record_key
+                        )
+                    ),
+                    qc_explanation = COALESCE(
+                        error_records.qc_explanation,
+                        (
+                            SELECT br.qc_explanation
+                            FROM biller_responses br
+                            WHERE br.record_key = error_records.record_key
+                        )
+                    ),
+                    qc_name = COALESCE(
+                        error_records.qc_name,
+                        (
+                            SELECT br.qc_name
+                            FROM biller_responses br
+                            WHERE br.record_key = error_records.record_key
+                        )
+                    ),
+                    updated_at = COALESCE(
+                        error_records.updated_at,
+                        (
+                            SELECT br.updated_at
+                            FROM biller_responses br
+                            WHERE br.record_key = error_records.record_key
+                        )
+                    ),
+                    updated_by = COALESCE(
+                        error_records.updated_by,
+                        (
+                            SELECT br.updated_by
+                            FROM biller_responses br
+                            WHERE br.record_key = error_records.record_key
+                        )
+                    )
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM biller_responses br
+                    WHERE br.record_key = error_records.record_key
+                )
             """)
 
             con.execute(
@@ -1082,10 +1243,10 @@ def get_user_project_ids(user_id=None):
                 """
                 SELECT id
                 FROM projects
+                WHERE active = 1
                 ORDER BY project_name
                 """
             ).fetchall()
-
         else:
 
             rows = con.execute(
@@ -1140,6 +1301,7 @@ def user_has_project(user_id, project_id):
                 SELECT id
                 FROM projects
                 WHERE id = ?
+                AND active = 1
                 """,
                 (project_id,)
             ).fetchone()
@@ -1259,17 +1421,70 @@ def assign_user_projects(user_id, project_ids):
         )
 
 
+
 # =========================================================
 # AUTHENTICATION AND ROLE DECORATORS
 # =========================================================
+
+
+def get_active_session_user():
+
+    user_id = session.get("user_id")
+
+    if not user_id:
+        return None
+
+    with db() as con:
+
+        user = con.execute(
+            """
+            SELECT
+                id,
+                username,
+                role,
+                display_name,
+                active
+            FROM users
+            WHERE id = ?
+            """,
+            (user_id,)
+        ).fetchone()
+
+    if not user or not user["active"]:
+        session.clear()
+        return None
+
+    current_role = normalize_text(
+        user["role"]
+    ).lower()
+
+    if current_role not in ("admin", "qc", "biller"):
+        session.clear()
+        return None
+
+    session["username"] = user["username"]
+    session["role"] = current_role
+
+    session["display_name"] = (
+        user["display_name"]
+        or user["username"]
+    )
+
+    return user
 
 def login_required(function):
 
     @wraps(function)
     def wrapper(*args, **kwargs):
 
-        if not session.get("user_id"):
-            flash("Please log in first.", "warning")
+        user = get_active_session_user()
+
+        if not user:
+            flash(
+                "Your session has expired or your account is inactive. Please log in again.",
+                "warning"
+            )
+
             return redirect(url_for("login"))
 
         return function(*args, **kwargs)
@@ -1289,15 +1504,21 @@ def role_required(*allowed_roles):
         @wraps(function)
         def wrapper(*args, **kwargs):
 
-            if not session.get("user_id"):
-                flash("Please log in first.", "warning")
+            user = get_active_session_user()
+
+            if not user:
+                flash(
+                    "Your session has expired or your account is inactive. Please log in again.",
+                    "warning"
+                )
+
                 return redirect(url_for("login"))
 
-            role = normalize_text(
-                session.get("role")
+            current_role = normalize_text(
+                user["role"]
             ).lower()
 
-            if role not in normalized_roles:
+            if current_role not in normalized_roles:
                 abort(403)
 
             return function(*args, **kwargs)
@@ -1356,15 +1577,15 @@ def log_action(username, action, details=""):
 @app.before_request
 def csrf_token():
 
-    if "csrf" not in session:
-        session["csrf"] = secrets.token_hex(32)
+    if "csrf_token" not in session:
+        session["csrf_token"] = secrets.token_hex(32)
 
 
 def validate_csrf():
 
-    submitted = request.form.get("csrf", "")
+    submitted = request.form.get("csrf_token", "")
 
-    stored = session.get("csrf", "")
+    stored = session.get("csrf_token", "")
 
     if not submitted or not stored:
         abort(400)
@@ -1380,10 +1601,9 @@ def validate_csrf():
 def inject_globals():
 
     return {
-        "csrf": session.get("csrf", "")
+        "csrf_token": session.get("csrf_token", "")
     }
-
-
+    
 # =========================================================
 # WORKBOOK READING
 # =========================================================
@@ -1675,10 +1895,11 @@ def import_error_sheet(con, dataframe):
             zb_field,
             error_details,
             project_id,
-            verified_error
+            verified_error,
+            imported_at
         )
         VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'N'
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'N', ?
         )
         ON CONFLICT (record_key) DO UPDATE SET
             billed_date = EXCLUDED.billed_date,
@@ -1829,7 +2050,8 @@ def import_error_sheet(con, dataframe):
             pro,
             zb_field,
             error_details,
-            project_id
+            project_id,
+            datetime.now().isoformat(timespec="seconds")
         ))
 
         imported += 1
@@ -3064,7 +3286,7 @@ def login():
             user["display_name"]
             or user["username"]
         )
-        session["csrf"] = secrets.token_hex(32)
+        session["csrf_token"] = secrets.token_hex(32)
 
         log_action(
             user["username"],
@@ -3379,11 +3601,14 @@ def admin_accounts():
             """
         ).fetchall()
 
+        
         projects = con.execute(
             """
-            SELECT id, project_name
+            SELECT
+                id,
+                project_name,
+                active
             FROM projects
-            WHERE active = 1
             ORDER BY project_name
             """
         ).fetchall()
@@ -3538,14 +3763,16 @@ def create_account():
 
     clean_project_ids = set()
 
-    for project_id in project_ids:
+    try:
+        for project_id in project_ids:
+            clean_project_ids.add(int(project_id))
 
-        try:
-            clean_project_ids.add(
-                int(project_id)
-            )
-        except (TypeError, ValueError):
-            continue
+    except (TypeError, ValueError):
+        flash(
+            "Invalid project selection.",
+            "danger"
+        )
+        return redirect(url_for("admin_accounts"))
 
     if role in ("biller", "qc") and not clean_project_ids:
 
@@ -3701,6 +3928,580 @@ def create_account():
 
     return redirect(url_for("admin_accounts"))
 
+
+# =========================================================
+# EDIT ACCOUNT
+# UPDATE ACCOUNT DETAILS AND PROJECT ASSIGNMENTS
+# =========================================================
+
+@app.route(
+    "/admin/account/edit",
+    methods=["POST"]
+)
+@login_required
+@admin_required
+def edit_account():
+
+    validate_csrf()
+
+    user_id = request.form.get("user_id", "").strip()
+
+    display_name = normalize_text(
+        request.form.get("display_name")
+    )
+
+    username = normalize_text(
+        request.form.get("username")
+    )
+
+    role = normalize_text(
+        request.form.get("role")
+    ).lower()
+
+    password = request.form.get("password", "")
+
+    submitted_project_ids = request.form.getlist(
+        "project_ids"
+    )
+
+    if not user_id.isdigit():
+
+        flash("Invalid account selected.", "danger")
+        return redirect(url_for("admin_accounts"))
+
+    user_id = int(user_id)
+
+    if not display_name or not username:
+
+        flash(
+            "Please complete all required account fields.",
+            "warning"
+        )
+        return redirect(url_for("admin_accounts"))
+
+    if role not in ("admin", "biller", "qc"):
+
+        flash("Invalid account role.", "danger")
+        return redirect(url_for("admin_accounts"))
+
+    if password and len(password) < 6:
+
+        flash(
+            "Password must contain at least 6 characters.",
+            "warning"
+        )
+        return redirect(url_for("admin_accounts"))
+
+    clean_project_ids = set()
+
+    try:
+
+        for project_id in submitted_project_ids:
+            clean_project_ids.add(int(project_id))
+
+    except (TypeError, ValueError):
+
+        flash(
+            "Invalid project selection.",
+            "danger"
+        )
+        return redirect(url_for("admin_accounts"))
+
+    try:
+
+        with db() as con:
+
+            # ---------------------------------------------
+            # PREVENT CONCURRENT ADMIN ROLE CHANGES
+            # ---------------------------------------------
+
+            if is_postgres():
+
+                con.execute(
+                    """
+                    SELECT pg_advisory_xact_lock(746281)
+                    """
+                )
+
+            # ---------------------------------------------
+            # CHECK TARGET ACCOUNT
+            # ---------------------------------------------
+
+            target = con.execute(
+                """
+                SELECT id, username, role, active
+                FROM users
+                WHERE id = ?
+                """,
+                (user_id,)
+            ).fetchone()
+
+            if not target:
+
+                raise ValueError(
+                    "The selected account does not exist."
+                )
+
+            old_role = normalize_text(
+                target["role"]
+            ).lower()
+
+            # -------------------------------------------------
+            # PREVENT ADMIN SELF-DEMOTION
+            # -------------------------------------------------
+            
+            current_user_id = session.get("user_id")
+            
+            if (
+                old_role == "admin"
+                and role != "admin"
+                and str(current_user_id) == str(user_id)
+            ):
+                raise ValueError(
+                    "You cannot change your own Admin role."
+                )
+
+            # ---------------------------------------------
+            # PREVENT DUPLICATE USERNAME
+            # ---------------------------------------------
+
+            duplicate = con.execute(
+                """
+                SELECT id
+                FROM users
+                WHERE LOWER(username) = LOWER(?)
+                AND id != ?
+                """,
+                (username, user_id)
+            ).fetchone()
+
+            if duplicate:
+
+                raise ValueError(
+                    "That username is already being used."
+                )
+
+            # ---------------------------------------------
+            # PREVENT DEMOTING THE LAST ACTIVE ADMIN
+            # ---------------------------------------------
+
+            if (
+                old_role == "admin"
+                and role != "admin"
+                and target["active"]
+            ):
+
+                active_admins = con.execute(
+                    """
+                    SELECT COUNT(*) AS total
+                    FROM users
+                    WHERE LOWER(role) = 'admin'
+                    AND active = 1
+                    """
+                ).fetchone()
+
+                if int(active_admins["total"]) <= 1:
+
+                    raise ValueError(
+                        "Cannot change the role of the last "
+                        "active Admin account."
+                    )
+
+            # ---------------------------------------------
+            # VALIDATE PROJECT ASSIGNMENTS
+            # ---------------------------------------------
+
+            final_project_ids = set()
+
+            if role in ("biller", "qc"):
+
+                # Submitted assignments must be active.
+                if clean_project_ids:
+
+                    placeholders = ",".join(
+                        ["?"] * len(clean_project_ids)
+                    )
+
+                    valid_projects = con.execute(
+                        f"""
+                        SELECT id
+                        FROM projects
+                        WHERE active = 1
+                        AND id IN ({placeholders})
+                        """,
+                        tuple(sorted(clean_project_ids))
+                    ).fetchall()
+
+                    valid_ids = {
+                        int(row["id"])
+                        for row in valid_projects
+                    }
+
+                    if valid_ids != clean_project_ids:
+
+                        raise ValueError(
+                            "One or more selected projects "
+                            "are invalid or inactive."
+                        )
+
+                # Preserve previously assigned inactive projects.
+                existing_assignments = con.execute(
+                    """
+                    SELECT up.project_id
+                    FROM user_projects up
+                    INNER JOIN projects p
+                        ON p.id = up.project_id
+                    WHERE up.user_id = ?
+                    AND p.active = 0
+                    """,
+                    (user_id,)
+                ).fetchall()
+
+                preserved_inactive_ids = {
+                    int(row["project_id"])
+                    for row in existing_assignments
+                }
+
+                final_project_ids = (
+                    clean_project_ids |
+                    preserved_inactive_ids
+                )
+
+                if not final_project_ids:
+
+                    raise ValueError(
+                        "Select at least one project "
+                        "for QC and Biller accounts."
+                    )
+
+            # Admin accounts use global active-project access.
+            # Their individual project assignments are cleared.
+            # ---------------------------------------------
+            # UPDATE ACCOUNT DETAILS
+            # ---------------------------------------------
+
+            if password:
+
+                password_hash = generate_password_hash(
+                    password
+                )
+
+                con.execute(
+                    """
+                    UPDATE users
+                    SET
+                        display_name = ?,
+                        username = ?,
+                        role = ?,
+                        password_hash = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        display_name,
+                        username,
+                        role,
+                        password_hash,
+                        user_id
+                    )
+                )
+
+            else:
+
+                con.execute(
+                    """
+                    UPDATE users
+                    SET
+                        display_name = ?,
+                        username = ?,
+                        role = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        display_name,
+                        username,
+                        role,
+                        user_id
+                    )
+                )
+
+            # ---------------------------------------------
+            # UPDATE PROJECT ASSIGNMENTS
+            # ---------------------------------------------
+
+            con.execute(
+                """
+                DELETE FROM user_projects
+                WHERE user_id = ?
+                """,
+                (user_id,)
+            )
+
+            if role in ("biller", "qc"):
+
+                con.executemany(
+                    """
+                    INSERT INTO user_projects (
+                        user_id,
+                        project_id
+                    )
+                    VALUES (?, ?)
+                    """,
+                    [
+                        (user_id, project_id)
+                        for project_id in sorted(final_project_ids)
+                    ]
+                )
+
+            # ---------------------------------------------
+            # ACTIVITY LOG
+            # ---------------------------------------------
+
+            con.execute(
+                """
+                INSERT INTO activity_logs (
+                    username,
+                    action,
+                    details,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    session.get("username", ""),
+                    "EDIT ACCOUNT",
+                    f"Updated account: {username} "
+                    f"({old_role.upper()} to {role.upper()})",
+                    datetime.now().isoformat(timespec="seconds")
+                )
+            )
+
+        flash(
+            f"Account '{username}' updated successfully.",
+            "success"
+        )
+
+    except ValueError as exc:
+
+        flash(str(exc), "danger")
+
+    except Exception:
+
+        app.logger.exception(
+            "Account editing failed"
+        )
+
+        flash(
+            "Unable to update account. "
+            "Please check the account details.",
+            "danger"
+        )
+
+    return redirect(url_for("admin_accounts"))
+
+
+# =========================================================
+# TOGGLE ACCOUNT STATUS
+# ACTIVATE / DEACTIVATE ACCOUNT
+# =========================================================
+
+@app.route(
+    "/admin/account/toggle-status",
+    methods=["POST"]
+)
+@login_required
+@admin_required
+def toggle_account_status():
+
+    validate_csrf()
+
+    user_id = request.form.get(
+        "user_id", ""
+    ).strip()
+
+    if not user_id.isdigit():
+
+        flash(
+            "Invalid account selected.",
+            "danger"
+        )
+        return redirect(url_for("admin_accounts"))
+
+    user_id = int(user_id)
+
+    try:
+
+        with db() as con:
+
+            # ---------------------------------------------
+            # PREVENT CONCURRENT ADMIN STATUS CHANGES
+            # ---------------------------------------------
+
+            if is_postgres():
+
+                con.execute(
+                    """
+                    SELECT pg_advisory_xact_lock(746281)
+                    """
+                )
+
+            # ---------------------------------------------
+            # GET TARGET ACCOUNT
+            # ---------------------------------------------
+
+            target = con.execute(
+                """
+                SELECT
+                    id,
+                    username,
+                    role,
+                    active
+                FROM users
+                WHERE id = ?
+                """,
+                (user_id,)
+            ).fetchone()
+
+            if not target:
+
+                raise ValueError(
+                    "The selected account does not exist."
+                )
+
+            username = target["username"]
+
+            role = normalize_text(
+                target["role"]
+            ).lower()
+
+            currently_active = bool(
+                target["active"]
+            )
+
+            # ---------------------------------------------
+            # DETERMINE NEW STATUS
+            # ---------------------------------------------
+
+            new_status = 0 if currently_active else 1
+
+            # ---------------------------------------------
+            # PREVENT SELF-DEACTIVATION
+            # ---------------------------------------------
+
+            current_user_id = session.get("user_id")
+
+            if (
+                currently_active
+                and str(current_user_id) == str(user_id)
+            ):
+
+                raise ValueError(
+                    "You cannot deactivate your own account."
+                )
+
+            # ---------------------------------------------
+            # PREVENT DEACTIVATING THE LAST ACTIVE ADMIN
+            # ---------------------------------------------
+
+            if currently_active and role == "admin":
+
+                active_admins = con.execute(
+                    """
+                    SELECT COUNT(*) AS total
+                    FROM users
+                    WHERE LOWER(role) = 'admin'
+                    AND active = 1
+                    """
+                ).fetchone()
+
+                if int(active_admins["total"]) <= 1:
+
+                    raise ValueError(
+                        "Cannot deactivate the last active "
+                        "Admin account."
+                    )
+
+            # ---------------------------------------------
+            # UPDATE ACCOUNT STATUS
+            # ---------------------------------------------
+
+            con.execute(
+                """
+                UPDATE users
+                SET active = ?
+                WHERE id = ?
+                """,
+                (
+                    new_status,
+                    user_id
+                )
+            )
+
+            # ---------------------------------------------
+            # ACTIVITY LOG
+            # ---------------------------------------------
+
+            action = (
+                "ACTIVATE ACCOUNT"
+                if new_status
+                else "DEACTIVATE ACCOUNT"
+            )
+
+            con.execute(
+                """
+                INSERT INTO activity_logs (
+                    username,
+                    action,
+                    details,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    session.get("username", ""),
+                    action,
+                    f"{action.title()}: {username} "
+                    f"(Account ID: {user_id})",
+                    datetime.now().isoformat(timespec="seconds")
+                )
+            )
+
+        # ---------------------------------------------
+        # SUCCESS MESSAGE
+        # ---------------------------------------------
+
+        if new_status:
+
+            flash(
+                f"Account '{username}' activated successfully.",
+                "success"
+            )
+
+        else:
+
+            flash(
+                f"Account '{username}' deactivated successfully.",
+                "success"
+            )
+
+    except ValueError as exc:
+
+        flash(
+            str(exc),
+            "danger"
+        )
+
+    except Exception:
+
+        app.logger.exception(
+            "Account status update failed"
+        )
+
+        flash(
+            "Unable to update account status.",
+            "danger"
+        )
+
+    return redirect(url_for("admin_accounts"))
 
 # =========================================================
 # UPDATE ACCOUNT PROJECT ASSIGNMENTS
@@ -4519,7 +5320,7 @@ def admin_errors():
                     ELSE 0
                 END,
                 billed_date DESC,
-                id DESC
+                record_key DESC
             LIMIT 250
             """
         ).fetchall()
@@ -6071,10 +6872,10 @@ def biller_errors():
         ]
 
     return render_template(
-        "errors.html",
-        errors=errors,
-        dates=dates,
-        selected_date=selected_date
+    "biller_errors.html",
+    errors=errors,
+    dates=dates,
+    selected_date=selected_date
     )
 
 # =========================================================
@@ -6317,7 +7118,7 @@ def save_response(record_key):
                         )
                     )
 
-                con.execute(
+                cursor = con.execute(
                     """
                     UPDATE error_records
                     SET
@@ -6326,15 +7127,48 @@ def save_response(record_key):
                         updated_at = ?,
                         updated_by = ?
                     WHERE record_key = ?
+                    AND project_id = ?
+                    AND LOWER(TRIM(COALESCE(username, ''))) = ?
                     """,
                     (
                         verified_error,
                         biller_comment,
                         response_updated_at,
                         response_updated_by,
-                        record_key
+                        record_key,
+                        project_id,
+                        username.lower()
                     )
                 )
+
+                if cursor.rowcount != 1:
+
+                    flash(
+                        "Unable to update this record. Please refresh the page.",
+                        "warning"
+                    )
+
+                    return redirect(
+                        url_for("biller_errors")
+                    )
+
+                latest_record = con.execute(
+                    """
+                    SELECT
+                        qc_explanation,
+                        qc_name
+                    FROM error_records
+                    WHERE record_key = ?
+                    AND project_id = ?
+                    """,
+                    (
+                        record_key,
+                        project_id
+                    )
+                ).fetchone()
+
+                if not latest_record:
+                    abort(404)
 
                 con.execute(
                     """
@@ -6359,8 +7193,8 @@ def save_response(record_key):
                         record_key,
                         verified_error,
                         biller_comment,
-                        record["qc_explanation"],
-                        record["qc_name"],
+                        latest_record["qc_explanation"],
+                        latest_record["qc_name"],
                         response_updated_by,
                         response_updated_at
                     )
@@ -6416,7 +7250,7 @@ def save_response(record_key):
                     session.get("display_name")
                 ) or username
 
-                con.execute(
+                cursor = con.execute(
                     """
                     UPDATE error_records
                     SET
@@ -6425,6 +7259,7 @@ def save_response(record_key):
                         updated_at = ?,
                         updated_by = ?
                     WHERE record_key = ?
+                    AND project_id = ?
                     AND UPPER(TRIM(COALESCE(verified_error, '')))
                         = 'N'
                     """,
@@ -6433,9 +7268,40 @@ def save_response(record_key):
                         qc_name,
                         response_updated_at,
                         response_updated_by,
-                        record_key
+                        record_key,
+                        project_id
                     )
                 )
+
+                if cursor.rowcount != 1:
+
+                    flash(
+                        "This record has already been updated. Please refresh the page.",
+                        "warning"
+                    )
+
+                    return redirect(
+                        url_for("qc_errors")
+                    )
+
+                latest_record = con.execute(
+                    """
+                    SELECT
+                        verified_error,
+                        biller_comment
+                    FROM error_records
+                    WHERE record_key = ?
+                    AND project_id = ?
+                    """,
+                    (
+                        record_key,
+                        project_id
+                    )
+                ).fetchone()
+
+                if not latest_record:
+                    abort(404)
+
 
                 con.execute(
                     """
@@ -6458,8 +7324,8 @@ def save_response(record_key):
                     """,
                     (
                         record_key,
-                        record["verified_error"],
-                        record["biller_comment"],
+                        latest_record["verified_error"],
+                        latest_record["biller_comment"],
                         qc_explanation,
                         qc_name,
                         response_updated_by,
@@ -6687,25 +7553,17 @@ def internal_server_error(error):
 
 
 # =========================================================
-# INITIALIZE DATABASE
+# MANUAL DATABASE INITIALIZATION COMMAND
 # =========================================================
 
-try:
+@app.cli.command("init-db")
+def initialize_database_command():
 
     init_db()
 
-    app.logger.info(
-        "Database initialization completed."
+    print(
+        "Database initialization completed successfully."
     )
-
-except Exception:
-
-    app.logger.exception(
-        "Database initialization failed."
-    )
-
-    raise
-
 
 # =========================================================
 # LOCAL DEVELOPMENT
