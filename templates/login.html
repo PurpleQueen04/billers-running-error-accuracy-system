@@ -49,6 +49,12 @@
 
             <form method="POST" class="login-form">
 
+                <input
+                    type="hidden"
+                    name="csrf_token"
+                    value="{{ session.get('csrf_token', '') }}"
+                >
+
                 <div class="form-group">
                     <label for="username">Username</label>
 
