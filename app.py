@@ -3454,12 +3454,15 @@ def admin_dashboard():
     # RENDER ADMIN DASHBOARD
     # -----------------------------------------------------
 
-    return render_template(
-        "admin.html",
-        counts=counts,
-        history=history,
-        **accuracy_context
-    )
+    return (
+    f"ADMIN DASHBOARD DIAGNOSTIC<br>"
+    f"Errors: {counts['errors']}<br>"
+    f"Billers: {counts['billers']}<br>"
+    f"Verified: {counts['verified']}<br>"
+    f"Disputed: {counts['disputed']}<br>"
+    f"Pending: {counts['pending']}<br>"
+    f"Imports: {counts['imports']}"
+)
 
 # =========================================================
 # ADMIN WORKBOOK UPLOAD
