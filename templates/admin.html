@@ -74,6 +74,66 @@
 
 
 <!-- =====================================================
+     ADMIN WORKBOOK IMPORT
+===================================================== -->
+
+<section class="content-card upload-section">
+
+    <div class="section-heading">
+        <div>
+            <h2>Workbook Import</h2>
+            <p>
+                Upload error records and accuracy workbooks
+                for system-wide processing.
+            </p>
+        </div>
+
+        <span class="section-tag">ADMIN ACCESS</span>
+    </div>
+
+    <form method="POST"
+          action="{{ url_for('upload_workbook') }}"
+          enctype="multipart/form-data"
+          class="upload-form">
+
+        <input type="hidden"
+               name="csrf_token"
+               value="{{ session.get('csrf_token', '') }}">
+
+        <div class="form-group">
+            <label for="source_file">Select Workbook</label>
+
+            <input type="file"
+                   name="source_file"
+                   id="source_file"
+                   accept=".csv,.xls,.xlsx,.ods"
+                   required>
+
+            <small>
+                Supported formats: CSV, XLS, XLSX, ODS
+            </small>
+        </div>
+
+        <div class="form-group">
+            <label for="csv_sheet">Import Type</label>
+
+            <select name="csv_sheet" id="csv_sheet" required>
+                <option value="ERROR">Error Records</option>
+                <option value="INTERNAL">Internal Accuracy</option>
+                <option value="EXTERNAL">External Accuracy</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+            ⇧ Upload Workbook
+        </button>
+
+    </form>
+
+</section>
+
+
+<!-- =====================================================
      BILLER ACCURACY MONITORING
 ===================================================== -->
 
