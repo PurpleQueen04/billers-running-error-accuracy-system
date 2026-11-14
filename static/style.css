@@ -553,8 +553,9 @@ img {
 
 .stat-card {
     display: flex;
-    align-items: flex-start;
-    gap: 15px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
 
     min-width: 0;
     padding: 21px;
@@ -573,45 +574,51 @@ img {
     border-color: var(--accent);
 }
 
+.stat-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
 .stat-icon {
     display: flex;
     align-items: center;
     justify-content: center;
 
-    width: 45px;
-    height: 45px;
-    min-width: 45px;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
 
     background: var(--accent-soft);
     color: var(--accent);
 
-    border-radius: 12px;
-
-    font-size: 20px;
-}
-
-.stat-info {
-    min-width: 0;
+    border-radius: 10px;
+    font-size: 18px;
 }
 
 .stat-label {
     color: var(--text-secondary);
-
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.5px;
 }
 
 .stat-value {
-    margin-top: 5px;
+    margin-top: 3px;
 
     color: var(--text-main);
-
     font-size: 25px;
     font-weight: 800;
     line-height: 1.3;
 
     overflow-wrap: anywhere;
+}
+
+.stat-description {
+    margin-top: 2px;
+    color: var(--text-muted);
+    font-size: 11px;
 }
 
 .stat-subtitle {
