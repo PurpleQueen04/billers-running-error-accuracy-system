@@ -155,6 +155,7 @@
                         <th>ASSIGNED PROJECTS</th>
                         <th>STATUS</th>
                         <th>DATE CREATED</th>
+                        <th>ACTION</th>
                     </tr>
                 </thead>
 
@@ -217,6 +218,62 @@
                                 {{ account.created_at or '—' }}
                             </td>
 
+                            <td>
+                                <div class="action-buttons">
+
+                                    <!-- EDIT ACCOUNT -->
+                                    <button
+                                        type="button"
+                                        class="btn btn-primary edit-account-btn"
+                                        data-user-id="{{ account.id }}"
+                                        data-display-name="{{ account.display_name }}"
+                                        data-username="{{ account.username }}"
+                                        data-role="{{ account.role|lower }}"
+                                        data-project-ids="{{ account.assigned_project_ids|tojson|forceescape }}"
+                                    >
+                                        <i class="fa-solid fa-pen"></i>
+                                        Edit
+                                    </button>
+
+                                    <!-- ACTIVATE / DEACTIVATE -->
+                                    <form
+                                        method="POST"
+                                        action="{{ url_for('toggle_account_status') }}"
+                                        onsubmit="return confirm(
+                                            'Are you sure you want to {{ 'deactivate' if account.active else 'activate' }} this account?'
+                                        );"
+                                    >
+
+                                        <input
+                                            type="hidden"
+                                            name="csrf_token"
+                                            value="{{ csrf_token }}"
+                                        >
+
+                                        <input
+                                            type="hidden"
+                                            name="user_id"
+                                            value="{{ account.id }}"
+                                        >
+
+                                        <button
+                                            type="submit"
+                                            class="btn {{ 'btn-danger' if account.active else 'btn-success' }}"
+                                        >
+                                            {% if account.active %}
+                                                <i class="fa-solid fa-user-slash"></i>
+                                                Deactivate
+                                            {% else %}
+                                                <i class="fa-solid fa-user-check"></i>
+                                                Activate
+                                            {% endif %}
+                                        </button>
+
+                                    </form>
+
+                                </div>
+                            </td>
+
                         </tr>
 
                     {% endfor %}
@@ -253,13 +310,174 @@
 
 </div>
 
+
+<!-- EDIT ACCOUNT MODAL -->
+<div id="editAccountModal" class="modal" style="display: none;">
+
+    <div class="modal-content">
+
+        <div class="section-heading">
+            <div>
+                <h2>Edit Account</h2>
+                <p>Update account details and project assignments.</p>
+            </div>
+
+            <button
+                type="button"
+                class="btn btn-secondary"
+                onclick="closeEditAccount()"
+            >
+                Close
+            </button>
+        </div>
+
+        <form
+            method="POST"
+            action="{{ url_for('edit_account') }}"
+        >
+
+            <input
+                type="hidden"
+                name="csrf_token"
+                value="{{ csrf_token }}"
+            >
+
+            <input
+                type="hidden"
+                name="user_id"
+                id="edit_user_id"
+            >
+
+            <div class="form-group">
+                <label for="edit_display_name">Display Name</label>
+
+                <input
+                    type="text"
+                    name="display_name"
+                    id="edit_display_name"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="edit_username">Username</label>
+
+                <input
+                    type="text"
+                    name="username"
+                    id="edit_username"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="edit_role">Role</label>
+
+                <select
+                    name="role"
+                    id="edit_role"
+                    required
+                >
+                    <option value="admin">Admin</option>
+                    <option value="qc">QC</option>
+                    <option value="biller">Biller</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+
+                <label>Assigned Projects</label>
+
+                <div class="project-assignment-list">
+
+                    {% for project in projects %}
+
+                        <label class="checkbox-label">
+
+                            <input
+                                type="checkbox"
+                                name="project_ids"
+                                value="{{ project.id }}"
+                                class="edit-project-checkbox"
+                                {% if not project.active %}disabled{% endif %}
+                            >
+
+                            {{ project.project_name }}
+
+                            {% if not project.active %}
+                                <small>
+                                    (Inactive — Existing Assignment Only)
+                                </small>
+                            {% endif %}
+
+                        </label>
+
+                    {% endfor %}
+
+                </div>
+
+                <small>
+                    Select one or more active projects for QC and Biller accounts.
+                    Admin accounts automatically have access to all active projects.
+                </small>
+
+            </div>
+
+            <div class="form-group">
+
+                <label for="edit_password">
+                    New Password
+                    <small>(Leave blank to keep current password)</small>
+                </label>
+
+                <input
+                    type="password"
+                    name="password"
+                    id="edit_password"
+                    minlength="6"
+                    autocomplete="new-password"
+                >
+
+            </div>
+
+            <div class="form-actions">
+
+                <button
+                    type="button"
+                    class="btn btn-secondary"
+                    onclick="closeEditAccount()"
+                >
+                    Cancel
+                </button>
+
+                <button
+                    type="submit"
+                    class="btn btn-primary"
+                >
+                    <i class="fa-solid fa-save"></i>
+                    Save Changes
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
 {% endblock %}
 
 
 {% block scripts %}
 
 <script>
+
 document.addEventListener("DOMContentLoaded", function () {
+
+    // =================================================
+    // ACCOUNT FILTERS
+    // =================================================
 
     const searchInput = document.getElementById("accountSearch");
     const roleFilter = document.getElementById("roleFilter");
@@ -267,65 +485,198 @@ document.addEventListener("DOMContentLoaded", function () {
     const table = document.getElementById("accountsTable");
     const resultCount = document.getElementById("accountResultCount");
 
-    if (!table) return;
+    if (table) {
 
-    const rows = Array.from(
-        table.querySelectorAll("tbody tr")
+        const rows = Array.from(
+            table.querySelectorAll("tbody tr")
+        );
+
+        function filterAccounts() {
+
+            const searchValue = searchInput.value
+                .toLowerCase()
+                .trim();
+
+            const selectedRole = roleFilter.value;
+            const selectedStatus = statusFilter.value;
+
+            let visibleCount = 0;
+
+            rows.forEach(function (row) {
+
+                const rowText = row.innerText.toLowerCase();
+
+                const matchesSearch =
+                    rowText.includes(searchValue);
+
+                const matchesRole =
+                    selectedRole === "all" ||
+                    row.dataset.role === selectedRole;
+
+                const matchesStatus =
+                    selectedStatus === "all" ||
+                    row.dataset.status === selectedStatus;
+
+                const visible =
+                    matchesSearch &&
+                    matchesRole &&
+                    matchesStatus;
+
+                row.style.display = visible ? "" : "none";
+
+                if (visible) {
+                    visibleCount++;
+                }
+
+            });
+
+            if (resultCount) {
+                resultCount.textContent =
+                    "Showing " + visibleCount +
+                    " of " + rows.length + " accounts";
+            }
+
+        }
+
+        if (searchInput && roleFilter && statusFilter) {
+
+            searchInput.addEventListener("input", filterAccounts);
+            roleFilter.addEventListener("change", filterAccounts);
+            statusFilter.addEventListener("change", filterAccounts);
+
+        }
+
+    }
+
+
+    // =================================================
+    // EDIT ACCOUNT MODAL
+    // =================================================
+
+    const modal = document.getElementById("editAccountModal");
+
+    const userIdInput = document.getElementById("edit_user_id");
+    const displayNameInput = document.getElementById("edit_display_name");
+    const usernameInput = document.getElementById("edit_username");
+    const roleInput = document.getElementById("edit_role");
+    const passwordInput = document.getElementById("edit_password");
+
+    const projectCheckboxes = document.querySelectorAll(
+        ".edit-project-checkbox"
     );
 
-    function filterAccounts() {
+    document.querySelectorAll(".edit-account-btn").forEach(function (button) {
 
-        const searchValue = searchInput.value
-            .toLowerCase()
-            .trim();
+        button.addEventListener("click", function () {
 
-        const selectedRole = roleFilter.value;
-        const selectedStatus = statusFilter.value;
+            const userId = this.dataset.userId;
+            const displayName = this.dataset.displayName;
+            const username = this.dataset.username;
+            const role = this.dataset.role;
 
-        let visibleCount = 0;
+            let assignedProjectIds = [];
 
-        rows.forEach(function (row) {
+            try {
 
-            const rowText = row.innerText.toLowerCase();
-            const rowRole = row.dataset.role;
-            const rowStatus = row.dataset.status;
+                assignedProjectIds = JSON.parse(
+                    this.dataset.projectIds || "[]"
+                );
 
-            const matchesSearch =
-                rowText.includes(searchValue);
+            } catch (error) {
 
-            const matchesRole =
-                selectedRole === "all" ||
-                rowRole === selectedRole;
+                console.error("Invalid project assignment data.", error);
 
-            const matchesStatus =
-                selectedStatus === "all" ||
-                rowStatus === selectedStatus;
+                alert("Unable to load this account's project assignments.");
 
-            const visible =
-                matchesSearch &&
-                matchesRole &&
-                matchesStatus;
+                return;
 
-            row.style.display = visible ? "" : "none";
-
-            if (visible) {
-                visibleCount++;
             }
+
+            userIdInput.value = userId;
+            displayNameInput.value = displayName;
+            usernameInput.value = username;
+            roleInput.value = role;
+
+            passwordInput.value = "";
+
+            projectCheckboxes.forEach(function (checkbox) {
+
+                const isAssigned = assignedProjectIds.includes(
+                    Number(checkbox.value)
+                );
+
+                checkbox.checked = isAssigned;
+
+                // Preserve inactive project assignments visually.
+                if (checkbox.disabled && isAssigned) {
+                    checkbox.checked = true;
+                }
+
+            });
+
+            updateProjectAssignmentVisibility();
+
+            modal.style.display = "flex";
 
         });
 
-        if (resultCount) {
-            resultCount.textContent =
-                "Showing " + visibleCount +
-                " of " + rows.length + " accounts";
+    });
+
+
+    // =================================================
+    // ROLE-BASED PROJECT ASSIGNMENT VISIBILITY
+    // =================================================
+
+    function updateProjectAssignmentVisibility() {
+
+        const projectSection = document.querySelector(
+            ".project-assignment-list"
+        );
+
+        if (!projectSection) return;
+
+        const projectGroup = projectSection.closest(".form-group");
+
+        if (!projectGroup) return;
+
+        if (roleInput.value === "admin") {
+
+            projectGroup.style.display = "none";
+
+        } else {
+
+            projectGroup.style.display = "";
+
         }
+
     }
 
-    searchInput.addEventListener("input", filterAccounts);
-    roleFilter.addEventListener("change", filterAccounts);
-    statusFilter.addEventListener("change", filterAccounts);
+    roleInput.addEventListener(
+        "change",
+        updateProjectAssignmentVisibility
+    );
+
+
+    // =================================================
+    // CLOSE MODAL
+    // =================================================
+
+    window.closeEditAccount = function () {
+
+        modal.style.display = "none";
+
+    };
+
+    modal.addEventListener("click", function (event) {
+
+        if (event.target === modal) {
+            closeEditAccount();
+        }
+
+    });
 
 });
+
 </script>
 
 {% endblock %}
