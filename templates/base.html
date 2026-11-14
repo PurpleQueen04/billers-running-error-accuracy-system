@@ -22,17 +22,11 @@
 <body>
 
 {% set current_role = session.get('role', '')|lower %}
-{% set display_name = session.get('full_name') or session.get('username') or 'User' %}
+{% set display_name = session.get('display_name') or session.get('full_name') or session.get('username') or 'User' %}
 
 <div class="app-layout">
 
-    <!-- =================================================
-         SIDEBAR
-    ================================================== -->
-
     <aside class="sidebar" id="sidebar">
-
-        <!-- BRAND -->
 
         <div class="sidebar-brand">
 
@@ -55,9 +49,6 @@
 
         </div>
 
-
-        <!-- NAVIGATION -->
-
         <nav class="sidebar-nav">
 
             {% if current_role == 'admin' %}
@@ -71,13 +62,13 @@
                 </a>
 
                 <a href="/admin/projects"
-                   class="nav-link {% if '/projects' in request.path %}active{% endif %}">
+                   class="nav-link {% if request.path.startswith('/admin/projects') %}active{% endif %}">
                     <span class="nav-icon">▣</span>
                     <span>Projects</span>
                 </a>
 
                 <a href="/admin/accounts"
-                   class="nav-link {% if '/accounts' in request.path %}active{% endif %}">
+                   class="nav-link {% if request.path.startswith('/admin/accounts') %}active{% endif %}">
                     <span class="nav-icon">♙</span>
                     <span>Accounts</span>
                 </a>
@@ -85,13 +76,13 @@
                 <div class="nav-section-label">MONITORING</div>
 
                 <a href="/admin/errors"
-                   class="nav-link {% if '/errors' in request.path %}active{% endif %}">
+                   class="nav-link {% if request.path.startswith('/admin/errors') or request.path.startswith('/admin/error') %}active{% endif %}">
                     <span class="nav-icon">⚑</span>
                     <span>Error Records</span>
                 </a>
 
                 <a href="/admin/accuracy"
-                   class="nav-link {% if '/accuracy' in request.path %}active{% endif %}">
+                   class="nav-link {% if request.path.startswith('/admin/accuracy') %}active{% endif %}">
                     <span class="nav-icon">↗</span>
                     <span>Accuracy Monitoring</span>
                 </a>
@@ -99,17 +90,16 @@
                 <div class="nav-section-label">SYSTEM</div>
 
                 <a href="/admin/import-history"
-                   class="nav-link {% if '/import-history' in request.path %}active{% endif %}">
+                   class="nav-link {% if request.path.startswith('/admin/import-history') %}active{% endif %}">
                     <span class="nav-icon">⇧</span>
                     <span>Import History</span>
                 </a>
 
                 <a href="/admin/activity-logs"
-                   class="nav-link {% if '/activity-logs' in request.path %}active{% endif %}">
+                   class="nav-link {% if request.path.startswith('/admin/activity-logs') %}active{% endif %}">
                     <span class="nav-icon">◷</span>
                     <span>Activity Logs</span>
                 </a>
-
 
             {% elif current_role == 'qc' %}
 
@@ -122,7 +112,7 @@
                 </a>
 
                 <a href="/qc/projects"
-                   class="nav-link {% if '/projects' in request.path %}active{% endif %}">
+                   class="nav-link {% if request.path.startswith('/qc/projects') %}active{% endif %}">
                     <span class="nav-icon">▣</span>
                     <span>My Projects</span>
                 </a>
@@ -130,23 +120,22 @@
                 <div class="nav-section-label">MONITORING</div>
 
                 <a href="/qc/errors"
-                   class="nav-link {% if '/errors' in request.path %}active{% endif %}">
+                   class="nav-link {% if request.path.startswith('/qc/errors') %}active{% endif %}">
                     <span class="nav-icon">⚑</span>
                     <span>Error Verification</span>
                 </a>
 
                 <a href="/qc/accuracy"
-                   class="nav-link {% if '/accuracy' in request.path %}active{% endif %}">
+                   class="nav-link {% if request.path.startswith('/qc/accuracy') %}active{% endif %}">
                     <span class="nav-icon">↗</span>
                     <span>Accuracy Monitoring</span>
                 </a>
 
                 <a href="/qc/import-history"
-                   class="nav-link {% if '/import-history' in request.path %}active{% endif %}">
+                   class="nav-link {% if request.path.startswith('/qc/import-history') %}active{% endif %}">
                     <span class="nav-icon">⇧</span>
                     <span>Import History</span>
                 </a>
-
 
             {% elif current_role == 'biller' %}
 
@@ -161,19 +150,19 @@
                 <div class="nav-section-label">MY RECORDS</div>
 
                 <a href="/biller/errors"
-                   class="nav-link {% if '/errors' in request.path %}active{% endif %}">
+                   class="nav-link {% if request.path.startswith('/biller/errors') %}active{% endif %}">
                     <span class="nav-icon">⚑</span>
                     <span>My Error Records</span>
                 </a>
 
                 <a href="/biller/accuracy"
-                   class="nav-link {% if '/accuracy' in request.path %}active{% endif %}">
+                   class="nav-link {% if request.path.startswith('/biller/accuracy') %}active{% endif %}">
                     <span class="nav-icon">↗</span>
                     <span>My Accuracy</span>
                 </a>
 
                 <a href="/biller/responses"
-                   class="nav-link {% if '/responses' in request.path %}active{% endif %}">
+                   class="nav-link {% if request.path.startswith('/biller/responses') %}active{% endif %}">
                     <span class="nav-icon">☷</span>
                     <span>My Responses</span>
                 </a>
@@ -181,9 +170,6 @@
             {% endif %}
 
         </nav>
-
-
-        <!-- USER PROFILE / LOGOUT -->
 
         <div class="sidebar-bottom">
 
@@ -200,23 +186,26 @@
 
             </div>
 
-            <a href="/logout" class="logout-link">
-                <span class="nav-icon">⇥</span>
-                <span>Logout</span>
-            </a>
+            <form method="POST"
+                  action="{{ url_for('logout') }}"
+                  class="logout-form">
+
+                <input type="hidden"
+                       name="csrf_token"
+                       value="{{ session.get('csrf_token', '') }}">
+
+                <button type="submit" class="logout-link">
+                    <span class="nav-icon">⇥</span>
+                    <span>Logout</span>
+                </button>
+
+            </form>
 
         </div>
 
     </aside>
 
-
-    <!-- =================================================
-         MAIN CONTENT
-    ================================================== -->
-
     <main class="main-area">
-
-        <!-- TOP HEADER -->
 
         <header class="topbar">
 
@@ -256,38 +245,25 @@
 
         </header>
 
-
-        <!-- PAGE CONTENT -->
-
         <section class="page-content">
-
-            <!-- FLASH MESSAGES -->
 
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     <div class="flash-container">
 
                         {% for category, message in messages %}
-
                             <div class="flash-message flash-{{ category }}">
                                 <span>{{ message }}</span>
                             </div>
-
                         {% endfor %}
 
                     </div>
                 {% endif %}
             {% endwith %}
 
-
-            <!-- MAIN PAGE BLOCK -->
-
             {% block content %}{% endblock %}
 
         </section>
-
-
-        <!-- FOOTER -->
 
         <footer class="app-footer">
             <span>BILLERS RUNNING ERROR & ACCURACY SYSTEM</span>
@@ -297,11 +273,6 @@
     </main>
 
 </div>
-
-
-<!-- =====================================================
-     SIDEBAR MOBILE TOGGLE
-====================================================== -->
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
