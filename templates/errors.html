@@ -15,6 +15,46 @@
     </div>
 </div>
 
+<!-- SUMMARY -->
+<div class="stats-grid qc-stats-grid">
+    <div class="stat-card">
+        <div class="stat-card-top">
+            <span class="stat-label">Pending Error Records</span>
+            <span class="stat-icon warning">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </span>
+        </div>
+
+        <div class="stat-value">
+            {{ errors|length }}
+        </div>
+
+        <div class="stat-description">
+            Records marked VERIFIED ERROR = N
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-card-top">
+            <span class="stat-label">Available Billed Dates</span>
+            <span class="stat-icon">
+                <i class="fa-solid fa-calendar-days"></i>
+            </span>
+        </div>
+
+        <div class="stat-value">
+            {{ dates|length }}
+        </div>
+
+        <div class="stat-description">
+            Dates with pending error records
+        </div>
+    </div>
+</div>
+
+
+
+
 <!-- QC WORKBOOK IMPORT -->
 <section class="content-card upload-section">
     <div class="section-heading">
@@ -66,44 +106,6 @@
         </button>
     </form>
 </section>
-
-<!-- SUMMARY -->
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-card-top">
-            <span class="stat-label">Pending Error Records</span>
-            <span class="stat-icon warning">
-                <i class="fa-solid fa-triangle-exclamation"></i>
-            </span>
-        </div>
-
-        <div class="stat-value">
-            {{ errors|length }}
-        </div>
-
-        <div class="stat-description">
-            Records marked VERIFIED ERROR = N
-        </div>
-    </div>
-
-    <div class="stat-card">
-        <div class="stat-card-top">
-            <span class="stat-label">Available Billed Dates</span>
-            <span class="stat-icon">
-                <i class="fa-solid fa-calendar-days"></i>
-            </span>
-        </div>
-
-        <div class="stat-value">
-            {{ dates|length }}
-        </div>
-
-        <div class="stat-description">
-            Dates with pending error records
-        </div>
-    </div>
-</div>
-
 
 <!-- FILTERS -->
 <div class="content-card">
