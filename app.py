@@ -2174,11 +2174,21 @@ def import_accuracy_sheet(
     source_row_numbers = [int(index) + 2 for index in dataframe.index]
     first_source_row = min(source_row_numbers) if source_row_numbers else 2
     last_source_row = max(source_row_numbers) if source_row_numbers else 1
+
     existing_by_key = {}
+    existing_blank_by_key = {}
+    latest_blank_import_by_project = {}
 
     existing_rows = con.execute(
         """
-        SELECT id, username, record_date, accuracy_type, source_row, project_id
+        SELECT
+            id,
+            username,
+            record_date,
+            accuracy_type,
+            source_row,
+            project_id,
+            imported_at
         FROM accuracy_records
         WHERE sheet = ? AND source_row BETWEEN ? AND ?
         ORDER BY id DESC
@@ -2186,17 +2196,73 @@ def import_accuracy_sheet(
         (sheet_name, first_source_row, last_source_row)
     ).fetchall()
 
-    # ORDER BY id DESC plus setdefault preserves the old
-    # ORDER BY id DESC LIMIT 1 behavior for duplicate matches.
+    # Identify the latest import batch containing blank dates
+    # for each project.
     for existing in existing_rows:
-        key = (
-            normalize_text(existing["username"]),
-            normalize_text(existing["record_date"]),
-            normalize_text(existing["accuracy_type"]),
-            int(existing["source_row"]),
-            int(existing["project_id"]) if existing["project_id"] is not None else None
+        if normalize_text(existing["record_date"]):
+            continue
+
+        project_key = (
+            int(existing["project_id"])
+            if existing["project_id"] is not None
+            else None
         )
-        existing_by_key.setdefault(key, int(existing["id"]))
+
+        batch_time = normalize_text(existing["imported_at"])
+
+        if not batch_time:
+            continue
+
+        current_latest = latest_blank_import_by_project.get(project_key)
+
+        if current_latest is None or batch_time > current_latest:
+            latest_blank_import_by_project[project_key] = batch_time
+
+    # Build exact matches and safe fallback matches.
+    for existing in existing_rows:
+        username_key = normalize_text(existing["username"])
+        date_key = normalize_text(existing["record_date"])
+        accuracy_type_key = normalize_text(existing["accuracy_type"])
+        source_row_key = int(existing["source_row"])
+
+        project_key = (
+            int(existing["project_id"])
+            if existing["project_id"] is not None
+            else None
+        )
+
+        existing_id = int(existing["id"])
+
+        exact_key = (
+            username_key,
+            date_key,
+            accuracy_type_key,
+            source_row_key,
+            project_key
+        )
+
+        existing_by_key.setdefault(exact_key, existing_id)
+
+        batch_time = normalize_text(existing["imported_at"])
+
+        # Only use blank-date records from the latest blank-date
+        # import batch for that project.
+        if (
+            not date_key
+            and batch_time
+            == latest_blank_import_by_project.get(project_key)
+        ):
+            fallback_key = (
+                username_key,
+                accuracy_type_key,
+                source_row_key,
+                project_key
+            )
+
+            existing_blank_by_key.setdefault(
+                fallback_key,
+                existing_id
+            )
 
     imported = 0
     project_cache = {}
@@ -2240,34 +2306,86 @@ def import_accuracy_sheet(
                 continue
             errors = number_value(val(row, error_column)) or 0
 
+            
+            project_key = (
+                int(project_id)
+                if project_id is not None
+                else None
+            )
+
             key = (
                 username,
                 date_text,
                 accuracy_type,
                 source_row,
-                int(project_id) if project_id is not None else None
+                project_key
             )
+
             values = (
-                biller_name, month, weekly, accuracy_value,
-                bills_processed, audited, errors, imported_at
+                biller_name,
+                month,
+                weekly,
+                date_text,
+                accuracy_value,
+                bills_processed,
+                audited,
+                errors,
+                imported_at
             )
+
             existing_id = existing_by_key.get(key)
+
+            # If the exact date match is missing, check the
+            # latest blank-date import batch for this project.
+            if existing_id is None and date_text:
+                fallback_key = (
+                    username,
+                    accuracy_type,
+                    source_row,
+                    project_key
+                )
+
+                existing_id = existing_blank_by_key.get(
+                    fallback_key
+                )
+
             if existing_id is not None:
                 updates.append((*values, existing_id))
             else:
                 inserts.append((
-                    sheet_name, username, biller_name, month, weekly, date_text,
-                    accuracy_type, accuracy_value, bills_processed, audited,
-                    errors, source_row, imported_at, project_id
+                    sheet_name,
+                    username,
+                    biller_name,
+                    month,
+                    weekly,
+                    date_text,
+                    accuracy_type,
+                    accuracy_value,
+                    bills_processed,
+                    audited,
+                    errors,
+                    source_row,
+                    imported_at,
+                    project_id
                 ))
+
             imported += 1
+
 
     # Execute database writes in batches instead of issuing one
     # SELECT + UPDATE/INSERT cycle per row.
+    
     update_sql = """
         UPDATE accuracy_records SET
-            biller_name = ?, month = ?, weekly = ?, accuracy_value = ?,
-            bills_processed = ?, audited = ?, errors = ?, imported_at = ?
+            biller_name = ?,
+            month = ?,
+            weekly = ?,
+            record_date = ?,
+            accuracy_value = ?,
+            bills_processed = ?,
+            audited = ?,
+            errors = ?,
+            imported_at = ?
         WHERE id = ?
     """
     insert_sql = """
