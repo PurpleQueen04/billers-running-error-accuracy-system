@@ -1733,7 +1733,8 @@ def read_source(file_storage, csv_sheet="ERROR"):
         result[requested] = pd.read_excel(
             workbook,
             sheet_name=actual_name,
-            dtype=object
+            dtype=object,
+            na_filter=False
         )
 
     if not result:
@@ -2047,9 +2048,43 @@ def import_accuracy_sheet(
             (EXTERNAL_ACCURACY[1], columns["external_woc_accuracy"], columns["external_woc_errors"])
         ]
 
+    # -----------------------------------------------------
+    # PRELOAD EXISTING ROWS IN ONE QUERY
+    # The old implementation ran a SELECT for every workbook
+    # row, which caused long-running imports and Gunicorn
+    # worker timeouts on larger ODS files.
+    # -----------------------------------------------------
+    first_source_row = 2
+    last_source_row = len(dataframe) + 1
+    existing_by_key = {}
+
+    existing_rows = con.execute(
+        """
+        SELECT id, username, record_date, accuracy_type, source_row, project_id
+        FROM accuracy_records
+        WHERE sheet = ? AND source_row BETWEEN ? AND ?
+        ORDER BY id DESC
+        """,
+        (sheet_name, first_source_row, last_source_row)
+    ).fetchall()
+
+    # ORDER BY id DESC plus setdefault preserves the old
+    # ORDER BY id DESC LIMIT 1 behavior for duplicate matches.
+    for existing in existing_rows:
+        key = (
+            normalize_text(existing["username"]),
+            normalize_text(existing["record_date"]),
+            normalize_text(existing["accuracy_type"]),
+            int(existing["source_row"]),
+            int(existing["project_id"]) if existing["project_id"] is not None else None
+        )
+        existing_by_key.setdefault(key, int(existing["id"]))
+
     imported = 0
     project_cache = {}
     imported_at = datetime.now().isoformat(timespec="seconds")
+    updates = []
+    inserts = []
 
     for source_row, (_, row) in enumerate(dataframe.iterrows(), start=2):
         username = dataframe_value(row, columns["username"])
@@ -2083,48 +2118,49 @@ def import_accuracy_sheet(
                 continue
             errors = number_value(val(row, error_column)) or 0
 
-            # Do not rely on a UNIQUE constraint that may not exist in older
-            # Supabase databases. Update one matching imported row if present;
-            # otherwise insert. Existing duplicate/history rows are untouched.
-            existing = con.execute(
-                """
-                SELECT id FROM accuracy_records
-                WHERE sheet = ? AND username = ? AND record_date = ?
-                  AND accuracy_type = ? AND source_row = ?
-                  AND ((project_id = ?) OR (project_id IS NULL AND ? IS NULL))
-                ORDER BY id DESC LIMIT 1
-                """,
-                (sheet_name, username, date_text, accuracy_type, source_row, project_id, project_id)
-            ).fetchone()
-
+            key = (
+                username,
+                date_text,
+                accuracy_type,
+                source_row,
+                int(project_id) if project_id is not None else None
+            )
             values = (
                 biller_name, month, weekly, accuracy_value,
                 bills_processed, audited, errors, imported_at
             )
-            if existing:
-                con.execute(
-                    """
-                    UPDATE accuracy_records SET
-                        biller_name = ?, month = ?, weekly = ?, accuracy_value = ?,
-                        bills_processed = ?, audited = ?, errors = ?, imported_at = ?
-                    WHERE id = ?
-                    """,
-                    (*values, existing["id"])
-                )
+            existing_id = existing_by_key.get(key)
+            if existing_id is not None:
+                updates.append((*values, existing_id))
             else:
-                con.execute(
-                    """
-                    INSERT INTO accuracy_records (
-                        sheet, username, biller_name, month, weekly, record_date,
-                        accuracy_type, accuracy_value, bills_processed, audited,
-                        errors, source_row, imported_at, project_id
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (sheet_name, username, biller_name, month, weekly, date_text,
-                     accuracy_type, accuracy_value, bills_processed, audited,
-                     errors, source_row, imported_at, project_id)
-                )
+                inserts.append((
+                    sheet_name, username, biller_name, month, weekly, date_text,
+                    accuracy_type, accuracy_value, bills_processed, audited,
+                    errors, source_row, imported_at, project_id
+                ))
             imported += 1
+
+    # Execute database writes in batches instead of issuing one
+    # SELECT + UPDATE/INSERT cycle per row.
+    update_sql = """
+        UPDATE accuracy_records SET
+            biller_name = ?, month = ?, weekly = ?, accuracy_value = ?,
+            bills_processed = ?, audited = ?, errors = ?, imported_at = ?
+        WHERE id = ?
+    """
+    insert_sql = """
+        INSERT INTO accuracy_records (
+            sheet, username, biller_name, month, weekly, record_date,
+            accuracy_type, accuracy_value, bills_processed, audited,
+            errors, source_row, imported_at, project_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """
+
+    batch_size = 500
+    for offset in range(0, len(updates), batch_size):
+        con.executemany(update_sql, updates[offset:offset + batch_size])
+    for offset in range(0, len(inserts), batch_size):
+        con.executemany(insert_sql, inserts[offset:offset + batch_size])
 
     return imported
 
