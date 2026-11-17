@@ -5994,12 +5994,12 @@ def build_accuracy_context(
                 tuple(error_params)
             ).fetchall()
 
-    # -----------------------------------------------------
+   # -----------------------------------------------------
     # BUILD AVAILABLE PERIODS
     # -----------------------------------------------------
-    
-            period_keys = set()
-            row_periods = {}
+
+    period_keys = set()
+    row_periods = {}
 
     # Periods from latest INTERNAL and EXTERNAL imports
     for row in records:
