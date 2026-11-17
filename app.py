@@ -2307,7 +2307,7 @@ def import_workbook(
         "EXTERNAL": 0
     }
 
-workbook_imported_at = datetime.now().isoformat(timespec="microseconds")
+    workbook_imported_at = datetime.now().isoformat(timespec="microseconds")
 
     if isinstance(sheets, ODSWorkbookSource):
         seen_supported_sheets = set()
