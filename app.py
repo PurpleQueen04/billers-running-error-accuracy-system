@@ -4698,18 +4698,14 @@ def create_project():
         request.form.get("project_name")
     )
 
-    name = normalize_text(
-        request.form.get("name")
-    )
-
     role = normalize_text(
         request.form.get("role")
     ).lower()
 
-    if not project_name or not name:
+    if not project_name:
 
         flash(
-            "Project Name and Name are required.",
+            "Project Name is required.",
             "warning"
         )
 
@@ -4756,11 +4752,10 @@ def create_project():
                     active,
                     created_at
                 )
-                VALUES (?, ?, ?, 1, ?)
+                VALUES (?, NULL, ?, 1, ?)
                 """,
                 (
                     project_name,
-                    name,
                     role,
                     datetime.now().isoformat(timespec="seconds")
                 )
