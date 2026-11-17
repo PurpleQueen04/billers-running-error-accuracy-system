@@ -4698,24 +4698,11 @@ def create_project():
         request.form.get("project_name")
     )
 
-    role = normalize_text(
-        request.form.get("role")
-    ).lower()
-
     if not project_name:
 
         flash(
             "Project Name is required.",
             "warning"
-        )
-
-        return redirect(url_for("admin_projects"))
-
-    if role not in ("biller", "qc"):
-
-        flash(
-            "Project Role must be BILLER or QC.",
-            "danger"
         )
 
         return redirect(url_for("admin_projects"))
@@ -4743,6 +4730,8 @@ def create_project():
 
                 return redirect(url_for("admin_projects"))
 
+            # Keep legacy columns for database compatibility, but
+            # project creation no longer requires or assigns a role/name.
             con.execute(
                 """
                 INSERT INTO projects (
@@ -4752,11 +4741,10 @@ def create_project():
                     active,
                     created_at
                 )
-                VALUES (?, NULL, ?, 1, ?)
+                VALUES (?, NULL, '', 1, ?)
                 """,
                 (
                     project_name,
-                    role,
                     datetime.now().isoformat(timespec="seconds")
                 )
             )
