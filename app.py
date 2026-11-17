@@ -6008,15 +6008,54 @@ def build_accuracy_context(
                 tuple(error_params)
             ).fetchall()
 
-   # -----------------------------------------------------
+       # -----------------------------------------------------
     # BUILD AVAILABLE PERIODS
+    # Show periods from the latest import per project/sheet.
+    # Keep all historical records for period comparisons.
     # -----------------------------------------------------
 
     period_keys = set()
     row_periods = {}
 
-    # Periods from latest INTERNAL and EXTERNAL imports
+    # Map period keys for ALL historical accuracy records.
     for row in records:
+        key = accuracy_period_key(
+            row.get("record_date"),
+            period_type,
+            row.get("month")
+        )
+
+        if key:
+            row_periods[id(row)] = key
+
+    # Find latest accuracy import per project and sheet.
+    latest_accuracy_imports = {}
+
+    for row in records:
+        imported_at = normalize_text(row.get("imported_at"))
+        if not imported_at:
+            continue
+
+        import_key = (
+            row.get("project_id"),
+            normalize_text(row.get("sheet")).upper()
+        )
+
+        if imported_at > latest_accuracy_imports.get(import_key, ""):
+            latest_accuracy_imports[import_key] = imported_at
+
+    # Add periods only from the latest accuracy imports.
+    for row in records:
+        import_key = (
+            row.get("project_id"),
+            normalize_text(row.get("sheet")).upper()
+        )
+
+        if (
+            normalize_text(row.get("imported_at"))
+            != latest_accuracy_imports.get(import_key)
+        ):
+            continue
 
         key = accuracy_period_key(
             row.get("record_date"),
@@ -6026,10 +6065,29 @@ def build_accuracy_context(
 
         if key:
             period_keys.add(key)
-            row_periods[id(row)] = key
 
-    # Periods from latest ERROR imports
+    # Find latest ERROR import per project.
+    latest_error_imports = {}
+
     for row in error_rows:
+        imported_at = normalize_text(row["imported_at"])
+        if not imported_at:
+            continue
+
+        project_id = row["project_id"]
+
+        if imported_at > latest_error_imports.get(project_id, ""):
+            latest_error_imports[project_id] = imported_at
+
+    # Add periods only from the latest ERROR imports.
+    for row in error_rows:
+        project_id = row["project_id"]
+
+        if (
+            normalize_text(row["imported_at"])
+            != latest_error_imports.get(project_id)
+        ):
+            continue
 
         key = accuracy_period_key(
             row["billed_date"],
@@ -6040,9 +6098,14 @@ def build_accuracy_context(
             period_keys.add(key)
 
     periods = sorted(period_keys)
+
     if selected_period not in period_keys:
         selected_period = periods[-1] if periods else ""
-    previous_period = previous_accuracy_period(selected_period, period_type)
+
+    previous_period = previous_accuracy_period(
+        selected_period,
+        period_type
+    )
 
     def aggregate_record(target_map, group_key, row):
         username = normalize_text(row.get("username"))
