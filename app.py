@@ -5993,14 +5993,23 @@ def build_accuracy_context(
     # BUILD AVAILABLE PERIODS
     # -----------------------------------------------------
     
-    period_keys = set()
+        period_keys = set()
     row_periods = {}
+
+    # Periods from latest INTERNAL and EXTERNAL imports
     for row in records:
+
         key = accuracy_period_key(
-            row.get("record_date"), period_type, row.get("month")
+            row.get("record_date"),
+            period_type,
+            row.get("month")
         )
-        
-    # Include periods from the latest ERROR import.
+
+        if key:
+            period_keys.add(key)
+            row_periods[id(row)] = key
+
+    # Periods from latest ERROR imports
     for row in error_rows:
 
         key = accuracy_period_key(
