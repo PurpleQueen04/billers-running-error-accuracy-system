@@ -126,7 +126,6 @@
                     <tr>
                         <th>PROJECT ID</th>
                         <th>PROJECT NAME</th>
-                        <th>NAME</th>
                         <th>ROLE</th>
                         <th>ASSIGNED ACCOUNTS</th>
                         <th>STATUS</th>
@@ -150,10 +149,6 @@
                                 <strong>
                                     {{ project.project_name or '—' }}
                                 </strong>
-                            </td>
-
-                            <td>
-                                {{ project.name or '—' }}
                             </td>
 
                             <td>
@@ -235,11 +230,6 @@
             <div class="form-group">
                 <label for="new_project_name">Project Name</label>
                 <input type="text" id="new_project_name" name="project_name" maxlength="120" placeholder="e.g. SAIA" required>
-            </div>
-
-            <div class="form-group">
-                <label for="new_project_client_name">Name</label>
-                <input type="text" id="new_project_client_name" name="name" maxlength="120" placeholder="Enter project name/associated name" required>
             </div>
 
             <div class="form-group">
