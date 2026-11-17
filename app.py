@@ -6482,6 +6482,22 @@ def qc_errors():
 
             rows = []
 
+        # Supply only the QC account's assigned active projects to the
+        # Workbook Import selector. This is template context only; the
+        # existing server-side upload authorization remains unchanged.
+        project_rows = con.execute(
+            f"""
+            SELECT id, project_name
+            FROM projects
+            WHERE active = 1
+              AND id IN ({placeholders})
+            ORDER BY project_name
+            """,
+            tuple(project_ids)
+        ).fetchall()
+
+    projects = [dict(row) for row in project_rows]
+
     errors = [
         dict(row)
         for row in rows
@@ -6491,7 +6507,8 @@ def qc_errors():
         "errors.html",
         errors=errors,
         dates=dates,
-        selected_date=selected_date
+        selected_date=selected_date,
+        projects=projects
     )
 
 # =========================================================
