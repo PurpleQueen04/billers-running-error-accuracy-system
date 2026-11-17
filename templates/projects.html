@@ -129,6 +129,7 @@
                         <th>ASSIGNED ACCOUNTS</th>
                         <th>STATUS</th>
                         <th>DATE CREATED</th>
+                        <th>ACTION</th>
                     </tr>
                 </thead>
 
@@ -170,6 +171,17 @@
                                 {{ project.created_at or '—' }}
                             </td>
 
+                            <td>
+                                <button
+                                    type="button"
+                                    class="btn btn-primary btn-small edit-project-btn"
+                                    data-project-id="{{ project.id }}"
+                                    data-project-name="{{ project.project_name|e }}"
+                                >
+                                    <i class="fa-solid fa-pen"></i> Edit
+                                </button>
+                            </td>
+
                         </tr>
 
                     {% endfor %}
@@ -207,6 +219,30 @@
 </div>
 
 
+
+<!-- EDIT PROJECT MODAL -->
+<div id="editProjectModal" class="modal-backdrop" style="display:none;" onclick="if(event.target===this) closeEditProject()">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editProjectTitle">
+        <div class="modal-header">
+            <div>
+                <h2 class="modal-title" id="editProjectTitle">Edit Project</h2>
+                <p class="form-help">Update the project name.</p>
+            </div>
+            <button type="button" class="btn btn-secondary btn-small" onclick="closeEditProject()">Close</button>
+        </div>
+        <form id="editProjectForm" method="POST" action="/admin/project/0/edit">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="form-group">
+                <label for="edit_project_name">Project Name</label>
+                <input type="text" id="edit_project_name" name="project_name" maxlength="120" required>
+            </div>
+            <div class="action-buttons">
+                <button type="button" class="btn btn-secondary" onclick="closeEditProject()">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <!-- CREATE PROJECT MODAL -->
 <div id="createProjectModal" class="modal-backdrop" style="display:none;" onclick="if(event.target===this) closeCreateProject()">
@@ -310,8 +346,33 @@ function closeCreateProject() {
     if (modal) modal.style.display = "none";
 }
 
+function openEditProject(projectId, projectName) {
+    const modal = document.getElementById("editProjectModal");
+    const form = document.getElementById("editProjectForm");
+    const nameInput = document.getElementById("edit_project_name");
+    if (!modal || !form || !nameInput) return;
+    form.action = "/admin/project/" + encodeURIComponent(projectId) + "/edit";
+    nameInput.value = projectName || "";
+    modal.style.display = "flex";
+    nameInput.focus();
+}
+
+function closeEditProject() {
+    const modal = document.getElementById("editProjectModal");
+    if (modal) modal.style.display = "none";
+}
+
+document.querySelectorAll(".edit-project-btn").forEach(function(button) {
+    button.addEventListener("click", function() {
+        openEditProject(this.dataset.projectId, this.dataset.projectName);
+    });
+});
+
 document.addEventListener("keydown", function(event) {
-    if (event.key === "Escape") closeCreateProject();
+    if (event.key === "Escape") {
+        closeCreateProject();
+        closeEditProject();
+    }
 });
 </script>
 
