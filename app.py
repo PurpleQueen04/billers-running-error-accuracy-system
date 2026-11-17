@@ -2139,7 +2139,8 @@ def import_accuracy_sheet(
     dataframe,
     sheet_name,
     default_project_id=None,
-    allowed_project_ids=None
+    allowed_project_ids=None,
+    imported_at=None
 ):
     if dataframe is None or dataframe.empty:
         return 0
@@ -2199,7 +2200,10 @@ def import_accuracy_sheet(
 
     imported = 0
     project_cache = {}
-    imported_at = datetime.now().isoformat(timespec="seconds")
+
+    if imported_at is None:
+        imported_at = datetime.now().isoformat(timespec="microseconds")
+
     updates = []
     inserts = []
 
@@ -2325,7 +2329,8 @@ def import_workbook(
                     dataframe,
                     sheet_name,
                     default_project_id,
-                    allowed_project_ids
+                    allowed_project_ids,
+                    imported_at=workbook_imported_at
                 )
 
         if not seen_supported_sheets:
@@ -2353,7 +2358,8 @@ def import_workbook(
                 internal_dataframe,
                 "INTERNAL",
                 default_project_id,
-                allowed_project_ids
+                allowed_project_ids,
+                imported_at=workbook_imported_at
             )
 
         if external_dataframe is not None:
@@ -2362,7 +2368,8 @@ def import_workbook(
                 external_dataframe,
                 "EXTERNAL",
                 default_project_id,
-                allowed_project_ids
+                allowed_project_ids,
+                imported_at=workbook_imported_at
             )
 
     # -----------------------------------------------------
