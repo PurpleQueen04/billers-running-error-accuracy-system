@@ -10,9 +10,14 @@
         <p>Manage and monitor projects and their assigned accounts.</p>
     </div>
 
-    <span class="section-tag">
+    <div class="page-header-actions">
+        <button type="button" class="btn btn-primary" onclick="openCreateProject()">
+            <i class="fa-solid fa-plus"></i> Add Project
+        </button>
+        <span class="section-tag">
         {{ projects|length }} Projects
-    </span>
+        </span>
+    </div>
 </div>
 
 
@@ -212,6 +217,49 @@
 </div>
 
 
+
+<!-- CREATE PROJECT MODAL -->
+<div id="createProjectModal" class="modal-backdrop" style="display:none;" onclick="if(event.target===this) closeCreateProject()">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="createProjectTitle">
+        <div class="modal-header">
+            <div>
+                <h2 class="modal-title" id="createProjectTitle">Add Project</h2>
+                <p class="form-help">Create a new active project for Biller and QC assignments.</p>
+            </div>
+            <button type="button" class="btn btn-secondary btn-small" onclick="closeCreateProject()">Close</button>
+        </div>
+
+        <form method="POST" action="{{ url_for('create_project') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+            <div class="form-group">
+                <label for="new_project_name">Project Name</label>
+                <input type="text" id="new_project_name" name="project_name" maxlength="120" placeholder="e.g. SAIA" required>
+            </div>
+
+            <div class="form-group">
+                <label for="new_project_client_name">Name</label>
+                <input type="text" id="new_project_client_name" name="name" maxlength="120" placeholder="Enter project name/associated name" required>
+            </div>
+
+            <div class="form-group">
+                <label for="new_project_role">Project Role</label>
+                <select id="new_project_role" name="role" required>
+                    <option value="">Select role</option>
+                    <option value="biller">Biller</option>
+                    <option value="qc">QC</option>
+                </select>
+                <small class="form-help">This field is required by the existing project creation process.</small>
+            </div>
+
+            <div class="action-buttons">
+                <button type="button" class="btn btn-secondary" onclick="closeCreateProject()">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Create Project</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 {% endblock %}
 
 
@@ -274,6 +322,20 @@ document.addEventListener("DOMContentLoaded", function () {
     searchInput.addEventListener("input", filterProjects);
     statusFilter.addEventListener("change", filterProjects);
 
+});
+
+function openCreateProject() {
+    const modal = document.getElementById("createProjectModal");
+    if (modal) modal.style.display = "flex";
+}
+
+function closeCreateProject() {
+    const modal = document.getElementById("createProjectModal");
+    if (modal) modal.style.display = "none";
+}
+
+document.addEventListener("keydown", function(event) {
+    if (event.key === "Escape") closeCreateProject();
 });
 </script>
 

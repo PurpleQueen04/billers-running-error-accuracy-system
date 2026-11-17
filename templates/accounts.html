@@ -10,9 +10,14 @@
         <p>View user accounts, roles, and project assignments.</p>
     </div>
 
-    <span class="section-tag">
+    <div class="page-header-actions">
+        <button type="button" class="btn btn-primary" onclick="openCreateAccount()">
+            <i class="fa-solid fa-user-plus"></i> Add User
+        </button>
+        <span class="section-tag">
         {{ accounts|length }} Accounts
-    </span>
+        </span>
+    </div>
 </div>
 
 
@@ -308,6 +313,69 @@
 
     {% endif %}
 
+</div>
+
+
+<!-- CREATE ACCOUNT MODAL -->
+<div id="createAccountModal" class="modal-backdrop" style="display:none;" onclick="if(event.target===this) closeCreateAccount()">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="createAccountTitle">
+        <div class="modal-header">
+            <div>
+                <h2 class="modal-title" id="createAccountTitle">Add User</h2>
+                <p class="form-help">Create an Admin, QC, or Biller account.</p>
+            </div>
+            <button type="button" class="btn btn-secondary btn-small" onclick="closeCreateAccount()">Close</button>
+        </div>
+
+        <form method="POST" action="{{ url_for('create_account') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+            <div class="form-group">
+                <label for="new_display_name">Display Name</label>
+                <input type="text" id="new_display_name" name="display_name" maxlength="150" autocomplete="name" required>
+            </div>
+
+            <div class="form-group">
+                <label for="new_username">Username</label>
+                <input type="text" id="new_username" name="username" maxlength="80" autocomplete="off" required>
+            </div>
+
+            <div class="form-group">
+                <label for="new_role">Account Role</label>
+                <select id="new_role" name="role" required>
+                    <option value="biller">Biller</option>
+                    <option value="qc">QC</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="new_password">Password</label>
+                <input type="password" id="new_password" name="password" minlength="6" autocomplete="new-password" required>
+                <small class="form-help">At least 6 characters.</small>
+            </div>
+
+            <div class="form-group" id="createProjectAssignmentGroup">
+                <label>Assigned Projects</label>
+                <div class="project-assignment-list">
+                    {% for project in projects %}
+                        {% if project.active %}
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="project_ids" value="{{ project.id }}" class="create-project-checkbox">
+                            {{ project.project_name }}
+                        </label>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                <small class="form-help">Select at least one active project for QC and Biller accounts. Admin accounts automatically have access to all active projects.</small>
+            </div>
+
+            <div class="action-buttons">
+                <button type="button" class="btn btn-secondary" onclick="closeCreateAccount()">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-user-plus"></i> Create Account</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 
@@ -673,6 +741,47 @@ document.addEventListener("DOMContentLoaded", function () {
             closeEditAccount();
         }
 
+    });
+
+    // CREATE ACCOUNT MODAL: show project selection only for QC/Biller.
+    const createRole = document.getElementById("new_role");
+    const createProjectGroup = document.getElementById("createProjectAssignmentGroup");
+    const createModal = document.getElementById("createAccountModal");
+
+    function updateCreateProjectVisibility() {
+        if (!createRole || !createProjectGroup) return;
+        createProjectGroup.style.display = createRole.value === "admin" ? "none" : "";
+        document.querySelectorAll(".create-project-checkbox").forEach(function (checkbox) {
+            checkbox.required = false;
+        });
+    }
+
+    if (createRole) {
+        createRole.addEventListener("change", updateCreateProjectVisibility);
+        updateCreateProjectVisibility();
+    }
+
+    window.openCreateAccount = function () {
+        if (!createModal) return;
+        if (createRole) { createRole.value = "biller"; updateCreateProjectVisibility(); }
+        createModal.style.display = "flex";
+    };
+
+    window.closeCreateAccount = function () {
+        if (createModal) createModal.style.display = "none";
+    };
+
+    if (createModal) {
+        createModal.addEventListener("click", function(event) {
+            if (event.target === createModal) closeCreateAccount();
+        });
+    }
+
+    document.addEventListener("keydown", function(event) {
+        if (event.key === "Escape") {
+            closeCreateAccount();
+            closeEditAccount();
+        }
     });
 
 });
