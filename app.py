@@ -5766,6 +5766,7 @@ ACCURACY_TYPES = (
 )
 
 
+
 def normalize_accuracy_type(value):
 
     value = normalize_text(value).upper()
@@ -5773,6 +5774,7 @@ def normalize_accuracy_type(value):
     value = value.replace("-", "_")
     value = value.replace(" ", "_")
 
+    # INTERNAL
     if value in (
         "INTERNAL",
         "INTERNAL_ACCURACY",
@@ -5780,23 +5782,25 @@ def normalize_accuracy_type(value):
     ):
         return "INTERNAL"
 
+    # EXTERNAL WITH CLAIMS
     if value in (
         "EXTERNAL_WC",
         "EXTERNAL_WC_ACCURACY",
-        "WC"
+        "WC",
+        "PER_AUDITED_ACCURACY"
     ):
         return "EXTERNAL_WC"
 
+    # EXTERNAL WITHOUT CLAIMS
     if value in (
         "EXTERNAL_WOC",
         "EXTERNAL_WOC_ACCURACY",
-        "WOC"
+        "WOC",
+        "PER_AUDITED_ACCURACY___WOC"
     ):
         return "EXTERNAL_WOC"
 
     return None
-
-
 
 def parse_accuracy_date(value, month_value=None):
     """Parse full dates and short dates using the row's month and year."""
