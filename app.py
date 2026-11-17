@@ -2296,6 +2296,7 @@ def import_workbook(
     allowed_project_ids=None
 ):
     total_imported = 0
+    workbook_imported_at = datetime.now().isoformat(timespec="microseconds")
 
     if isinstance(sheets, ODSWorkbookSource):
         seen_supported_sheets = set()
@@ -2314,7 +2315,8 @@ def import_workbook(
                     dataframe,
                     default_project_id,
                     allowed_project_ids,
-                    occurrences=error_occurrences
+                    occurrences=error_occurrences,
+                    imported_at=workbook_imported_at
                 )
 
             elif sheet_name in ("INTERNAL", "EXTERNAL"):
@@ -2341,7 +2343,8 @@ def import_workbook(
                 con,
                 error_dataframe,
                 default_project_id,
-                allowed_project_ids
+                allowed_project_ids,
+                imported_at=workbook_imported_at
             )
 
         if internal_dataframe is not None:
