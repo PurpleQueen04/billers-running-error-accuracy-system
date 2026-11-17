@@ -2299,25 +2299,35 @@ def import_workbook(
         error_occurrences = {}
 
         # ODS parsing and database writes happen sheet-by-sheet in chunks.
-        # The full workbook and all worksheets are never materialized together.
         for sheet_name, dataframe in sheets.iter_chunks():
             seen_supported_sheets.add(sheet_name)
+
             if dataframe is None or dataframe.empty:
                 continue
+
             if sheet_name == "ERROR":
                 total_imported += import_error_sheet(
-                    con, dataframe, default_project_id, allowed_project_ids,
+                    con,
+                    dataframe,
+                    default_project_id,
+                    allowed_project_ids,
                     occurrences=error_occurrences
                 )
+
             elif sheet_name in ("INTERNAL", "EXTERNAL"):
                 total_imported += import_accuracy_sheet(
-                    con, dataframe, sheet_name, default_project_id, allowed_project_ids
+                    con,
+                    dataframe,
+                    sheet_name,
+                    default_project_id,
+                    allowed_project_ids
                 )
 
         if not seen_supported_sheets:
             raise ValueError(
                 "No supported sheets found. Expected ERROR, INTERNAL, or EXTERNAL."
             )
+
     else:
         error_dataframe = sheets.get("ERROR")
         internal_dataframe = sheets.get("INTERNAL")
@@ -2325,36 +2335,112 @@ def import_workbook(
 
         if error_dataframe is not None:
             total_imported += import_error_sheet(
-                con, error_dataframe, default_project_id, allowed_project_ids
-            )
-        if internal_dataframe is not None:
-            total_imported += import_accuracy_sheet(
-                con, internal_dataframe, "INTERNAL", default_project_id, allowed_project_ids
-            )
-        if external_dataframe is not None:
-            total_imported += import_accuracy_sheet(
-                con, external_dataframe, "EXTERNAL", default_project_id, allowed_project_ids
+                con,
+                error_dataframe,
+                default_project_id,
+                allowed_project_ids
             )
 
+        if internal_dataframe is not None:
+            total_imported += import_accuracy_sheet(
+                con,
+                internal_dataframe,
+                "INTERNAL",
+                default_project_id,
+                allowed_project_ids
+            )
+
+        if external_dataframe is not None:
+            total_imported += import_accuracy_sheet(
+                con,
+                external_dataframe,
+                "EXTERNAL",
+                default_project_id,
+                allowed_project_ids
+            )
+
+    # -----------------------------------------------------
+    # IMPORT HISTORY
+    # Detect actual database columns to support both
+    # older schemas and the expanded Supabase schema.
+    # -----------------------------------------------------
+
     imported_at = datetime.now().isoformat(timespec="seconds")
+
+    if is_postgres():
+        history_columns = {
+            row["column_name"]
+            for row in con.execute(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = current_schema()
+                  AND table_name = 'import_history'
+                """
+            ).fetchall()
+        }
+    else:
+        history_columns = {
+            row["name"]
+            for row in con.execute(
+                "PRAGMA table_info(import_history)"
+            ).fetchall()
+        }
+
+    history_data = {
+        "filename": secure_filename(filename or "source"),
+        "uploaded_by": normalize_text(uploaded_by),
+        "imported_by": normalize_text(uploaded_by),
+        "records_imported": total_imported,
+        "imported_at": imported_at,
+        "status": "SUCCESS"
+    }
+
+    insert_columns = [
+        column
+        for column in history_data
+        if column in history_columns
+    ]
+
+    if not insert_columns:
+        raise RuntimeError(
+            "No compatible columns found in import_history."
+        )
+
+    columns_sql = ", ".join(insert_columns)
+    placeholders = ", ".join(["?"] * len(insert_columns))
+
+    values = tuple(
+        history_data[column]
+        for column in insert_columns
+    )
+
     con.execute(
-        """INSERT INTO import_history
-               (filename, uploaded_by, imported_by, records_imported, imported_at)
-           VALUES (?, ?, ?, ?, ?)""",
+        f"""
+        INSERT INTO import_history ({columns_sql})
+        VALUES ({placeholders})
+        """,
+        values
+    )
+
+    # -----------------------------------------------------
+    # ACTIVITY LOG
+    # -----------------------------------------------------
+
+    con.execute(
+        """
+        INSERT INTO activity_logs
+            (username, action, details, created_at)
+        VALUES (?, ?, ?, ?)
+        """,
         (
-            secure_filename(filename or "source"),
             normalize_text(uploaded_by),
-            normalize_text(uploaded_by),
-            total_imported,
+            "WORKBOOK IMPORT",
+            f"{filename}: {total_imported} rows imported or updated",
             imported_at
         )
     )
-    con.execute(
-        """INSERT INTO activity_logs (username, action, details, created_at)
-           VALUES (?, ?, ?, ?)""",
-        (normalize_text(uploaded_by), "WORKBOOK IMPORT",
-         f"{filename}: {total_imported} rows imported or updated", imported_at)
-    )
+
     return total_imported
 
 
