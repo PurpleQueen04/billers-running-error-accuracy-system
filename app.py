@@ -5998,8 +5998,8 @@ def build_accuracy_context(
     # BUILD AVAILABLE PERIODS
     # -----------------------------------------------------
     
-        period_keys = set()
-        row_periods = {}
+            period_keys = set()
+            row_periods = {}
 
     # Periods from latest INTERNAL and EXTERNAL imports
     for row in records:
