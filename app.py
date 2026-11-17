@@ -4804,28 +4804,11 @@ def edit_project(project_id):
         request.form.get("project_name")
     )
 
-    name = normalize_text(
-        request.form.get("name")
-    )
-
-    role = normalize_text(
-        request.form.get("role")
-    ).lower()
-
-    if not project_name or not name:
+    if not project_name:
 
         flash(
-            "Project Name and Name are required.",
+            "Project Name is required.",
             "warning"
-        )
-
-        return redirect(url_for("admin_projects"))
-
-    if role not in ("biller", "qc"):
-
-        flash(
-            "Project Role must be BILLER or QC.",
-            "danger"
         )
 
         return redirect(url_for("admin_projects"))
@@ -4854,10 +4837,7 @@ def edit_project(project_id):
                     = LOWER(TRIM(?))
                 AND id <> ?
                 """,
-                (
-                    project_name,
-                    project_id
-                )
+                (project_name, project_id)
             ).fetchone()
 
             if duplicate:
@@ -4871,24 +4851,15 @@ def edit_project(project_id):
 
             old_name = project["project_name"]
 
-            # Update project details only.
-            # Existing user roles and project assignments
-            # are deliberately left unchanged.
+            # Only update the project name. Legacy name/role columns
+            # remain untouched for database compatibility.
             con.execute(
                 """
                 UPDATE projects
-                SET
-                    project_name = ?,
-                    name = ?,
-                    role = ?
+                SET project_name = ?
                 WHERE id = ?
                 """,
-                (
-                    project_name,
-                    name,
-                    role,
-                    project_id
-                )
+                (project_name, project_id)
             )
 
             con.execute(
@@ -4904,10 +4875,7 @@ def edit_project(project_id):
                 (
                     session.get("username", ""),
                     "EDIT PROJECT",
-                    (
-                        f"Updated project "
-                        f"{old_name} to {project_name}"
-                    ),
+                    f"Updated project {old_name} to {project_name}",
                     datetime.now().isoformat(timespec="seconds")
                 )
             )
