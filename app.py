@@ -5933,18 +5933,13 @@ def build_accuracy_context(
             ]
 
 
+    
     # -----------------------------------------------------
-    # GET PERIODS FROM THE LATEST ERROR IMPORT PER PROJECT
+    # GET ALL ERROR DATES
+    # Use BILLED DATE from ERROR sheet
     # -----------------------------------------------------
 
     error_conditions = [
-        """
-        imported_at = (
-            SELECT MAX(latest.imported_at)
-            FROM error_records AS latest
-            WHERE latest.project_id = error_records.project_id
-        )
-        """,
         "billed_date IS NOT NULL",
         "TRIM(billed_date) != ''"
     ]
@@ -5967,7 +5962,22 @@ def build_accuracy_context(
 
             error_params.extend(sorted(allowed_set))
 
-    if allowed_set is None or allowed_set:
+            if selected_project != "all":
+                error_conditions.append("project_id = ?")
+                error_params.append(int(selected_project))
+
+            with db() as con:
+
+                error_rows = con.execute(
+                    f"""
+                    SELECT billed_date, project_id
+                    FROM error_records
+                    WHERE {" AND ".join(error_conditions)}
+                    """,
+                    tuple(error_params)
+                ).fetchall()
+
+    else:
 
         if selected_project != "all":
             error_conditions.append("project_id = ?")
