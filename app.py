@@ -2386,6 +2386,7 @@ def import_workbook(
             )
 
         total_imported = sum(sheet_import_counts.values())
+        
     # -----------------------------------------------------
     # IMPORT HISTORY
     # Detect actual database columns to support both
@@ -5678,21 +5679,44 @@ def normalize_accuracy_type(value):
     return None
 
 
+
 def parse_accuracy_date(value, month_value=None):
-    """Parse full dates and short dates such as 'Oct - 27' using 'Oct - 26'."""
+    """Parse full dates and short dates using the row's month and year."""
+
     parsed = parse_date(value)
+
     if parsed is not None:
         return parsed
 
     raw_date = normalize_text(value)
     raw_month = normalize_text(month_value)
+
     if not raw_date or not raw_month:
         return None
 
+    # Support both 2-digit and 4-digit years.
+    year_formats = (
+        "%b - %y",
+        "%B - %y",
+        "%b %y",
+        "%B %y",
+        "%b - %Y",
+        "%B - %Y",
+        "%b-%Y",
+        "%B-%Y",
+        "%b %Y",
+        "%B %Y",
+        "%Y-%m"
+    )
+
     year = None
-    for fmt in ("%b - %y", "%B - %y", "%b %y", "%B %y", "%Y-%m"):
+
+    for fmt in year_formats:
         try:
-            year = datetime.strptime(raw_month, fmt).year
+            year = datetime.strptime(
+                raw_month,
+                fmt
+            ).year
             break
         except (TypeError, ValueError):
             continue
@@ -5700,14 +5724,33 @@ def parse_accuracy_date(value, month_value=None):
     if year is None:
         return None
 
-    for fmt in ("%b - %d", "%B - %d", "%b %d", "%B %d"):
+    # Support short date values such as Nov - 02.
+    date_formats = (
+        "%b - %d",
+        "%B - %d",
+        "%b-%d",
+        "%B-%d",
+        "%b %d",
+        "%B %d"
+    )
+
+    for fmt in date_formats:
         try:
-            month_day = datetime.strptime(raw_date, fmt)
-            return date(year, month_day.month, month_day.day)
+            month_day = datetime.strptime(
+                raw_date,
+                fmt
+            )
+
+            return date(
+                year,
+                month_day.month,
+                month_day.day
+            )
+
         except (TypeError, ValueError):
             continue
-    return None
 
+    return None
 
 def accuracy_period_key(value, period_type, month_value=None):
     """Return a stable period key, resolving short dates using the row month."""
@@ -6027,7 +6070,7 @@ def build_accuracy_context(
                 tuple(error_params)
             ).fetchall()
 
-       # -----------------------------------------------------
+    # -----------------------------------------------------
     # BUILD AVAILABLE PERIODS
     # Show periods from the latest import per project/sheet.
     # Keep all historical records for period comparisons.
