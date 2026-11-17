@@ -2033,10 +2033,14 @@ def import_error_sheet(
     dataframe,
     default_project_id=None,
     allowed_project_ids=None,
-    occurrences=None
+    occurrences=None,
+    imported_at=None
 ):
     if dataframe is None or dataframe.empty:
         return 0
+
+    if imported_at is None:
+        imported_at = datetime.now().isoformat(timespec="microseconds")
 
     columns = get_error_columns(dataframe)
     if not columns["username"] or not columns["pro"]:
@@ -2108,7 +2112,7 @@ def import_error_sheet(
             record_key, billed_date_text, week, source, audit_type,
             biller_name, username, id_number, auditor, pro, zb_field,
             error_details, project_id,
-            datetime.now().isoformat(timespec="seconds")
+            imported_at
         ))
         imported += 1
         if len(batch) >= 500:
