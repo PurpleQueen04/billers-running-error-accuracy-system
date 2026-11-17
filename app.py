@@ -5984,7 +5984,7 @@ def build_accuracy_context(
 
                 error_rows = con.execute(
                     f"""
-                    SELECT billed_date, project_id
+                    SELECT billed_date, project_id, imported_at
                     FROM error_records
                     WHERE {" AND ".join(error_conditions)}
                     """,
@@ -6001,7 +6001,7 @@ def build_accuracy_context(
 
             error_rows = con.execute(
                 f"""
-                SELECT billed_date, project_id
+                SELECT billed_date, project_id, imported_at
                 FROM error_records
                 WHERE {" AND ".join(error_conditions)}
                 """,
