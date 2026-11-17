@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Activity Logs{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Activity Logs</h1>
+        <p>Review recent account and system activity.</p>
+    </div>
+    <span class="section-tag">{{ rows|length }} Records</span>
+</div>
+
+<section class="content-card">
+    {% if rows %}
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>DATE / TIME</th>
+                        <th>USERNAME</th>
+                        <th>ACTION</th>
+                        <th>DETAILS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <td>{{ row.created_at or '—' }}</td>
+                        <td>{{ row.username or '—' }}</td>
+                        <td>{{ row.action or '—' }}</td>
+                        <td>{{ row.details or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h3>No Activity Logs</h3>
+            <p>No system activity has been recorded yet.</p>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}
