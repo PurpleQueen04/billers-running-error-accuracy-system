@@ -5829,7 +5829,6 @@ def calculate_weighted_accuracy(audited, errors):
 # GET ACCURACY RECORDS
 # =========================================================
 
-
 def get_accuracy_records(project_ids=None):
 
     with db() as con:
@@ -5852,12 +5851,8 @@ def get_accuracy_records(project_ids=None):
                 project_id,
                 imported_at
             FROM accuracy_records
-            WHERE imported_at = (
-                SELECT MAX(latest.imported_at)
-                FROM accuracy_records AS latest
-                WHERE latest.project_id = accuracy_records.project_id
-                AND latest.sheet = accuracy_records.sheet
-            )
+            WHERE record_date IS NOT NULL
+              AND TRIM(record_date) != ''
         """
 
         params = ()
