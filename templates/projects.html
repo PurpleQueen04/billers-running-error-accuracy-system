@@ -98,7 +98,7 @@
             <input
                 type="search"
                 id="projectSearch"
-                placeholder="Search project name, role, or assigned account..."
+                placeholder="Search project name or assigned account..."
                 autocomplete="off"
             >
         </div>
@@ -126,7 +126,6 @@
                     <tr>
                         <th>PROJECT ID</th>
                         <th>PROJECT NAME</th>
-                        <th>ROLE</th>
                         <th>ASSIGNED ACCOUNTS</th>
                         <th>STATUS</th>
                         <th>DATE CREATED</th>
@@ -149,10 +148,6 @@
                                 <strong>
                                     {{ project.project_name or '—' }}
                                 </strong>
-                            </td>
-
-                            <td>
-                                {{ project.role or '—' }}
                             </td>
 
                             <td class="comment-cell">
@@ -232,15 +227,6 @@
                 <input type="text" id="new_project_name" name="project_name" maxlength="120" placeholder="e.g. SAIA" required>
             </div>
 
-            <div class="form-group">
-                <label for="new_project_role">Project Role</label>
-                <select id="new_project_role" name="role" required>
-                    <option value="">Select role</option>
-                    <option value="biller">Biller</option>
-                    <option value="qc">QC</option>
-                </select>
-                <small class="form-help">This field is required by the existing project creation process.</small>
-            </div>
 
             <div class="action-buttons">
                 <button type="button" class="btn btn-secondary" onclick="closeCreateProject()">Cancel</button>
