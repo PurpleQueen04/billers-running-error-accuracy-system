@@ -59,7 +59,7 @@
             <input
                 type="search"
                 id="recordSearch"
-                placeholder="Search biller, username, PRO, project, or record key..."
+                placeholder="Search biller, username, PRO, or project..."
                 autocomplete="off"
             >
         </div>
@@ -75,7 +75,6 @@
 
                 <thead>
                     <tr>
-                        <th>RECORD KEY</th>
                         <th>BILLED DATE</th>
                         <th>WEEK</th>
                         <th>BILLER NAME</th>
@@ -93,13 +92,6 @@
                     {% for record in records %}
 
                         <tr>
-
-                            <td>
-                                <span class="text-muted">
-                                    {{ record.record_key or '—' }}
-                                </span>
-                            </td>
-
                             <td>
                                 {{ record.billed_date or '—' }}
                             </td>
