@@ -2300,7 +2300,14 @@ def import_workbook(
     allowed_project_ids=None
 ):
     total_imported = 0
-    workbook_imported_at = datetime.now().isoformat(timespec="microseconds")
+
+    sheet_import_counts = {
+        "ERROR": 0,
+        "INTERNAL": 0,
+        "EXTERNAL": 0
+    }
+
+workbook_imported_at = datetime.now().isoformat(timespec="microseconds")
 
     if isinstance(sheets, ODSWorkbookSource):
         seen_supported_sheets = set()
@@ -2314,7 +2321,7 @@ def import_workbook(
                 continue
 
             if sheet_name == "ERROR":
-                total_imported += import_error_sheet(
+                sheet_imported = import_error_sheet(
                     con,
                     dataframe,
                     default_project_id,
@@ -2323,8 +2330,11 @@ def import_workbook(
                     imported_at=workbook_imported_at
                 )
 
+                sheet_import_counts["ERROR"] += sheet_imported
+                total_imported += sheet_imported
+
             elif sheet_name in ("INTERNAL", "EXTERNAL"):
-                total_imported += import_accuracy_sheet(
+                sheet_imported = import_accuracy_sheet(
                     con,
                     dataframe,
                     sheet_name,
@@ -2332,6 +2342,9 @@ def import_workbook(
                     allowed_project_ids,
                     imported_at=workbook_imported_at
                 )
+
+                sheet_import_counts[sheet_name] += sheet_imported
+                total_imported += sheet_imported
 
         if not seen_supported_sheets:
             raise ValueError(
@@ -2344,7 +2357,7 @@ def import_workbook(
         external_dataframe = sheets.get("EXTERNAL")
 
         if error_dataframe is not None:
-            total_imported += import_error_sheet(
+            sheet_import_counts["ERROR"] += import_error_sheet(
                 con,
                 error_dataframe,
                 default_project_id,
@@ -2353,7 +2366,7 @@ def import_workbook(
             )
 
         if internal_dataframe is not None:
-            total_imported += import_accuracy_sheet(
+            sheet_import_counts["INTERNAL"] += import_accuracy_sheet(
                 con,
                 internal_dataframe,
                 "INTERNAL",
@@ -2363,7 +2376,7 @@ def import_workbook(
             )
 
         if external_dataframe is not None:
-            total_imported += import_accuracy_sheet(
+            sheet_import_counts["EXTERNAL"] += import_accuracy_sheet(
                 con,
                 external_dataframe,
                 "EXTERNAL",
@@ -2372,6 +2385,7 @@ def import_workbook(
                 imported_at=workbook_imported_at
             )
 
+        total_imported = sum(sheet_import_counts.values())
     # -----------------------------------------------------
     # IMPORT HISTORY
     # Detect actual database columns to support both
@@ -2449,7 +2463,12 @@ def import_workbook(
         (
             normalize_text(uploaded_by),
             "WORKBOOK IMPORT",
-            f"{filename}: {total_imported} rows imported or updated",
+        (
+            f"{filename}: {total_imported} rows imported or updated | "
+            f"ERROR: {sheet_import_counts['ERROR']} | "
+            f"INTERNAL: {sheet_import_counts['INTERNAL']} | "
+            f"EXTERNAL: {sheet_import_counts['EXTERNAL']}"
+        ),
             imported_at
         )
     )
