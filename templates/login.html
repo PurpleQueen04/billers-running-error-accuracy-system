@@ -1,107 +1,143 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login | Billers Running Error & Accuracy System</title>
+    <meta name="theme-color" content="#101b1a">
+    <title>Sign In | Billers Running Error &amp; Accuracy System</title>
 
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
 </head>
-
-<body class="login-page">
-
-    <main class="login-wrapper">
-
-        <section class="login-card">
-
-            <div class="login-brand">
-                <div class="login-brand-icon">
-                    <span>✦</span>
+<body class="login-page login-redesign">
+    <main class="login-shell">
+        <section class="login-showcase" aria-label="System information">
+            <div class="login-showcase-top">
+                <div class="login-logo-mark" aria-hidden="true">
+                    <span class="logo-mark-main">Q</span>
+                    <span class="logo-mark-dot"></span>
                 </div>
-
-                <h1>
-                    BILLERS RUNNING ERROR
-                    <span>ERROR & ACCURACY SYSTEM</span>
-                </h1>
+                <span class="login-system-label">WORKSPACE PORTAL</span>
             </div>
 
-            <div class="login-heading">
-                <h2>Welcome Back</h2>
-                <p>Sign in to access your dashboard.</p>
-            </div>
+            <div class="login-showcase-content">
+                <div class="login-eyebrow"><span></span> BILLING QUALITY CONTROL</div>
+                <h1>Accuracy starts<br>with <em>visibility.</em></h1>
+                <p class="login-showcase-copy">
+                    A centralized workspace for monitoring billing errors,
+                    tracking accuracy, and keeping every team aligned.
+                </p>
 
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    <div class="login-messages">
-                        {% for category, message in messages %}
-                            <div class="flash-message {{ category }}">
-                                {{ message }}
-                            </div>
-                        {% endfor %}
+                <div class="login-feature-list">
+                    <div class="login-feature-item">
+                        <span class="login-feature-icon" aria-hidden="true">✓</span>
+                        <span>Track errors and resolutions</span>
                     </div>
-                {% endif %}
-            {% endwith %}
-
-            <form method="POST" class="login-form">
-
-                <input
-                    type="hidden"
-                    name="csrf_token"
-                    value="{{ session.get('csrf_token', '') }}"
-                >
-
-                <div class="form-group">
-                    <label for="username">Username</label>
-
-                    <input
-                        type="text"
-                        id="username"
-                        name="username"
-                        placeholder="Enter your username"
-                        autocomplete="username"
-                        required
-                        autofocus
-                    >
+                    <div class="login-feature-item">
+                        <span class="login-feature-icon" aria-hidden="true">↗</span>
+                        <span>Monitor accuracy performance</span>
+                    </div>
+                    <div class="login-feature-item">
+                        <span class="login-feature-icon" aria-hidden="true">⌁</span>
+                        <span>Keep teams and projects connected</span>
+                    </div>
                 </div>
-
-                <div class="form-group">
-                    <label for="password">Password</label>
-
-                    <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        placeholder="Enter your password"
-                        autocomplete="current-password"
-                        required
-                    >
-                </div>
-
-                <button type="submit" class="login-button">
-                    Sign In
-                    <span>→</span>
-                </button>
-
-            </form>
-
-            <div class="login-footer">
-                <span class="login-status-dot"></span>
-                Secure System Access
             </div>
 
+            <div class="login-showcase-bottom">
+                <span class="login-live-indicator"></span>
+                <span>One workspace. Clearer performance.</span>
+            </div>
+            <div class="login-orbit login-orbit-one" aria-hidden="true"></div>
+            <div class="login-orbit login-orbit-two" aria-hidden="true"></div>
         </section>
 
-        <p class="login-copyright">
-            © {{ now.year if now is defined else '' }}
-            Billers Running Error & Accuracy System
-        </p>
+        <section class="login-panel" aria-labelledby="login-title">
+            <div class="login-panel-inner">
+                <div class="login-mobile-brand">
+                    <div class="login-logo-mark" aria-hidden="true">
+                        <span class="logo-mark-main">Q</span>
+                        <span class="logo-mark-dot"></span>
+                    </div>
+                    <span>QC WORKSPACE</span>
+                </div>
 
+                <div class="login-heading">
+                    <div class="login-welcome-label">WELCOME BACK</div>
+                    <h2 id="login-title">Sign in to your account</h2>
+                    <p>Enter your credentials to continue to your workspace.</p>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="login-messages" role="alert" aria-live="polite">
+                            {% for category, message in messages %}
+                                <div class="flash-message {{ category }}">{{ message }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                <form method="POST" class="login-form" autocomplete="on">
+                    <input
+                        type="hidden"
+                        name="csrf_token"
+                        value="{{ session.get('csrf_token', '') }}"
+                    >
+
+                    <div class="login-field">
+                        <label for="username">Username</label>
+                        <div class="login-input-wrap">
+                            <span class="login-input-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="8" r="3.5"></circle><path d="M5 20c.7-3.2 3.1-5 7-5s6.3 1.8 7 5"></path></svg>
+                            </span>
+                            <input
+                                type="text"
+                                id="username"
+                                name="username"
+                                placeholder="Enter your username"
+                                autocomplete="username"
+                                required
+                                autofocus
+                            >
+                        </div>
+                    </div>
+
+                    <div class="login-field">
+                        <label for="password">Password</label>
+                        <div class="login-input-wrap">
+                            <span class="login-input-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" focusable="false"><rect x="5" y="10" width="14" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path><path d="M12 14v2"></path></svg>
+                            </span>
+                            <input
+                                type="password"
+                                id="password"
+                                name="password"
+                                placeholder="Enter your password"
+                                autocomplete="current-password"
+                                required
+                            >
+                        </div>
+                    </div>
+
+                    <button type="submit" class="login-button">
+                        <span>Sign In</span>
+                        <span class="login-button-arrow" aria-hidden="true">→</span>
+                    </button>
+                </form>
+
+                <div class="login-security-note">
+                    <span class="login-security-icon" aria-hidden="true">✓</span>
+                    <span>Your session is protected by secure access controls.</span>
+                </div>
+            </div>
+
+            <footer class="login-copyright">
+                © {{ now.year if now is defined else '' }} Billers Running Error &amp; Accuracy System
+            </footer>
+        </section>
     </main>
-
 </body>
 </html>
