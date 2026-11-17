@@ -5828,35 +5828,40 @@ def calculate_weighted_accuracy(audited, errors):
 # GET ACCURACY RECORDS
 # =========================================================
 
+
 def get_accuracy_records(project_ids=None):
 
     with db() as con:
 
-        if project_ids is None:
+        base_query = """
+            SELECT
+                id,
+                sheet,
+                username,
+                biller_name,
+                month,
+                weekly,
+                record_date,
+                accuracy_type,
+                accuracy_value,
+                bills_processed,
+                audited,
+                errors,
+                source_row,
+                project_id,
+                imported_at
+            FROM accuracy_records
+            WHERE imported_at = (
+                SELECT MAX(latest.imported_at)
+                FROM accuracy_records AS latest
+                WHERE latest.project_id = accuracy_records.project_id
+                AND latest.sheet = accuracy_records.sheet
+            )
+        """
 
-            rows = con.execute(
-                """
-                SELECT
-                    id,
-                    sheet,
-                    username,
-                    biller_name,
-                    month,
-                    weekly,
-                    record_date,
-                    accuracy_type,
-                    accuracy_value,
-                    bills_processed,
-                    audited,
-                    errors,
-                    source_row,
-                    project_id
-                FROM accuracy_records
-                ORDER BY record_date
-                """
-            ).fetchall()
+        params = ()
 
-        else:
+        if project_ids is not None:
 
             project_ids = [
                 int(project_id)
@@ -5870,35 +5875,23 @@ def get_accuracy_records(project_ids=None):
                 ["?"] * len(project_ids)
             )
 
-            rows = con.execute(
-                f"""
-                SELECT
-                    id,
-                    sheet,
-                    username,
-                    biller_name,
-                    month,
-                    weekly,
-                    record_date,
-                    accuracy_type,
-                    accuracy_value,
-                    bills_processed,
-                    audited,
-                    errors,
-                    source_row,
-                    project_id
-                FROM accuracy_records
-                WHERE project_id IN ({placeholders})
-                ORDER BY record_date
-                """,
-                tuple(project_ids)
-            ).fetchall()
+            base_query += f"""
+                AND project_id IN ({placeholders})
+            """
+
+            params = tuple(project_ids)
+
+        base_query += " ORDER BY record_date"
+
+        rows = con.execute(
+            base_query,
+            params
+        ).fetchall()
 
     return [
         dict(row)
         for row in rows
     ]
-
 
 # =========================================================
 # BUILD ACCURACY SUMMARY
@@ -5943,15 +5936,79 @@ def build_accuracy_context(
                 and int(row["project_id"]) == selected_id
             ]
 
+
+    # -----------------------------------------------------
+    # GET PERIODS FROM THE LATEST ERROR IMPORT PER PROJECT
+    # -----------------------------------------------------
+
+    error_conditions = [
+        """
+        imported_at = (
+            SELECT MAX(latest.imported_at)
+            FROM error_records AS latest
+            WHERE latest.project_id = error_records.project_id
+        )
+        """,
+        "billed_date IS NOT NULL",
+        "TRIM(billed_date) != ''"
+    ]
+
+    error_params = []
+
+    if allowed_set is not None:
+
+        if not allowed_set:
+            error_rows = []
+
+        else:
+            placeholders = ", ".join(
+                ["?"] * len(allowed_set)
+            )
+
+            error_conditions.append(
+                f"project_id IN ({placeholders})"
+            )
+
+            error_params.extend(sorted(allowed_set))
+
+    if allowed_set is None or allowed_set:
+
+        if selected_project != "all":
+            error_conditions.append("project_id = ?")
+            error_params.append(int(selected_project))
+
+        with db() as con:
+
+            error_rows = con.execute(
+                f"""
+                SELECT billed_date, project_id
+                FROM error_records
+                WHERE {" AND ".join(error_conditions)}
+                """,
+                tuple(error_params)
+            ).fetchall()
+
+    # -----------------------------------------------------
+    # BUILD AVAILABLE PERIODS
+    # -----------------------------------------------------
+    
     period_keys = set()
     row_periods = {}
     for row in records:
         key = accuracy_period_key(
             row.get("record_date"), period_type, row.get("month")
         )
+        
+    # Include periods from the latest ERROR import.
+    for row in error_rows:
+
+        key = accuracy_period_key(
+            row["billed_date"],
+            period_type
+        )
+
         if key:
             period_keys.add(key)
-            row_periods[id(row)] = key
 
     periods = sorted(period_keys)
     if selected_period not in period_keys:
