@@ -594,15 +594,9 @@ def normalize_accuracy(value):
 
 
 def parse_date(value):
-
+    """Parse common workbook date values without expensive pandas inference."""
     if value is None:
         return None
-
-    try:
-        if pd.isna(value):
-            return None
-    except (TypeError, ValueError):
-        pass
 
     if isinstance(value, datetime):
         return value.date()
@@ -610,29 +604,51 @@ def parse_date(value):
     if isinstance(value, date):
         return value
 
-    text_value = normalize_text(value)
+    # pandas Timestamp and numpy date-like values expose to_pydatetime().
+    to_python = getattr(value, "to_pydatetime", None)
+    if callable(to_python):
+        try:
+            converted = to_python()
+            if isinstance(converted, datetime):
+                return converted.date()
+            if isinstance(converted, date):
+                return converted
+        except (TypeError, ValueError, OverflowError):
+            pass
 
+    # Excel serial date values may appear when a column was not auto-converted.
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        try:
+            if 1 <= float(value) <= 2958465:
+                return (datetime(1899, 12, 30) + timedelta(days=float(value))).date()
+        except (TypeError, ValueError, OverflowError):
+            return None
+
+    text_value = normalize_text(value)
     if not text_value:
         return None
 
+    # ISO strings, including timestamps and timezone suffixes.
     try:
-        parsed = pd.to_datetime(
-            text_value,
-            errors="coerce"
-        )
-
-        if pd.isna(parsed):
-            return None
-
-        result = parsed.date()
-
-        if result.year < 1900 or result.year > 9999:
-            return None
-
-        return result
-
+        return datetime.fromisoformat(text_value.replace("Z", "+00:00")).date()
     except (TypeError, ValueError, OverflowError):
-        return None
+        pass
+
+    formats = (
+        "%m/%d/%Y", "%m/%d/%y", "%d/%m/%Y", "%d/%m/%y",
+        "%Y/%m/%d", "%m-%d-%Y", "%m-%d-%y", "%d-%m-%Y",
+        "%d-%m-%y", "%d-%b-%Y", "%d-%B-%Y", "%b %d, %Y",
+        "%B %d, %Y", "%b %d %Y", "%B %d %Y", "%b-%d-%Y",
+        "%B-%d-%Y", "%d %b %Y", "%d %B %Y"
+    )
+    for fmt in formats:
+        try:
+            parsed = datetime.strptime(text_value, fmt).date()
+            if 1900 <= parsed.year <= 9999:
+                return parsed
+        except (TypeError, ValueError, OverflowError):
+            continue
+    return None
 
 
 def month_from_date(value):
@@ -1121,6 +1137,31 @@ def init_db():
         """)
 
         
+        # -------------------------------------------------
+        # SAFE LEGACY PROJECT ASSIGNMENT BACKFILL
+        # Copy old single-project assignments into the
+        # many-to-many table without deleting/replacing rows.
+        # -------------------------------------------------
+        assignment_migration = "copy_legacy_assigned_project_id_v1"
+        assignment_done = con.execute(
+            "SELECT migration_name FROM schema_migrations WHERE migration_name = ?",
+            (assignment_migration,)
+        ).fetchone()
+        if not assignment_done and "assigned_project_id" in table_columns(con, "users"):
+            con.execute("""
+                INSERT INTO user_projects (user_id, project_id)
+                SELECT u.id, u.assigned_project_id
+                FROM users u
+                INNER JOIN projects p ON p.id = u.assigned_project_id
+                WHERE u.assigned_project_id IS NOT NULL
+                ON CONFLICT (user_id, project_id) DO NOTHING
+            """)
+        if not assignment_done:
+            con.execute(
+                "INSERT INTO schema_migrations (migration_name, applied_at) VALUES (?, ?)",
+                (assignment_migration, datetime.now().isoformat(timespec="seconds"))
+            )
+
         migration_name = "copy_biller_responses_to_error_records_v1"
 
         migration = con.execute(
@@ -1137,57 +1178,38 @@ def init_db():
             con.execute("""
                 UPDATE error_records
                 SET
-                    verified_error = COALESCE(
-                        error_records.verified_error,
-                        (
-                            SELECT br.verified_error
-                            FROM biller_responses br
+                    verified_error = CASE
+                        WHEN EXISTS (
+                            SELECT 1 FROM biller_responses br
+                            WHERE br.record_key = error_records.record_key
+                              AND NULLIF(TRIM(br.verified_error), '') IS NOT NULL
+                        ) AND (
+                            error_records.verified_error IS NULL
+                            OR TRIM(error_records.verified_error) = ''
+                            OR (UPPER(TRIM(error_records.verified_error)) = 'N'
+                                AND EXISTS (
+                                    SELECT 1 FROM biller_responses br
+                                    WHERE br.record_key = error_records.record_key
+                                      AND UPPER(TRIM(COALESCE(br.verified_error, ''))) = 'Y'
+                                ))
+                        ) THEN (
+                            SELECT br.verified_error FROM biller_responses br
                             WHERE br.record_key = error_records.record_key
                         )
-                    ),
-                    biller_comment = COALESCE(
-                        error_records.biller_comment,
-                        (
-                            SELECT br.biller_comment
-                            FROM biller_responses br
-                            WHERE br.record_key = error_records.record_key
-                        )
-                    ),
-                    qc_explanation = COALESCE(
-                        error_records.qc_explanation,
-                        (
-                            SELECT br.qc_explanation
-                            FROM biller_responses br
-                            WHERE br.record_key = error_records.record_key
-                        )
-                    ),
-                    qc_name = COALESCE(
-                        error_records.qc_name,
-                        (
-                            SELECT br.qc_name
-                            FROM biller_responses br
-                            WHERE br.record_key = error_records.record_key
-                        )
-                    ),
-                    updated_at = COALESCE(
-                        error_records.updated_at,
-                        (
-                            SELECT br.updated_at
-                            FROM biller_responses br
-                            WHERE br.record_key = error_records.record_key
-                        )
-                    ),
-                    updated_by = COALESCE(
-                        error_records.updated_by,
-                        (
-                            SELECT br.updated_by
-                            FROM biller_responses br
-                            WHERE br.record_key = error_records.record_key
-                        )
-                    )
+                        ELSE error_records.verified_error
+                    END,
+                    biller_comment = COALESCE(NULLIF(error_records.biller_comment, ''),
+                        (SELECT br.biller_comment FROM biller_responses br WHERE br.record_key = error_records.record_key)),
+                    qc_explanation = COALESCE(NULLIF(error_records.qc_explanation, ''),
+                        (SELECT br.qc_explanation FROM biller_responses br WHERE br.record_key = error_records.record_key)),
+                    qc_name = COALESCE(NULLIF(error_records.qc_name, ''),
+                        (SELECT br.qc_name FROM biller_responses br WHERE br.record_key = error_records.record_key)),
+                    updated_at = COALESCE(NULLIF(error_records.updated_at, ''),
+                        (SELECT br.updated_at FROM biller_responses br WHERE br.record_key = error_records.record_key)),
+                    updated_by = COALESCE(NULLIF(error_records.updated_by, ''),
+                        (SELECT br.updated_by FROM biller_responses br WHERE br.record_key = error_records.record_key))
                 WHERE EXISTS (
-                    SELECT 1
-                    FROM biller_responses br
+                    SELECT 1 FROM biller_responses br
                     WHERE br.record_key = error_records.record_key
                 )
             """)
@@ -1754,6 +1776,40 @@ def get_import_project_id(con, project_name):
     return int(row["id"])
 
 
+def resolve_workbook_project_id(
+    con,
+    project_name,
+    default_project_id=None,
+    allowed_project_ids=None
+):
+    """Resolve a row's project and enforce the uploader's project scope."""
+    if normalize_text(project_name):
+        project_id = get_import_project_id(con, project_name)
+    elif default_project_id is not None:
+        project_id = int(default_project_id)
+        active = con.execute(
+            "SELECT id FROM projects WHERE id = ? AND active = 1",
+            (project_id,)
+        ).fetchone()
+        if not active:
+            raise ValueError("The selected project does not exist or is inactive.")
+    elif allowed_project_ids is not None and len(allowed_project_ids) == 1:
+        project_id = int(allowed_project_ids[0])
+    else:
+        raise ValueError(
+            "A PROJECT column is required when importing into multiple projects. "
+            "Or select one project before uploading."
+        )
+
+    if allowed_project_ids is not None and int(project_id) not in {
+        int(value) for value in allowed_project_ids
+    }:
+        raise ValueError(
+            f"Project '{normalize_text(project_name) or project_id}' is not assigned to your QC account."
+        )
+    return int(project_id)
+
+
 # =========================================================
 # DATAFRAME HELPERS
 # =========================================================
@@ -1862,47 +1918,30 @@ def get_accuracy_columns(dataframe):
 # ERROR RECORD IMPORT - BATCH UPSERT
 # =========================================================
 
-def import_error_sheet(con, dataframe):
-
+def import_error_sheet(
+    con,
+    dataframe,
+    default_project_id=None,
+    allowed_project_ids=None
+):
     if dataframe is None or dataframe.empty:
         return 0
 
     columns = get_error_columns(dataframe)
-
     if not columns["username"] or not columns["pro"]:
-        raise ValueError(
-            "ERROR sheet must contain USERNAME and PRO columns."
-        )
+        raise ValueError("ERROR sheet must contain USERNAME and PRO columns.")
 
     imported = 0
     occurrences = {}
-
-    # Cache project lookups to avoid repeated SELECT queries.
     project_cache = {}
-
     batch = []
-
     upsert_sql = """
         INSERT INTO error_records (
-            record_key,
-            billed_date,
-            week,
-            source,
-            audit_type,
-            biller_name,
-            username,
-            id_number,
-            auditor,
-            pro,
-            zb_field,
-            error_details,
-            project_id,
-            verified_error,
-            imported_at
+            record_key, billed_date, week, source, audit_type, biller_name,
+            username, id_number, auditor, pro, zb_field, error_details,
+            project_id, verified_error, imported_at
         )
-        VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'N', ?
-        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'N', ?)
         ON CONFLICT (record_key) DO UPDATE SET
             billed_date = EXCLUDED.billed_date,
             week = EXCLUDED.week,
@@ -1915,169 +1954,57 @@ def import_error_sheet(con, dataframe):
             pro = EXCLUDED.pro,
             zb_field = EXCLUDED.zb_field,
             error_details = EXCLUDED.error_details,
-            project_id = COALESCE(
-                EXCLUDED.project_id,
-                error_records.project_id
-            )
+            project_id = COALESCE(error_records.project_id, EXCLUDED.project_id)
     """
 
     for _, row in dataframe.iterrows():
-
-        username = dataframe_value(
-            row,
-            columns["username"]
-        )
-
-        pro = dataframe_value(
-            row,
-            columns["pro"]
-        )
-
+        username = dataframe_value(row, columns["username"])
+        pro = dataframe_value(row, columns["pro"])
         if not username or not pro:
             continue
 
-        project_name = dataframe_value(
-            row,
-            columns["project"]
-        )
+        project_name = dataframe_value(row, columns["project"])
+        cache_key = normalize_text(project_name).casefold() or f"default:{default_project_id}"
+        if cache_key not in project_cache:
+            project_cache[cache_key] = resolve_workbook_project_id(
+                con, project_name, default_project_id, allowed_project_ids
+            )
+        project_id = project_cache[cache_key]
 
-        project_id = None
-
-        if project_name:
-
-            cache_key = normalize_text(
-                project_name
-            ).casefold()
-
-            if cache_key not in project_cache:
-
-                project_cache[cache_key] = (
-                    get_import_project_id(
-                        con,
-                        project_name
-                    )
-                )
-
-            project_id = project_cache[cache_key]
-
-        billed_date = parse_date(
-            val(row, columns["billed_date"])
-        )
-
-        billed_date_text = (
-            billed_date.isoformat()
-            if billed_date
-            else ""
-        )
-
-        source = dataframe_value(
-            row,
-            columns["source"]
-        )
-
-        audit_type = dataframe_value(
-            row,
-            columns["audit_type"]
-        )
-
-        biller_name = dataframe_value(
-            row,
-            columns["biller_name"]
-        )
-
-        id_number = dataframe_value(
-            row,
-            columns["id_number"]
-        )
-
-        auditor = dataframe_value(
-            row,
-            columns["auditor"]
-        )
-
-        zb_field = dataframe_value(
-            row,
-            columns["zb_field"]
-        )
-
-        error_details = dataframe_value(
-            row,
-            columns["error_details"]
-        )
-
-        week = week_for_billed_date(
-            billed_date_text
-        )
+        billed_date = parse_date(val(row, columns["billed_date"]))
+        billed_date_text = billed_date.isoformat() if billed_date else ""
+        source = dataframe_value(row, columns["source"])
+        audit_type = dataframe_value(row, columns["audit_type"])
+        biller_name = dataframe_value(row, columns["biller_name"])
+        id_number = dataframe_value(row, columns["id_number"])
+        auditor = dataframe_value(row, columns["auditor"])
+        zb_field = dataframe_value(row, columns["zb_field"])
+        error_details = dataframe_value(row, columns["error_details"])
+        week = week_for_billed_date(billed_date_text)
 
         fingerprint_parts = [
-            billed_date_text,
-            source,
-            audit_type,
-            biller_name,
-            username,
-            id_number,
-            auditor,
-            pro,
-            zb_field,
-            error_details
+            billed_date_text, source, audit_type, biller_name, username,
+            id_number, auditor, pro, zb_field, error_details
         ]
-
-        base_fingerprint = fingerprint(
-            fingerprint_parts,
-            occurrence=0
-        )
-
-        occurrence = occurrences.get(
-            base_fingerprint,
-            0
-        )
-
+        base_fingerprint = fingerprint(fingerprint_parts, occurrence=0)
+        occurrence = occurrences.get(base_fingerprint, 0)
         occurrences[base_fingerprint] = occurrence + 1
-
-        record_key = fingerprint(
-            fingerprint_parts,
-            occurrence=occurrence
-        )
+        record_key = fingerprint(fingerprint_parts, occurrence=occurrence)
 
         batch.append((
-            record_key,
-            billed_date_text,
-            week,
-            source,
-            audit_type,
-            biller_name,
-            username,
-            id_number,
-            auditor,
-            pro,
-            zb_field,
-            error_details,
-            project_id,
+            record_key, billed_date_text, week, source, audit_type,
+            biller_name, username, id_number, auditor, pro, zb_field,
+            error_details, project_id,
             datetime.now().isoformat(timespec="seconds")
         ))
-
         imported += 1
-
-        # Execute in manageable batches.
         if len(batch) >= 500:
-
-            con.executemany(
-                upsert_sql,
-                batch
-            )
-
+            con.executemany(upsert_sql, batch)
             batch.clear()
 
-    # Process remaining records.
     if batch:
-
-        con.executemany(
-            upsert_sql,
-            batch
-        )
-
+        con.executemany(upsert_sql, batch)
     return imported
-
 
 
 # =========================================================
@@ -2093,260 +2020,114 @@ def import_error_sheet(con, dataframe):
 def import_accuracy_sheet(
     con,
     dataframe,
-    sheet_name
+    sheet_name,
+    default_project_id=None,
+    allowed_project_ids=None
 ):
-
     if dataframe is None or dataframe.empty:
         return 0
 
-    sheet_name = normalize_text(
-        sheet_name
-    ).upper()
-
-    if sheet_name not in (
-        "INTERNAL",
-        "EXTERNAL"
-    ):
-        raise ValueError(
-            "Invalid accuracy sheet."
-        )
+    sheet_name = normalize_text(sheet_name).upper()
+    if sheet_name not in ("INTERNAL", "EXTERNAL"):
+        raise ValueError("Invalid accuracy sheet.")
 
     columns = get_accuracy_columns(dataframe)
-
     if not columns["username"]:
-        raise ValueError(
-            f"{sheet_name} sheet must contain USER."
-        )
-
+        raise ValueError(f"{sheet_name} sheet must contain USER.")
     if not columns["biller_name"]:
-        raise ValueError(
-            f"{sheet_name} sheet must contain NAME."
-        )
-
+        raise ValueError(f"{sheet_name} sheet must contain NAME.")
     if not columns["audited"]:
-        raise ValueError(
-            f"{sheet_name} sheet must contain AUDITED."
-        )
-
-    # -----------------------------------------------------
-    # Determine accuracy types
-    # -----------------------------------------------------
+        raise ValueError(f"{sheet_name} sheet must contain AUDITED.")
 
     if sheet_name == "INTERNAL":
-
-        accuracy_types = [
-            (
-                INTERNAL_ACCURACY,
-                columns["internal_accuracy"],
-                columns["internal_errors"]
-            )
-        ]
-
+        accuracy_types = [(INTERNAL_ACCURACY, columns["internal_accuracy"], columns["internal_errors"])]
     else:
-
         accuracy_types = [
-            (
-                EXTERNAL_ACCURACY[0],
-                columns["external_wc_accuracy"],
-                columns["internal_errors"]
-            ),
-            (
-                EXTERNAL_ACCURACY[1],
-                columns["external_woc_accuracy"],
-                columns["external_woc_errors"]
-            )
+            (EXTERNAL_ACCURACY[0], columns["external_wc_accuracy"], columns["internal_errors"]),
+            (EXTERNAL_ACCURACY[1], columns["external_woc_accuracy"], columns["external_woc_errors"])
         ]
-
-    # -----------------------------------------------------
-    # Batch UPSERT
-    # -----------------------------------------------------
 
     imported = 0
     project_cache = {}
-    batch = []
+    imported_at = datetime.now().isoformat(timespec="seconds")
 
-    imported_at = datetime.now().isoformat(
-        timespec="seconds"
-    )
-
-    upsert_sql = """
-        INSERT INTO accuracy_records (
-            sheet,
-            username,
-            biller_name,
-            month,
-            weekly,
-            record_date,
-            accuracy_type,
-            accuracy_value,
-            bills_processed,
-            audited,
-            errors,
-            source_row,
-            imported_at,
-            project_id
-        )
-        VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-        )
-        ON CONFLICT (
-            sheet,
-            username,
-            record_date,
-            accuracy_type,
-            source_row
-        )
-        DO UPDATE SET
-            biller_name = EXCLUDED.biller_name,
-            month = EXCLUDED.month,
-            weekly = EXCLUDED.weekly,
-            accuracy_value = EXCLUDED.accuracy_value,
-            bills_processed = EXCLUDED.bills_processed,
-            audited = EXCLUDED.audited,
-            errors = EXCLUDED.errors,
-            imported_at = EXCLUDED.imported_at,
-            project_id = COALESCE(
-                EXCLUDED.project_id,
-                accuracy_records.project_id
-            )
-    """
-
-    for source_row, (_, row) in enumerate(
-        dataframe.iterrows(),
-        start=2
-    ):
-
-        username = dataframe_value(
-            row,
-            columns["username"]
-        )
-
-        biller_name = dataframe_value(
-            row,
-            columns["biller_name"]
-        )
-
+    for source_row, (_, row) in enumerate(dataframe.iterrows(), start=2):
+        username = dataframe_value(row, columns["username"])
+        biller_name = dataframe_value(row, columns["biller_name"])
         if not username:
             continue
 
-        project_name = dataframe_value(
-            row,
-            columns["project"]
+        project_name = dataframe_value(row, columns["project"])
+        cache_key = normalize_text(project_name).casefold() or f"default:{default_project_id}"
+        if cache_key not in project_cache:
+            project_cache[cache_key] = resolve_workbook_project_id(
+                con, project_name, default_project_id, allowed_project_ids
+            )
+        project_id = project_cache[cache_key]
+
+        source_month = dataframe_value(row, columns["month"])
+        record_date = parse_accuracy_date(
+            val(row, columns["date"]), source_month
         )
+        date_text = record_date.isoformat() if record_date else ""
+        month = record_date.strftime("%Y-%m") if record_date else source_month
+        weekly = week_for_billed_date(record_date) if record_date else dataframe_value(row, columns["weekly"])
+        audited = number_value(val(row, columns["audited"])) or 0
+        bills_processed = number_value(val(row, columns["bills_processed"]))
 
-        project_id = None
-
-        if project_name:
-
-            cache_key = normalize_text(
-                project_name
-            ).casefold()
-
-            if cache_key not in project_cache:
-
-                project_cache[cache_key] = (
-                    get_import_project_id(
-                        con,
-                        project_name
-                    )
-                )
-
-            project_id = project_cache[cache_key]
-
-        record_date = parse_date(
-            val(row, columns["date"])
-        )
-
-        date_text = (
-            record_date.isoformat()
-            if record_date
-            else ""
-        )
-
- 
-        month = (
-            record_date.strftime("%Y-%m")
-            if record_date
-            else ""
-        )
-
-        weekly = week_for_billed_date(
-            record_date
-        )
-
-        audited = number_value(
-            val(row, columns["audited"])
-        )
-
-        bills_processed = number_value(
-            val(row, columns["bills_processed"])
-        )
-
-        if audited is None:
-            audited = 0
-
-        for (
-            accuracy_type,
-            accuracy_column,
-            error_column
-        ) in accuracy_types:
-
+        for accuracy_type, accuracy_column, error_column in accuracy_types:
             if not accuracy_column:
                 continue
-
-            accuracy_value = normalize_accuracy(
-                val(row, accuracy_column)
-            )
-
-            if accuracy_value is None:
+            accuracy_value = normalize_accuracy(val(row, accuracy_column))
+            if accuracy_value is None or not 0 <= accuracy_value <= 100:
                 continue
+            errors = number_value(val(row, error_column)) or 0
 
-            if not 0 <= accuracy_value <= 100:
-                continue
+            # Do not rely on a UNIQUE constraint that may not exist in older
+            # Supabase databases. Update one matching imported row if present;
+            # otherwise insert. Existing duplicate/history rows are untouched.
+            existing = con.execute(
+                """
+                SELECT id FROM accuracy_records
+                WHERE sheet = ? AND username = ? AND record_date = ?
+                  AND accuracy_type = ? AND source_row = ?
+                  AND ((project_id = ?) OR (project_id IS NULL AND ? IS NULL))
+                ORDER BY id DESC LIMIT 1
+                """,
+                (sheet_name, username, date_text, accuracy_type, source_row, project_id, project_id)
+            ).fetchone()
 
-            errors = number_value(
-                val(row, error_column)
+            values = (
+                biller_name, month, weekly, accuracy_value,
+                bills_processed, audited, errors, imported_at
             )
-
-            if errors is None:
-                errors = 0
-
-            batch.append((
-                sheet_name,
-                username,
-                biller_name,
-                month,
-                weekly,
-                date_text,
-                accuracy_type,
-                accuracy_value,
-                bills_processed,
-                audited,
-                errors,
-                source_row,
-                imported_at,
-                project_id
-            ))
-
+            if existing:
+                con.execute(
+                    """
+                    UPDATE accuracy_records SET
+                        biller_name = ?, month = ?, weekly = ?, accuracy_value = ?,
+                        bills_processed = ?, audited = ?, errors = ?, imported_at = ?
+                    WHERE id = ?
+                    """,
+                    (*values, existing["id"])
+                )
+            else:
+                con.execute(
+                    """
+                    INSERT INTO accuracy_records (
+                        sheet, username, biller_name, month, weekly, record_date,
+                        accuracy_type, accuracy_value, bills_processed, audited,
+                        errors, source_row, imported_at, project_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (sheet_name, username, biller_name, month, weekly, date_text,
+                     accuracy_type, accuracy_value, bills_processed, audited,
+                     errors, source_row, imported_at, project_id)
+                )
             imported += 1
 
-            if len(batch) >= 500:
-
-                con.executemany(
-                    upsert_sql,
-                    batch
-                )
-
-                batch.clear()
-
-    if batch:
-
-        con.executemany(
-            upsert_sql,
-            batch
-        )
-
     return imported
+
 
 # =========================================================
 # COMPLETE WORKBOOK IMPORT
@@ -2356,78 +2137,40 @@ def import_workbook(
     con,
     sheets,
     filename,
-    uploaded_by
+    uploaded_by,
+    default_project_id=None,
+    allowed_project_ids=None
 ):
-
     total_imported = 0
-
     error_dataframe = sheets.get("ERROR")
     internal_dataframe = sheets.get("INTERNAL")
     external_dataframe = sheets.get("EXTERNAL")
 
     if error_dataframe is not None:
-
         total_imported += import_error_sheet(
-            con,
-            error_dataframe
+            con, error_dataframe, default_project_id, allowed_project_ids
         )
-
     if internal_dataframe is not None:
-
         total_imported += import_accuracy_sheet(
-            con,
-            internal_dataframe,
-            "INTERNAL"
+            con, internal_dataframe, "INTERNAL", default_project_id, allowed_project_ids
         )
-
     if external_dataframe is not None:
-
         total_imported += import_accuracy_sheet(
-            con,
-            external_dataframe,
-            "EXTERNAL"
+            con, external_dataframe, "EXTERNAL", default_project_id, allowed_project_ids
         )
 
-    imported_at = datetime.now().isoformat(
-        timespec="seconds"
-    )
-
+    imported_at = datetime.now().isoformat(timespec="seconds")
     con.execute(
-        """
-        INSERT INTO import_history (
-            filename,
-            uploaded_by,
-            records_imported,
-            imported_at
-        )
-        VALUES (?, ?, ?, ?)
-        """,
-        (
-            secure_filename(filename or "source"),
-            normalize_text(uploaded_by),
-            total_imported,
-            imported_at
-        )
+        """INSERT INTO import_history (filename, uploaded_by, records_imported, imported_at)
+           VALUES (?, ?, ?, ?)""",
+        (secure_filename(filename or "source"), normalize_text(uploaded_by), total_imported, imported_at)
     )
-
     con.execute(
-        """
-        INSERT INTO activity_logs (
-            username,
-            action,
-            details,
-            created_at
-        )
-        VALUES (?, ?, ?, ?)
-        """,
-        (
-            normalize_text(uploaded_by),
-            "WORKBOOK IMPORT",
-            f"{filename}: {total_imported} rows imported or updated",
-            imported_at
-        )
+        """INSERT INTO activity_logs (username, action, details, created_at)
+           VALUES (?, ?, ?, ?)""",
+        (normalize_text(uploaded_by), "WORKBOOK IMPORT",
+         f"{filename}: {total_imported} rows imported or updated", imported_at)
     )
-
     return total_imported
 
 
@@ -3467,107 +3210,120 @@ def admin_dashboard():
 # ADMIN WORKBOOK UPLOAD
 # =========================================================
 
-@app.route(
-    "/admin/upload",
-    methods=["POST"]
-)
+@app.route("/admin/upload", methods=["POST"])
 @login_required
 @admin_required
 def upload_workbook():
-
     validate_csrf()
-
     uploaded_file = request.files.get("source_file")
-
     if not uploaded_file or not uploaded_file.filename:
-
-        flash(
-            "Please select a workbook or CSV file.",
-            "warning"
-        )
-
+        flash("Please select a workbook or CSV file.", "warning")
         return redirect(url_for("admin_dashboard"))
 
-    filename = secure_filename(
-        uploaded_file.filename
-    )
-
+    filename = secure_filename(uploaded_file.filename)
     if not allowed_file(filename):
-
-        flash(
-            "Unsupported file type. "
-            "Allowed: ODS, XLSX, XLS, and CSV.",
-            "danger"
-        )
-
+        flash("Unsupported file type. Allowed: ODS, XLSX, XLS, and CSV.", "danger")
         return redirect(url_for("admin_dashboard"))
 
-    csv_sheet = normalize_text(
-        request.form.get("csv_sheet", "ERROR")
-    ).upper()
-
-    if csv_sheet not in (
-        "ERROR",
-        "INTERNAL",
-        "EXTERNAL"
-    ):
-
-        flash(
-            "Invalid CSV sheet selection.",
-            "danger"
-        )
-
+    csv_sheet = normalize_text(request.form.get("csv_sheet", "ERROR")).upper()
+    if csv_sheet not in ("ERROR", "INTERNAL", "EXTERNAL"):
+        flash("Invalid CSV sheet selection.", "danger")
         return redirect(url_for("admin_dashboard"))
+
+    selected_project = normalize_text(request.form.get("project_id")) or "all"
+    default_project_id = None
+    if selected_project != "all":
+        try:
+            default_project_id = int(selected_project)
+        except ValueError:
+            flash("Invalid project selection.", "danger")
+            return redirect(url_for("admin_dashboard"))
+        with db() as con:
+            valid = con.execute(
+                "SELECT id FROM projects WHERE id = ? AND active = 1",
+                (default_project_id,)
+            ).fetchone()
+        if not valid:
+            flash("Selected project does not exist or is inactive.", "danger")
+            return redirect(url_for("admin_dashboard"))
 
     try:
-
-        sheets = read_source(
-            uploaded_file,
-            csv_sheet=csv_sheet
-        )
-
+        sheets = read_source(uploaded_file, csv_sheet=csv_sheet)
         if not sheets:
-            raise ValueError(
-                "No supported data was found in the file."
-            )
-
+            raise ValueError("No supported data was found in the file.")
         with db() as con:
-
             imported = import_workbook(
-                con,
-                sheets,
-                filename,
-                session.get("username", "")
+                con, sheets, filename, session.get("username", ""),
+                default_project_id=default_project_id,
+                allowed_project_ids=None
             )
-
-        flash(
-            f"Import completed. "
-            f"{imported} records imported or updated.",
-            "success"
-        )
-
+        flash(f"Import completed. {imported} records imported or updated.", "success")
     except ValueError as exc:
-
-        flash(
-            f"Import failed: {str(exc)}",
-            "danger"
-        )
-
-    except Exception as exc:
-
-        app.logger.exception(
-            "Workbook import failed"
-        )
-
-        flash(
-            "Workbook import failed. "
-            "No successful import was confirmed. "
-            "Please check the workbook format and server logs.",
-            "danger"
-        )
-
+        flash(f"Import failed: {str(exc)}", "danger")
+    except Exception:
+        app.logger.exception("Admin workbook import failed")
+        flash("Workbook import failed. No successful import was confirmed. Please check the workbook format and server logs.", "danger")
     return redirect(url_for("admin_dashboard"))
 
+
+@app.route("/qc/upload", methods=["POST"])
+@login_required
+@qc_required
+def qc_upload_workbook():
+    validate_csrf()
+    allowed_ids = get_user_project_ids(session.get("user_id"))
+    if not allowed_ids:
+        flash("Your QC account has no assigned active project.", "warning")
+        return redirect(url_for("qc_dashboard"))
+
+    uploaded_file = request.files.get("source_file")
+    if not uploaded_file or not uploaded_file.filename:
+        flash("Please select a workbook or CSV file.", "warning")
+        return redirect(url_for("qc_dashboard"))
+
+    filename = secure_filename(uploaded_file.filename)
+    if not allowed_file(filename):
+        flash("Unsupported file type. Allowed: ODS, XLSX, XLS, and CSV.", "danger")
+        return redirect(url_for("qc_dashboard"))
+
+    csv_sheet = normalize_text(request.form.get("csv_sheet", "ERROR")).upper()
+    if csv_sheet not in ("ERROR", "INTERNAL", "EXTERNAL"):
+        flash("Invalid import type.", "danger")
+        return redirect(url_for("qc_dashboard"))
+
+    selected_project = normalize_text(request.form.get("project_id")) or ""
+    default_project_id = None
+    if selected_project and selected_project != "all":
+        try:
+            default_project_id = int(selected_project)
+        except ValueError:
+            flash("Invalid project selection.", "danger")
+            return redirect(url_for("qc_dashboard"))
+        if default_project_id not in allowed_ids:
+            abort(403)
+    elif selected_project == "all":
+        default_project_id = None
+    else:
+        flash("Please select an assigned project, or choose All Assigned Projects and include a PROJECT column.", "warning")
+        return redirect(url_for("qc_dashboard"))
+
+    try:
+        sheets = read_source(uploaded_file, csv_sheet=csv_sheet)
+        if not sheets:
+            raise ValueError("No supported data was found in the file.")
+        with db() as con:
+            imported = import_workbook(
+                con, sheets, filename, session.get("username", ""),
+                default_project_id=default_project_id,
+                allowed_project_ids=allowed_ids
+            )
+        flash(f"Import completed. {imported} records imported or updated.", "success")
+    except ValueError as exc:
+        flash(f"Import failed: {str(exc)}", "danger")
+    except Exception:
+        app.logger.exception("QC workbook import failed")
+        flash("Workbook import failed. No successful import was confirmed. Please check the workbook format and server logs.", "danger")
+    return redirect(url_for("qc_dashboard"))
 
 # =========================================================
 # ADMIN ACCOUNT MANAGEMENT
@@ -5419,11 +5175,21 @@ def admin_error_details():
         for row in rows
     ]
 
+    projects = []
+    with db() as con:
+        placeholders = ",".join(["?"] * len(project_ids))
+        project_rows = con.execute(
+            f"SELECT id, project_name FROM projects WHERE active = 1 AND id IN ({placeholders}) ORDER BY project_name",
+            tuple(project_ids)
+        ).fetchall()
+        projects = [dict(row) for row in project_rows]
+
     return render_template(
         "errors.html",
         errors=errors,
         dates=dates,
-        selected_date=selected_date
+        selected_date=selected_date,
+        projects=projects
     )
 
 # =========================================================
@@ -5637,7 +5403,8 @@ def normalize_accuracy_type(value):
 
     if value in (
         "INTERNAL",
-        "INTERNAL_ACCURACY"
+        "INTERNAL_ACCURACY",
+        "ACCURACY"
     ):
         return "INTERNAL"
 
@@ -5658,29 +5425,63 @@ def normalize_accuracy_type(value):
     return None
 
 
-def accuracy_period_key(value, period_type):
-
+def parse_accuracy_date(value, month_value=None):
+    """Parse full dates and short dates such as 'Oct - 27' using 'Oct - 26'."""
     parsed = parse_date(value)
+    if parsed is not None:
+        return parsed
+
+    raw_date = normalize_text(value)
+    raw_month = normalize_text(month_value)
+    if not raw_date or not raw_month:
+        return None
+
+    year = None
+    for fmt in ("%b - %y", "%B - %y", "%b %y", "%B %y", "%Y-%m"):
+        try:
+            year = datetime.strptime(raw_month, fmt).year
+            break
+        except (TypeError, ValueError):
+            continue
+
+    if year is None:
+        return None
+
+    for fmt in ("%b - %d", "%B - %d", "%b %d", "%B %d"):
+        try:
+            month_day = datetime.strptime(raw_date, fmt)
+            return date(year, month_day.month, month_day.day)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def accuracy_period_key(value, period_type, month_value=None):
+    """Return a stable period key, resolving short dates using the row month."""
+    parsed = parse_accuracy_date(value, month_value)
+
+    if parsed is None:
+        raw_month = normalize_text(month_value)
+        # If record_date is absent but MONTH is present, monthly summaries
+        # can still include the row without inventing a specific day.
+        if period_type == "monthly" and raw_month:
+            for fmt in ("%Y-%m", "%b - %y", "%B - %y", "%b %y", "%B %y"):
+                try:
+                    month_date = datetime.strptime(raw_month, fmt).date()
+                    return month_date.strftime("%Y-%m")
+                except (TypeError, ValueError):
+                    continue
 
     if not parsed:
         return None
 
     if period_type == "daily":
-
         return parsed.isoformat()
-
     if period_type == "weekly":
-
-        monday = parsed - timedelta(
-            days=parsed.weekday()
-        )
-
+        monday = parsed - timedelta(days=parsed.weekday())
         return monday.isoformat()
-
     if period_type == "monthly":
-
         return parsed.strftime("%Y-%m")
-
     return None
 
 
@@ -5890,439 +5691,133 @@ def build_accuracy_context(
     period_type="monthly",
     selected_period=None
 ):
-
-    if period_type not in (
-        "daily",
-        "weekly",
-        "monthly"
-    ):
-
+    if period_type not in ("daily", "weekly", "monthly"):
         period_type = "monthly"
 
+    allowed_set = None
+    if allowed_project_ids is not None:
+        allowed_set = {int(value) for value in allowed_project_ids}
+
     records = get_accuracy_records(
-        allowed_project_ids
+        sorted(allowed_set) if allowed_set is not None else None
     )
 
     with db() as con:
-
         project_rows = con.execute(
-            """
-            SELECT
-                id,
-                project_name,
-                active
-            FROM projects
-            ORDER BY project_name
-            """
+            "SELECT id, project_name, active FROM projects ORDER BY project_name"
         ).fetchall()
 
-    project_names = {
-        int(row["id"]): row["project_name"]
-        for row in project_rows
-    }
+    project_names = {int(row["id"]): row["project_name"] for row in project_rows}
 
-    # -----------------------------------------------------
-    # PROJECT FILTER
-    # -----------------------------------------------------
-
+    # Validate the requested project against the viewer's permitted set.
     if selected_project != "all":
-
         try:
-
-            selected_project_id = int(
-                selected_project
-            )
-
-        except (ValueError, TypeError):
-
-            selected_project_id = None
-
-        if (
-            selected_project_id is None
-            or (
-                allowed_project_ids is not None
-                and selected_project_id
-                    not in allowed_project_ids
-            )
-        ):
-
+            selected_id = int(selected_project)
+        except (TypeError, ValueError):
+            selected_id = None
+        if selected_id is None or (allowed_set is not None and selected_id not in allowed_set):
             selected_project = "all"
-
         else:
-
             records = [
-                row
-                for row in records
+                row for row in records
                 if row.get("project_id") is not None
-                and int(row["project_id"])
-                    == selected_project_id
+                and int(row["project_id"]) == selected_id
             ]
 
-    # -----------------------------------------------------
-    # PERIOD KEYS
-    # -----------------------------------------------------
-
     period_keys = set()
-
+    row_periods = {}
     for row in records:
-
         key = accuracy_period_key(
-            row.get("record_date"),
-            period_type
+            row.get("record_date"), period_type, row.get("month")
         )
-
         if key:
             period_keys.add(key)
+            row_periods[id(row)] = key
 
-    sorted_periods = sorted(period_keys)
-
+    periods = sorted(period_keys)
     if selected_period not in period_keys:
+        selected_period = periods[-1] if periods else ""
+    previous_period = previous_accuracy_period(selected_period, period_type)
 
-        selected_period = (
-            sorted_periods[-1]
-            if sorted_periods
-            else ""
-        )
-
-    previous_period = previous_accuracy_period(
-        selected_period,
-        period_type
-    )
-
-    # -----------------------------------------------------
-    # AGGREGATE BY BILLER / PROJECT / TYPE / PERIOD
-    # -----------------------------------------------------
-
-    aggregates = {}
-
-    def add_record(row):
-
-        accuracy_type = normalize_accuracy_type(
-            row.get("accuracy_type")
-        )
-
-        if accuracy_type not in ACCURACY_TYPES:
-            return
-
+    def aggregate_record(target_map, group_key, row):
+        username = normalize_text(row.get("username"))
         project_id = row.get("project_id")
-
-        if project_id is not None:
-            project_id = int(project_id)
-
-        biller_username = normalize_text(
-            row.get("username")
-        )
-
-        biller_name = normalize_text(
-            row.get("biller_name")
-        ) or biller_username
-
-        key = (
-            biller_username,
-            project_id,
-            accuracy_type
-        )
-
-        target = aggregates.setdefault(
-            key,
-            {
-                "username": biller_username,
-                "biller_name": biller_name,
-                "project_id": project_id,
-                "project_name": (
-                    project_names.get(
-                        project_id,
-                        "Unassigned"
-                    )
-                    if project_id is not None
-                    else "Unassigned"
-                ),
-                "accuracy_type": accuracy_type,
-                "audited": 0.0,
-                "errors": 0.0,
-                "bills_processed": 0.0
-            }
-        )
-
-        target["audited"] += (
-            number_value(row.get("audited")) or 0
-        )
-
-        target["errors"] += (
-            number_value(row.get("errors")) or 0
-        )
-
-        target["bills_processed"] += (
-            number_value(
-                row.get("bills_processed")
-            ) or 0
-        )
+        project_id = int(project_id) if project_id is not None else None
+        accuracy_type = normalize_accuracy_type(row.get("accuracy_type"))
+        item = target_map.setdefault(group_key, {
+            "username": username,
+            "biller_name": normalize_text(row.get("biller_name")) or username,
+            "project_id": project_id,
+            "project_name": project_names.get(project_id, "Unassigned") if project_id is not None else "Unassigned",
+            "accuracy_type": accuracy_type,
+            "audited": 0.0,
+            "errors": 0.0,
+            "bills_processed": 0.0
+        })
+        item["audited"] += number_value(row.get("audited")) or 0
+        item["errors"] += number_value(row.get("errors")) or 0
+        item["bills_processed"] += number_value(row.get("bills_processed")) or 0
 
     current_aggregates = {}
     previous_aggregates = {}
-
     for row in records:
-
-        key = accuracy_period_key(
-            row.get("record_date"),
-            period_type
-        )
-
-        if not key:
+        period_key = row_periods.get(id(row))
+        accuracy_type = normalize_accuracy_type(row.get("accuracy_type"))
+        if not period_key or accuracy_type not in ACCURACY_TYPES:
             continue
-
-        username = normalize_text(
-            row.get("username")
-        )
-
         project_id = row.get("project_id")
-
-        if project_id is not None:
-            project_id = int(project_id)
-
-        accuracy_type = normalize_accuracy_type(
-            row.get("accuracy_type")
-        )
-
-        if accuracy_type not in ACCURACY_TYPES:
-            continue
-
-        group_key = (
-            username,
-            project_id,
-            accuracy_type
-        )
-
-        if key == selected_period:
-
-            target = current_aggregates.setdefault(
-                group_key,
-                {
-                    "username": username,
-                    "biller_name": (
-                        normalize_text(
-                            row.get("biller_name")
-                        ) or username
-                    ),
-                    "project_id": project_id,
-                    "project_name": (
-                        project_names.get(
-                            project_id,
-                            "Unassigned"
-                        )
-                        if project_id is not None
-                        else "Unassigned"
-                    ),
-                    "accuracy_type": accuracy_type,
-                    "audited": 0.0,
-                    "errors": 0.0,
-                    "bills_processed": 0.0
-                }
-            )
-
-            target["audited"] += (
-                number_value(row.get("audited")) or 0
-            )
-
-            target["errors"] += (
-                number_value(row.get("errors")) or 0
-            )
-
-            target["bills_processed"] += (
-                number_value(
-                    row.get("bills_processed")
-                ) or 0
-            )
-
-        elif key == previous_period:
-
-            target = previous_aggregates.setdefault(
-                group_key,
-                {
-                    "username": username,
-                    "biller_name": (
-                        normalize_text(
-                            row.get("biller_name")
-                        ) or username
-                    ),
-                    "project_id": project_id,
-                    "project_name": (
-                        project_names.get(
-                            project_id,
-                            "Unassigned"
-                        )
-                        if project_id is not None
-                        else "Unassigned"
-                    ),
-                    "accuracy_type": accuracy_type,
-                    "audited": 0.0,
-                    "errors": 0.0,
-                    "bills_processed": 0.0
-                }
-            )
-
-            target["audited"] += (
-                number_value(row.get("audited")) or 0
-            )
-
-            target["errors"] += (
-                number_value(row.get("errors")) or 0
-            )
-
-            target["bills_processed"] += (
-                number_value(
-                    row.get("bills_processed")
-                ) or 0
-            )
-
-    # -----------------------------------------------------
-    # SUMMARY CARDS
-    # -----------------------------------------------------
+        project_id = int(project_id) if project_id is not None else None
+        group_key = (normalize_text(row.get("username")), project_id, accuracy_type)
+        if period_key == selected_period:
+            aggregate_record(current_aggregates, group_key, row)
+        elif period_key == previous_period:
+            aggregate_record(previous_aggregates, group_key, row)
 
     summary = {}
-
+    below_90 = {accuracy_type: [] for accuracy_type in ACCURACY_TYPES}
     for accuracy_type in ACCURACY_TYPES:
-
-        total_audited = 0.0
-        total_errors = 0.0
-        total_bills = 0.0
-
-        for key, item in current_aggregates.items():
-
-            if key[2] != accuracy_type:
-                continue
-
-            total_audited += item["audited"]
-            total_errors += item["errors"]
-            total_bills += item["bills_processed"]
-
+        matching = [item for item in current_aggregates.values() if item["accuracy_type"] == accuracy_type]
+        audited = sum(item["audited"] for item in matching)
+        errors = sum(item["errors"] for item in matching)
+        bills = sum(item["bills_processed"] for item in matching)
         summary[accuracy_type] = {
-            "audited": total_audited,
-            "errors": total_errors,
-            "bills_processed": total_bills,
-            "accuracy": calculate_weighted_accuracy(
-                total_audited,
-                total_errors
-            )
+            "audited": audited,
+            "errors": errors,
+            "bills_processed": bills,
+            "accuracy": calculate_weighted_accuracy(audited, errors)
         }
 
-    # -----------------------------------------------------
-    # BELOW 90% LISTS
-    # -----------------------------------------------------
-
-    below_90 = {
-        accuracy_type: []
-        for accuracy_type in ACCURACY_TYPES
-    }
-
-    current_accuracy_map = {}
-
-    for key, item in current_aggregates.items():
-
-        accuracy = calculate_weighted_accuracy(
-            item["audited"],
-            item["errors"]
-        )
-
-        item["accuracy"] = accuracy
-
-        current_accuracy_map[key] = accuracy
-
-        if (
-            accuracy is not None
-            and accuracy < 90
-        ):
-
-            below_90[item["accuracy_type"]].append({
-                **item,
-                "accuracy": accuracy,
-                "accuracy_display": format_accuracy(
-                    accuracy
-                )
+    improvements = []
+    for key, current in current_aggregates.items():
+        current_accuracy = calculate_weighted_accuracy(current["audited"], current["errors"])
+        current["accuracy"] = current_accuracy
+        if current_accuracy is not None and current_accuracy < 90:
+            below_90[current["accuracy_type"]].append({
+                **current,
+                "accuracy_display": format_accuracy(current_accuracy)
             })
 
-    for accuracy_type in ACCURACY_TYPES:
-
-        below_90[accuracy_type].sort(
-            key=lambda item: item["accuracy"]
-        )
-
-    # -----------------------------------------------------
-    # IMPROVEMENT COMPARISON
-    # -----------------------------------------------------
-
-    improvements = []
-
-    for key, current in current_aggregates.items():
-
-        current_accuracy = calculate_weighted_accuracy(
-            current["audited"],
-            current["errors"]
-        )
-
         previous = previous_aggregates.get(key)
-
         previous_accuracy = (
-            calculate_weighted_accuracy(
-                previous["audited"],
-                previous["errors"]
-            )
-            if previous
-            else None
+            calculate_weighted_accuracy(previous["audited"], previous["errors"])
+            if previous else None
         )
-
         if previous_accuracy is None:
-
             change = None
             status = "New Record"
-
-            note = (
-                "No previous period record is available "
-                "for comparison."
-            )
-
+            note = "No previous period record is available for comparison."
         else:
-
-            change = (
-                current_accuracy - previous_accuracy
-                if current_accuracy is not None
-                else None
-            )
-
+            change = current_accuracy - previous_accuracy if current_accuracy is not None else None
             if change is None:
-
-                status = "No Data"
-                note = "No audited records for this period."
-
+                status, note = "No Data", "No audited records for this period."
             elif change > 0:
-
                 status = "Improved"
-
-                note = (
-                    f"Improved by {change:.2f} percentage points"
-                )
-
-                if current_accuracy < 90:
-
-                    note += ", but still below 90%."
-
-                else:
-
-                    note += "."
-
+                note = f"Improved by {change:.2f} percentage points" + (", but still below 90%." if current_accuracy < 90 else ".")
             elif change < 0:
-
                 status = "Declined"
-
-                note = (
-                    f"Declined by {abs(change):.2f} "
-                    f"percentage points."
-                )
-
+                note = f"Declined by {abs(change):.2f} percentage points."
             else:
-
-                status = "No Change"
-                note = "Accuracy remained the same."
+                status, note = "No Change", "Accuracy remained the same."
 
         improvements.append({
             "biller_name": current["biller_name"],
@@ -6337,54 +5832,36 @@ def build_accuracy_context(
             "note": note
         })
 
-    improvements.sort(
-        key=lambda item: (
-            item["project_name"],
-            item["biller_name"],
-            item["accuracy_type"]
-        )
-    )
+    for accuracy_type in ACCURACY_TYPES:
+        below_90[accuracy_type].sort(key=lambda item: item["accuracy"])
 
-    # -----------------------------------------------------
-    # PROJECT FILTER OPTIONS
-    # -----------------------------------------------------
+    improvements.sort(key=lambda item: (
+        item["project_name"], item["biller_name"], item["accuracy_type"]
+    ))
 
-    if allowed_project_ids is None:
-
+    if allowed_set is None:
         visible_projects = [
-            {
-                "id": int(row["id"]),
-                "project_name": row["project_name"]
-            }
-            for row in project_rows
-            if bool(
-                con_value(row, "active", 1)
-            )
+            {"id": int(row["id"]), "project_name": row["project_name"]}
+            for row in project_rows if bool(con_value(row, "active", 1))
         ]
-
     else:
-
-        allowed_set = set(
-            int(value)
-            for value in allowed_project_ids
-        )
-
         visible_projects = [
-            {
-                "id": int(row["id"]),
-                "project_name": row["project_name"]
-            }
+            {"id": int(row["id"]), "project_name": row["project_name"]}
             for row in project_rows
-            if int(row["id"]) in allowed_set
-            and bool(con_value(row, "active", 1))
+            if int(row["id"]) in allowed_set and bool(con_value(row, "active", 1))
         ]
 
-    return render_template(
-        "admin.html",
-        counts=counts,
-        history=history,
-        **accuracy_context
-    )
+    return {
+        "below_90": below_90,
+        "format_accuracy": format_accuracy,
+        "improvements": improvements,
+        "period_type": period_type,
+        "periods": periods,
+        "projects": visible_projects,
+        "selected_period": selected_period,
+        "selected_project": str(selected_project),
+        "summary": summary
+    }
 
 
 # =========================================================
@@ -6732,6 +6209,13 @@ def biller_dashboard():
 # BILLER INTERNAL ACCURACY
 # =========================================================
 
+@app.route("/biller/accuracy")
+@login_required
+@biller_required
+def biller_accuracy():
+    return redirect(url_for("biller_internal_accuracy"))
+
+
 @app.route("/biller/accuracy/internal")
 @login_required
 @biller_required
@@ -6912,7 +6396,8 @@ def qc_errors():
             "errors.html",
             errors=[],
             dates=[],
-            selected_date=""
+            selected_date="",
+            projects=[]
         )
 
     placeholders = ", ".join(
@@ -7476,6 +6961,34 @@ def export_responses():
 # =========================================================
 # ADMIN ACTIVITY LOGS
 # =========================================================
+
+@app.route("/admin/import-history")
+@login_required
+@admin_required
+def admin_import_history():
+    with db() as con:
+        rows = con.execute(
+            """SELECT id, filename, uploaded_by, records_imported, imported_at
+               FROM import_history ORDER BY id DESC LIMIT 500"""
+        ).fetchall()
+    return render_template("import_history.html", history=[dict(row) for row in rows], scope="All system imports")
+
+
+@app.route("/qc/import-history")
+@login_required
+@qc_required
+def qc_import_history():
+    username = normalize_text(session.get("username"))
+    with db() as con:
+        rows = con.execute(
+            """SELECT id, filename, uploaded_by, records_imported, imported_at
+               FROM import_history
+               WHERE LOWER(TRIM(COALESCE(uploaded_by, ''))) = LOWER(?)
+               ORDER BY id DESC LIMIT 500""",
+            (username,)
+        ).fetchall()
+    return render_template("import_history.html", history=[dict(row) for row in rows], scope="Your QC imports")
+
 
 @app.route("/admin/logs")
 @login_required

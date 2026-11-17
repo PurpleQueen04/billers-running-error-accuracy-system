@@ -1,0 +1,411 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- PAGE HEADER -->
+<div class="page-header">
+    <div>
+        <h1>Accuracy Monitoring</h1>
+        <p>Monitor Biller accuracy across your assigned projects.</p>
+    </div>
+
+    <span class="section-tag">
+        QC Monitoring
+    </span>
+</div>
+
+
+<!-- FILTERS -->
+<div class="content-card">
+
+    <div class="section-heading">
+        <div>
+            <h2>Accuracy Filters</h2>
+            <p>Select a project and reporting period.</p>
+        </div>
+    </div>
+
+    <form method="GET"
+          action="{{ url_for('qc_accuracy') }}"
+          class="filter-bar">
+
+        <div class="filter-group">
+            <label for="project_id">Project</label>
+
+            <select name="project_id" id="project_id">
+                <option value="all"
+                    {% if selected_project == 'all' %}selected{% endif %}>
+                    All Assigned Projects
+                </option>
+
+                {% for project in projects %}
+                    <option value="{{ project.id }}"
+                        {% if selected_project|string == project.id|string %}selected{% endif %}>
+                        {{ project.project_name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="period">Reporting Period</label>
+
+            <select name="period" id="period">
+                <option value="daily"
+                    {% if period_type == 'daily' %}selected{% endif %}>
+                    Daily
+                </option>
+
+                <option value="weekly"
+                    {% if period_type == 'weekly' %}selected{% endif %}>
+                    Weekly
+                </option>
+
+                <option value="monthly"
+                    {% if period_type == 'monthly' %}selected{% endif %}>
+                    Monthly
+                </option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="date">Select Period</label>
+
+            <select name="date" id="date">
+                {% for period in periods %}
+                    <option value="{{ period }}"
+                        {% if selected_period == period %}selected{% endif %}>
+                        {{ period }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+            Apply Filters
+        </button>
+
+        <a href="{{ url_for('qc_accuracy') }}"
+           class="btn btn-secondary">
+            Reset
+        </a>
+
+    </form>
+
+</div>
+
+
+<!-- ACCURACY SUMMARY -->
+<div class="content-card">
+
+    <div class="section-heading">
+        <div>
+            <h2>Accuracy Summary</h2>
+            <p>
+                Overall Biller performance for the selected reporting period.
+            </p>
+        </div>
+
+        <span class="section-tag">
+            {{ period_type|capitalize }}
+        </span>
+    </div>
+
+    <div class="accuracy-summary-grid">
+
+        {% for accuracy_type, item in summary.items() %}
+
+            <div class="accuracy-summary-card">
+
+                <div class="stat-card-top">
+                    <span class="stat-label">
+                        {{ accuracy_type }}
+                    </span>
+
+                    <span class="stat-icon">
+                        <i class="fa-solid fa-chart-line"></i>
+                    </span>
+                </div>
+
+                <div class="stat-value">
+                    {{ format_accuracy(item.accuracy) }}
+                </div>
+
+                <div class="accuracy-progress">
+                    <div class="accuracy-progress-fill"
+                         style="width: {{ item.accuracy if item.accuracy is not none else 0 }}%;">
+                    </div>
+                </div>
+
+                <div class="accuracy-details">
+                    <span>
+                        Audited: {{ item.audited }}
+                    </span>
+
+                    <span>
+                        Errors: {{ item.errors }}
+                    </span>
+
+                    <span>
+                        Bills: {{ item.bills_processed }}
+                    </span>
+                </div>
+
+            </div>
+
+        {% else %}
+
+            <div class="empty-state">
+                <h3>No Accuracy Data</h3>
+                <p>No accuracy records are available for this period.</p>
+            </div>
+
+        {% endfor %}
+
+    </div>
+
+</div>
+
+
+<!-- BELOW 90% ACCURACY -->
+<div class="content-card">
+
+    <div class="section-heading">
+        <div>
+            <h2>Billers Below 90% Accuracy</h2>
+            <p>
+                Billers who need additional monitoring and coaching.
+            </p>
+        </div>
+
+        <span class="section-tag warning">
+            Target: 90%
+        </span>
+    </div>
+
+    {% set has_below_90 = namespace(value=false) %}
+
+    {% for accuracy_type, billers in below_90.items() %}
+        {% if billers %}
+            {% set has_below_90.value = true %}
+        {% endif %}
+    {% endfor %}
+
+    {% if has_below_90.value %}
+
+        {% for accuracy_type, billers in below_90.items() %}
+
+            {% if billers %}
+
+                <div class="table-section">
+
+                    <div class="section-heading">
+                        <h3>{{ accuracy_type }}</h3>
+                        <span class="section-tag">
+                            {{ billers|length }} Billers
+                        </span>
+                    </div>
+
+                    <div class="table-container">
+
+                        <table class="data-table">
+
+                            <thead>
+                                <tr>
+                                    <th>BILLER NAME</th>
+                                    <th>PROJECT</th>
+                                    <th>AUDITED</th>
+                                    <th>ERRORS</th>
+                                    <th>BILLS PROCESSED</th>
+                                    <th>ACCURACY</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+
+                                {% for biller in billers %}
+
+                                    <tr>
+                                        <td>
+                                            {{ biller.biller_name }}
+                                        </td>
+
+                                        <td>
+                                            {{ biller.project_name or '—' }}
+                                        </td>
+
+                                        <td>
+                                            {{ biller.audited }}
+                                        </td>
+
+                                        <td>
+                                            {{ biller.errors }}
+                                        </td>
+
+                                        <td>
+                                            {{ biller.bills_processed }}
+                                        </td>
+
+                                        <td>
+                                            <span class="status-badge status-danger">
+                                                {{ biller.accuracy_display }}
+                                            </span>
+                                        </td>
+                                    </tr>
+
+                                {% endfor %}
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            {% endif %}
+
+        {% endfor %}
+
+    {% else %}
+
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+
+            <h3>All Billers Meet the Target</h3>
+            <p>
+                No Billers are below 90% accuracy for the selected period.
+            </p>
+        </div>
+
+    {% endif %}
+
+</div>
+
+
+<!-- ACCURACY IMPROVEMENTS -->
+<div class="content-card">
+
+    <div class="section-heading">
+        <div>
+            <h2>Accuracy Improvement Monitoring</h2>
+            <p>
+                Compare current accuracy with the previous reporting period.
+            </p>
+        </div>
+    </div>
+
+    {% if improvements %}
+
+        <div class="table-container">
+
+            <table class="data-table">
+
+                <thead>
+                    <tr>
+                        <th>BILLER NAME</th>
+                        <th>PROJECT</th>
+                        <th>ACCURACY TYPE</th>
+                        <th>PREVIOUS ACCURACY</th>
+                        <th>CURRENT ACCURACY</th>
+                        <th>CHANGE</th>
+                        <th>STATUS</th>
+                        <th>COACHING NOTES</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for item in improvements %}
+
+                        <tr>
+                            <td>
+                                {{ item.biller_name }}
+                            </td>
+
+                            <td>
+                                {{ item.project_name or '—' }}
+                            </td>
+
+                            <td>
+                                {{ item.accuracy_type }}
+                            </td>
+
+                            <td>
+                                {{ format_accuracy(item.previous_accuracy) }}
+                            </td>
+
+                            <td>
+                                {{ format_accuracy(item.current_accuracy) }}
+                            </td>
+
+                            <td>
+                                {% if item.change is not none %}
+                                    {% if item.change > 0 %}
+                                        <span class="status-badge status-success">
+                                            +{{ "%.2f"|format(item.change) }}%
+                                        </span>
+                                    {% elif item.change < 0 %}
+                                        <span class="status-badge status-danger">
+                                            {{ "%.2f"|format(item.change) }}%
+                                        </span>
+                                    {% else %}
+                                        <span class="status-badge status-neutral">
+                                            0.00%
+                                        </span>
+                                    {% endif %}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if item.status == 'Improved' %}
+                                    <span class="status-badge status-success">
+                                        {{ item.status }}
+                                    </span>
+                                {% elif item.status == 'Declined' %}
+                                    <span class="status-badge status-danger">
+                                        {{ item.status }}
+                                    </span>
+                                {% elif item.status == 'No Change' %}
+                                    <span class="status-badge status-neutral">
+                                        {{ item.status }}
+                                    </span>
+                                {% else %}
+                                    <span class="status-badge status-warning">
+                                        {{ item.status }}
+                                    </span>
+                                {% endif %}
+                            </td>
+
+                            <td class="comment-cell">
+                                {{ item.note or '—' }}
+                            </td>
+                        </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    {% else %}
+
+        <div class="empty-state">
+            <h3>No Improvement Records</h3>
+            <p>
+                No comparison data is available for the selected period.
+            </p>
+        </div>
+
+    {% endif %}
+
+</div>
+
+{% endblock %}
