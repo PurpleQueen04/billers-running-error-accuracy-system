@@ -108,9 +108,7 @@ EXTERNAL_ACCURACY = [
 
 ERROR_ALIASES = {
     "billed_date": [
-        "BILLED DATE",
-        "DATE",
-        "BILLING DATE"
+        "BILLED DATE"
     ],
     "source": [
         "SOURCE",
@@ -1970,9 +1968,9 @@ def get_accuracy_columns(dataframe):
 
         "date": find_col(
             columns,
-            ["DATE STARTED", "DATE", "RECORD DATE"]
+            ["DATE"]
         ),
-
+        
         "month": find_col(
             columns,
             ["MONTH"]
