@@ -2066,7 +2066,8 @@ def import_error_sheet(
             pro = EXCLUDED.pro,
             zb_field = EXCLUDED.zb_field,
             error_details = EXCLUDED.error_details,
-            project_id = COALESCE(error_records.project_id, EXCLUDED.project_id)
+            project_id = COALESCE(error_records.project_id, EXCLUDED.project_id),
+            imported_at = EXCLUDED.imported_at
     """
 
     for _, row in dataframe.iterrows():
