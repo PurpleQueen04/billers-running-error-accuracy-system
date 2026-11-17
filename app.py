@@ -6,6 +6,8 @@ import csv
 import hashlib
 import sqlite3
 import secrets
+import zipfile
+import xml.etree.ElementTree as ET
 
 from datetime import datetime, date, timedelta
 from functools import wraps
@@ -1632,6 +1634,164 @@ def inject_globals():
 # WORKBOOK READING
 # =========================================================
 
+class ODSWorkbookSource:
+    """A seekable ODS upload parsed one sheet and one bounded chunk at a time."""
+
+    CHUNK_SIZE = 500
+    SUPPORTED_SHEETS = {"ERROR", "INTERNAL", "EXTERNAL"}
+
+    def __init__(self, stream):
+        self.stream = stream
+
+    @staticmethod
+    def _cell_text(cell):
+        office = "{urn:oasis:names:tc:opendocument:xmlns:office:1.0}"
+        text_ns = "{urn:oasis:names:tc:opendocument:xmlns:text:1.0}"
+        value = (
+            cell.get(office + "string-value")
+            or cell.get(office + "date-value")
+            or cell.get(office + "time-value")
+            or cell.get(office + "boolean-value")
+            or cell.get(office + "value")
+        )
+        paragraphs = []
+        for paragraph in cell.iter(text_ns + "p"):
+            paragraphs.append("".join(paragraph.itertext()))
+        paragraph_text = "\n".join(part for part in paragraphs if part != "")
+        if paragraph_text != "":
+            return paragraph_text
+        return value if value is not None else ""
+
+    @classmethod
+    def _row_values(cls, row_element):
+        table_ns = "{urn:oasis:names:tc:opendocument:xmlns:table:1.0}"
+        cell_tags = {
+            table_ns + "table-cell",
+            table_ns + "covered-table-cell",
+        }
+        values = []
+        for cell in list(row_element):
+            if cell.tag not in cell_tags:
+                continue
+            repeat_text = cell.get(table_ns + "number-columns-repeated", "1")
+            try:
+                repeat = max(1, min(int(repeat_text), 16384))
+            except (TypeError, ValueError):
+                repeat = 1
+            value = cls._cell_text(cell)
+            span_text = cell.get(table_ns + "number-columns-spanned", "1")
+            try:
+                span = max(1, min(int(span_text), 16384))
+            except (TypeError, ValueError):
+                span = 1
+            values.extend([value] * repeat)
+            if span > 1:
+                values.extend([""] * (span - 1))
+        # Trailing empty cells are not useful to the import and can be
+        # repeated by spreadsheet formatting across thousands of columns.
+        while values and values[-1] == "":
+            values.pop()
+        return values
+
+    def iter_chunks(self):
+        """Yield (sheet_name, DataFrame-or-None); None marks an empty supported sheet."""
+        table_ns = "{urn:oasis:names:tc:opendocument:xmlns:table:1.0}"
+        self.stream.seek(0)
+        try:
+            archive = zipfile.ZipFile(self.stream)
+        except (zipfile.BadZipFile, OSError) as exc:
+            raise ValueError("The ODS workbook is invalid or corrupted.") from exc
+
+        with archive:
+            if "content.xml" not in archive.namelist():
+                raise ValueError("The ODS workbook is missing content.xml.")
+            with archive.open("content.xml") as xml_stream:
+                stack = []
+                current_sheet = None
+                headers = None
+                physical_row = 0
+                rows = []
+                row_indexes = []
+                yielded_for_sheet = False
+
+                try:
+                    iterator = ET.iterparse(xml_stream, events=("start", "end"))
+                    for event, element in iterator:
+                        if event == "start":
+                            stack.append(element)
+                            if element.tag == table_ns + "table":
+                                raw_name = element.get(table_ns + "name", "")
+                                normalized = normalize_text(raw_name).upper()
+                                current_sheet = normalized if normalized in self.SUPPORTED_SHEETS else None
+                                headers = None
+                                physical_row = 0
+                                rows = []
+                                row_indexes = []
+                                yielded_for_sheet = False
+                            continue
+
+                        if element.tag == table_ns + "table-row" and current_sheet:
+                            row_values = self._row_values(element)
+                            repeat_text = element.get(table_ns + "number-rows-repeated", "1")
+                            try:
+                                row_repeat = max(1, min(int(repeat_text), 1000000))
+                            except (TypeError, ValueError):
+                                row_repeat = 1
+
+                            if headers is None:
+                                headers = row_values
+                                physical_row = row_repeat
+                            else:
+                                has_data = any(value not in (None, "") for value in row_values)
+                                if not has_data:
+                                    physical_row += row_repeat
+                                else:
+                                    for _ in range(row_repeat):
+                                        physical_row += 1
+                                        padded = row_values[:len(headers)]
+                                        if len(padded) < len(headers):
+                                            padded.extend([""] * (len(headers) - len(padded)))
+                                        rows.append(padded)
+                                        # Pandas importers use source row = index + 2.
+                                        row_indexes.append(physical_row - 2)
+                                        if len(rows) >= self.CHUNK_SIZE:
+                                            frame = pd.DataFrame(rows, columns=headers, index=row_indexes, dtype=object)
+                                            yield current_sheet, frame
+                                            yielded_for_sheet = True
+                                            rows = []
+                                            row_indexes = []
+
+                            if len(stack) >= 2:
+                                try:
+                                    stack[-2].remove(element)
+                                except ValueError:
+                                    pass
+                            element.clear()
+
+                        elif element.tag == table_ns + "table" and current_sheet:
+                            if rows:
+                                frame = pd.DataFrame(rows, columns=headers or [], index=row_indexes, dtype=object)
+                                yield current_sheet, frame
+                                yielded_for_sheet = True
+                            if not yielded_for_sheet:
+                                yield current_sheet, None
+                            current_sheet = None
+                            headers = None
+                            rows = []
+                            row_indexes = []
+                            if len(stack) >= 2:
+                                try:
+                                    stack[-2].remove(element)
+                                except ValueError:
+                                    pass
+                            element.clear()
+
+                        if stack:
+                            stack.pop()
+                except ET.ParseError as exc:
+                    raise ValueError("The ODS workbook contains invalid XML and could not be read.") from exc
+
+
 def read_source(file_storage, csv_sheet="ERROR"):
 
     filename = secure_filename(
@@ -1643,106 +1803,54 @@ def read_source(file_storage, csv_sheet="ERROR"):
     if extension not in ALLOWED_EXTENSIONS:
         raise ValueError("Unsupported file type.")
 
-    file_bytes = file_storage.read()
+    # ODS files are parsed directly from Flask's spooled upload stream.
+    # Do not duplicate the complete compressed file in a second BytesIO buffer.
+    if extension == ".ods":
+        stream = file_storage.stream
+        stream.seek(0)
+        if not zipfile.is_zipfile(stream):
+            raise ValueError("The uploaded ODS file is invalid or corrupted.")
+        stream.seek(0)
+        return ODSWorkbookSource(stream)
 
+    file_bytes = file_storage.read()
     if not file_bytes:
         raise ValueError("The uploaded file is empty.")
-
     buffer = io.BytesIO(file_bytes)
 
-    # -----------------------------------------------------
-    # CSV
-    # -----------------------------------------------------
-
     if extension == ".csv":
-
         last_error = None
-
-        for encoding in (
-            "utf-8-sig",
-            "cp1252",
-            "latin-1"
-        ):
-
+        for encoding in ("utf-8-sig", "cp1252", "latin-1"):
             try:
                 buffer.seek(0)
-
-                dataframe = pd.read_csv(
-                    buffer,
-                    encoding=encoding,
-                    dtype=object
-                )
-
-                sheet_name = normalize_text(
-                    csv_sheet
-                ).upper()
-
-                if sheet_name not in {
-                    "ERROR",
-                    "INTERNAL",
-                    "EXTERNAL"
-                }:
-                    raise ValueError(
-                        "Invalid CSV sheet selection."
-                    )
-
-                return {
-                    sheet_name: dataframe
-                }
-
+                dataframe = pd.read_csv(buffer, encoding=encoding, dtype=object)
+                sheet_name = normalize_text(csv_sheet).upper()
+                if sheet_name not in {"ERROR", "INTERNAL", "EXTERNAL"}:
+                    raise ValueError("Invalid CSV sheet selection.")
+                return {sheet_name: dataframe}
             except UnicodeDecodeError as exc:
                 last_error = exc
+        raise ValueError(f"Unable to read CSV encoding: {last_error}")
 
-        raise ValueError(
-            f"Unable to read CSV encoding: {last_error}"
-        )
-
-    # -----------------------------------------------------
-    # ODS / XLSX / XLS
-    # -----------------------------------------------------
-
-    if extension == ".ods":
-
-        workbook = pd.ExcelFile(
-            buffer,
-            engine="odf"
-        )
-
-    else:
-
-        workbook = pd.ExcelFile(buffer)
-
+    workbook = pd.ExcelFile(buffer)
     result = {}
-
     available_sheets = {
         normalize_text(name).upper(): name
         for name in workbook.sheet_names
     }
-
-    for requested in (
-        "ERROR",
-        "INTERNAL",
-        "EXTERNAL"
-    ):
-
+    for requested in ("ERROR", "INTERNAL", "EXTERNAL"):
         actual_name = available_sheets.get(requested)
-
-        if actual_name is None:
-            continue
-
-        result[requested] = pd.read_excel(
-            workbook,
-            sheet_name=actual_name,
-            dtype=object,
-            na_filter=False
-        )
-
+        if actual_name is not None:
+            result[requested] = pd.read_excel(
+                workbook,
+                sheet_name=actual_name,
+                dtype=object,
+                na_filter=False
+            )
     if not result:
         raise ValueError(
-            "No supported sheets found. "
-            "Expected ERROR, INTERNAL, or EXTERNAL."
+            "No supported sheets found. Expected ERROR, INTERNAL, or EXTERNAL."
         )
-
     return result
 
 
@@ -1923,7 +2031,8 @@ def import_error_sheet(
     con,
     dataframe,
     default_project_id=None,
-    allowed_project_ids=None
+    allowed_project_ids=None,
+    occurrences=None
 ):
     if dataframe is None or dataframe.empty:
         return 0
@@ -1933,7 +2042,8 @@ def import_error_sheet(
         raise ValueError("ERROR sheet must contain USERNAME and PRO columns.")
 
     imported = 0
-    occurrences = {}
+    if occurrences is None:
+        occurrences = {}
     project_cache = {}
     batch = []
     upsert_sql = """
@@ -2054,8 +2164,9 @@ def import_accuracy_sheet(
     # row, which caused long-running imports and Gunicorn
     # worker timeouts on larger ODS files.
     # -----------------------------------------------------
-    first_source_row = 2
-    last_source_row = len(dataframe) + 1
+    source_row_numbers = [int(index) + 2 for index in dataframe.index]
+    first_source_row = min(source_row_numbers) if source_row_numbers else 2
+    last_source_row = max(source_row_numbers) if source_row_numbers else 1
     existing_by_key = {}
 
     existing_rows = con.execute(
@@ -2086,7 +2197,8 @@ def import_accuracy_sheet(
     updates = []
     inserts = []
 
-    for source_row, (_, row) in enumerate(dataframe.iterrows(), start=2):
+    for dataframe_index, row in dataframe.iterrows():
+        source_row = int(dataframe_index) + 2
         username = dataframe_value(row, columns["username"])
         biller_name = dataframe_value(row, columns["biller_name"])
         if not username:
@@ -2178,22 +2290,48 @@ def import_workbook(
     allowed_project_ids=None
 ):
     total_imported = 0
-    error_dataframe = sheets.get("ERROR")
-    internal_dataframe = sheets.get("INTERNAL")
-    external_dataframe = sheets.get("EXTERNAL")
 
-    if error_dataframe is not None:
-        total_imported += import_error_sheet(
-            con, error_dataframe, default_project_id, allowed_project_ids
-        )
-    if internal_dataframe is not None:
-        total_imported += import_accuracy_sheet(
-            con, internal_dataframe, "INTERNAL", default_project_id, allowed_project_ids
-        )
-    if external_dataframe is not None:
-        total_imported += import_accuracy_sheet(
-            con, external_dataframe, "EXTERNAL", default_project_id, allowed_project_ids
-        )
+    if isinstance(sheets, ODSWorkbookSource):
+        seen_supported_sheets = set()
+        error_occurrences = {}
+
+        # ODS parsing and database writes happen sheet-by-sheet in chunks.
+        # The full workbook and all worksheets are never materialized together.
+        for sheet_name, dataframe in sheets.iter_chunks():
+            seen_supported_sheets.add(sheet_name)
+            if dataframe is None or dataframe.empty:
+                continue
+            if sheet_name == "ERROR":
+                total_imported += import_error_sheet(
+                    con, dataframe, default_project_id, allowed_project_ids,
+                    occurrences=error_occurrences
+                )
+            elif sheet_name in ("INTERNAL", "EXTERNAL"):
+                total_imported += import_accuracy_sheet(
+                    con, dataframe, sheet_name, default_project_id, allowed_project_ids
+                )
+
+        if not seen_supported_sheets:
+            raise ValueError(
+                "No supported sheets found. Expected ERROR, INTERNAL, or EXTERNAL."
+            )
+    else:
+        error_dataframe = sheets.get("ERROR")
+        internal_dataframe = sheets.get("INTERNAL")
+        external_dataframe = sheets.get("EXTERNAL")
+
+        if error_dataframe is not None:
+            total_imported += import_error_sheet(
+                con, error_dataframe, default_project_id, allowed_project_ids
+            )
+        if internal_dataframe is not None:
+            total_imported += import_accuracy_sheet(
+                con, internal_dataframe, "INTERNAL", default_project_id, allowed_project_ids
+            )
+        if external_dataframe is not None:
+            total_imported += import_accuracy_sheet(
+                con, external_dataframe, "EXTERNAL", default_project_id, allowed_project_ids
+            )
 
     imported_at = datetime.now().isoformat(timespec="seconds")
     con.execute(
