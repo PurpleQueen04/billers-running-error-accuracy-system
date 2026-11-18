@@ -366,7 +366,7 @@
     </form>
 
     {% for type, billers in below_90.items() %}
-    {% if not (below_category == 'external' and type == 'INTERNAL') %}
+    {% if below_category == 'all' or (below_category == 'external' and type == 'EXTERNAL') or (below_category == 'internal' and type == 'INTERNAL') %}
 
     <div class="table-section">
 
