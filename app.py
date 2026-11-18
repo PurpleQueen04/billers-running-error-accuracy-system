@@ -1197,6 +1197,38 @@ def init_db():
                 (cleanup_migration, datetime.now().isoformat(timespec="seconds"))
             )
 
+        # -------------------------------------------------
+        # CLEAR LEGACY IMPORT DEFAULTS (Y/N)
+        # Earlier imports may have stored a default Y or N.
+        # Keep genuine responses and QC-reviewed records.
+        # -------------------------------------------------
+        cleanup_migration_v2 = "clear_legacy_import_verified_defaults_v2"
+        cleanup_done_v2 = con.execute(
+            "SELECT migration_name FROM schema_migrations WHERE migration_name = ?",
+            (cleanup_migration_v2,)
+        ).fetchone()
+
+        if not cleanup_done_v2:
+            con.execute("""
+                UPDATE error_records
+                SET verified_error = ''
+                WHERE UPPER(TRIM(COALESCE(verified_error, ''))) IN ('Y', 'N')
+                  AND (biller_comment IS NULL OR TRIM(biller_comment) = '')
+                  AND (qc_explanation IS NULL OR TRIM(qc_explanation) = '')
+                  AND (updated_by IS NULL OR TRIM(updated_by) = '')
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM biller_responses br
+                      WHERE br.record_key = error_records.record_key
+                        AND UPPER(TRIM(COALESCE(br.verified_error, ''))) IN ('Y', 'N')
+                  )
+            """)
+
+            con.execute(
+                "INSERT INTO schema_migrations (migration_name, applied_at) VALUES (?, ?)",
+                (cleanup_migration_v2, datetime.now().isoformat(timespec="seconds"))
+            )
+
         migration_name = "copy_biller_responses_to_error_records_v1"
 
         migration = con.execute(
