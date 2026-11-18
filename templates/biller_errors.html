@@ -17,6 +17,19 @@
 
 
 <!-- SUMMARY -->
+{% set ns = namespace(verified=0, disputed=0, pending=0) %}
+{% for item in errors %}
+    {% set item_status = (item.verified_error or '')|trim|upper %}
+    {% set item_reason = (item.biller_comment or '')|trim %}
+    {% if item_status == 'Y' and item_reason %}
+        {% set ns.verified = ns.verified + 1 %}
+    {% elif item_status == 'N' and item_reason %}
+        {% set ns.disputed = ns.disputed + 1 %}
+    {% else %}
+        {% set ns.pending = ns.pending + 1 %}
+    {% endif %}
+{% endfor %}
+
 <div class="stats-grid">
 
     <div class="stat-card">
@@ -26,12 +39,8 @@
                 <i class="fa-solid fa-clipboard-list"></i>
             </span>
         </div>
-
         <div class="stat-value">{{ errors|length }}</div>
-
-        <div class="stat-description">
-            Records for the selected date
-        </div>
+        <div class="stat-description">Records for the selected date</div>
     </div>
 
     <div class="stat-card">
@@ -41,14 +50,8 @@
                 <i class="fa-solid fa-circle-check"></i>
             </span>
         </div>
-
-        <div class="stat-value">
-            {{ errors|selectattr('verified_error', 'equalto', 'Y')|list|length }}
-        </div>
-
-        <div class="stat-description">
-            Marked VERIFIED ERROR = Y
-        </div>
+        <div class="stat-value">{{ ns.verified }}</div>
+        <div class="stat-description">Marked Y with a Biller comment</div>
     </div>
 
     <div class="stat-card">
@@ -58,14 +61,8 @@
                 <i class="fa-solid fa-triangle-exclamation"></i>
             </span>
         </div>
-
-        <div class="stat-value">
-            {{ errors|selectattr('verified_error', 'equalto', 'N')|list|length }}
-        </div>
-
-        <div class="stat-description">
-            Marked VERIFIED ERROR = N
-        </div>
+        <div class="stat-value">{{ ns.disputed }}</div>
+        <div class="stat-description">Marked N with a Biller comment</div>
     </div>
 
     <div class="stat-card">
@@ -75,14 +72,8 @@
                 <i class="fa-solid fa-clock"></i>
             </span>
         </div>
-
-        <div class="stat-value">
-            {{ errors|rejectattr('verified_error')|list|length }}
-        </div>
-
-        <div class="stat-description">
-            Awaiting verification
-        </div>
+        <div class="stat-value">{{ ns.pending }}</div>
+        <div class="stat-description">Awaiting Biller comment and verification</div>
     </div>
 
 </div>
@@ -191,7 +182,9 @@
 
                     {% for error in errors %}
 
-                        {% set verification = (error.verified_error or '')|trim|upper %}
+                        {% set raw_verification = (error.verified_error or '')|trim|upper %}
+                        {% set biller_reason = (error.biller_comment or '')|trim %}
+                        {% set verification = raw_verification if biller_reason and raw_verification in ['Y', 'N'] else '' %}
 
                         <tr>
 
