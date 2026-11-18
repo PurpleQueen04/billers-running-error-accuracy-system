@@ -6579,9 +6579,26 @@ def build_accuracy_context(
     elif below_category == "external":
         below_90["INTERNAL"] = []
 
+    # Prioritize billers who need the most attention:
+    # 1) Declining accuracy, especially the largest drop
+    # 2) No improvement
+    # 3) New records with no earlier result to compare
+    # 4) Improving billers (still below 90%, but showing progress)
+    # Within each group, lower latest accuracy comes first.
+    attention_priority = {
+        "Declined": 0,
+        "No Change": 1,
+        "New Record": 2,
+        "Improved": 3
+    }
+
     for accuracy_type in ("INTERNAL", "EXTERNAL"):
         below_90[accuracy_type].sort(
-            key=lambda item: item["accuracy"]
+            key=lambda item: (
+                attention_priority.get(item.get("status"), 4),
+                item.get("change") if item.get("change") is not None else 0,
+                item.get("accuracy") if item.get("accuracy") is not None else 101
+            )
         )
 
     improvements.sort(key=lambda item: (
