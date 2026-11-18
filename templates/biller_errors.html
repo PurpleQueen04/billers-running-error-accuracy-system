@@ -272,36 +272,83 @@
                             </td>
 
                             <td>
-                                <details class="response-editor">
-                                    <summary class="btn btn-primary">＋ Add</summary>
+                                <button type="button"
+                                        class="btn btn-primary"
+                                        onclick="document.getElementById('biller-response-{{ loop.index }}').showModal()">
+                                    ＋ ADD
+                                </button>
 
-                                    <form method="POST"
-                                          action="{{ url_for('save_response', record_key=error.record_key) }}"
-                                          class="response-form">
-                                        <input type="hidden" name="csrf_token"
-                                               value="{{ session.get('csrf_token', '') }}">
-
-                                        <div class="form-group">
-                                            <label>VERIFIED (Y/N)</label>
-                                            <select name="verified_error" required>
-                                                <option value="">Select Y or N</option>
-                                                <option value="Y" {% if verification == 'Y' %}selected{% endif %}>Y — Yes</option>
-                                                <option value="N" {% if verification == 'N' %}selected{% endif %}>N — No</option>
-                                            </select>
+                                <dialog id="biller-response-{{ loop.index }}"
+                                        class="biller-response-modal"
+                                        style="width:min(760px, calc(100% - 32px)); max-width:760px; border:0; border-radius:14px; padding:0; box-shadow:0 20px 60px rgba(0,0,0,.35);">
+                                    <div style="padding:22px; max-height:80vh; overflow-y:auto;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px;">
+                                            <div>
+                                                <h2 style="margin:0;">Error Record Details</h2>
+                                                <p style="margin:5px 0 0; opacity:.75;">Review the record before submitting your verification.</p>
+                                            </div>
+                                            <button type="button"
+                                                    class="btn btn-secondary"
+                                                    aria-label="Close"
+                                                    onclick="document.getElementById('biller-response-{{ loop.index }}').close()">
+                                                ✕
+                                            </button>
                                         </div>
 
-                                        <div class="form-group">
-                                            <label>BILLER COMMENT</label>
-                                            <textarea name="biller_comment"
-                                                      rows="3"
-                                                      placeholder="Enter your comment...">{{ error.biller_comment or '' }}</textarea>
+                                        <div class="biller-error-detail-grid"
+                                             style="display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin-bottom:20px;">
+                                            <div><strong>PRO</strong><div>{{ error.pro or '—' }}</div></div>
+                                            <div><strong>PROJECT</strong><div>{{ error.project_name or '—' }}</div></div>
+                                            <div><strong>BILLED DATE</strong><div>{{ error.billed_date or '—' }}</div></div>
+                                            <div><strong>WEEK</strong><div>{{ error.week or '—' }}</div></div>
+                                            <div><strong>SOURCE</strong><div>{{ error.source or '—' }}</div></div>
+                                            <div><strong>USERNAME</strong><div>{{ error.username or '—' }}</div></div>
+                                            <div><strong>AUDITOR</strong><div>{{ error.auditor or '—' }}</div></div>
+                                            <div><strong>AUDIT TYPE</strong><div>{{ error.audit_type or '—' }}</div></div>
+                                            <div><strong>BILLER NAME</strong><div>{{ error.biller_name or '—' }}</div></div>
+                                            <div><strong>ZB FIELD</strong><div>{{ error.zb_field or '—' }}</div></div>
                                         </div>
 
-                                        <button type="submit" class="btn btn-primary">
-                                            Save Response
-                                        </button>
-                                    </form>
-                                </details>
+                                        <div style="margin-bottom:20px;">
+                                            <strong>ERROR DETAILS</strong>
+                                            <div style="white-space:pre-wrap; margin-top:6px;">{{ error.error_details or '—' }}</div>
+                                        </div>
+
+                                        <form method="POST"
+                                              action="{{ url_for('save_response', record_key=error.record_key) }}"
+                                              class="response-form">
+                                            <input type="hidden" name="csrf_token"
+                                                   value="{{ session.get('csrf_token', '') }}">
+
+                                            <div class="form-group">
+                                                <label>VERIFIED (Y/N)</label>
+                                                <select name="verified_error" required>
+                                                    <option value="">Select Y or N</option>
+                                                    <option value="Y" {% if verification == 'Y' %}selected{% endif %}>Y — Yes</option>
+                                                    <option value="N" {% if verification == 'N' %}selected{% endif %}>N — No</option>
+                                                </select>
+                                            </div>
+
+                                            <div class="form-group">
+                                                <label>MY COMMENT</label>
+                                                <textarea name="biller_comment"
+                                                          rows="4"
+                                                          placeholder="Enter your comment...">{{ error.biller_comment or '' }}</textarea>
+                                            </div>
+
+                                            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px;">
+                                                <button type="button"
+                                                        class="btn btn-secondary"
+                                                        onclick="document.getElementById('biller-response-{{ loop.index }}').close()">
+                                                    Cancel
+                                                </button>
+                                                <button type="submit" class="btn btn-primary">
+                                                    Save Response
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </dialog>
                             </td>
 
                         </tr>
