@@ -1348,6 +1348,58 @@ def init_db():
             )
 
 
+        # -------------------------------------------------
+        # FINAL CLEANUP AFTER LEGACY RESPONSE SYNC
+        # Run after copy_biller_responses_to_error_records_v1 so
+        # legacy default N values cannot be restored afterward.
+        # -------------------------------------------------
+        cleanup_migration_v4 = "clear_unreasoned_verified_defaults_after_sync_v4"
+        cleanup_done_v4 = con.execute(
+            "SELECT migration_name FROM schema_migrations WHERE migration_name = ?",
+            (cleanup_migration_v4,)
+        ).fetchone()
+
+        if not cleanup_done_v4:
+            con.execute("""
+                UPDATE error_records
+                SET verified_error = ''
+                WHERE UPPER(TRIM(COALESCE(verified_error, ''))) IN ('Y', 'N')
+                  AND NULLIF(TRIM(COALESCE(biller_comment, '')), '') IS NULL
+                  AND NULLIF(TRIM(COALESCE(qc_explanation, '')), '') IS NULL
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM biller_responses br
+                      WHERE br.record_key = error_records.record_key
+                        AND (
+                            NULLIF(TRIM(COALESCE(br.biller_comment, '')), '') IS NOT NULL
+                            OR NULLIF(TRIM(COALESCE(br.qc_explanation, '')), '') IS NOT NULL
+                        )
+                  )
+            """)
+
+            con.execute("""
+                UPDATE biller_responses
+                SET verified_error = ''
+                WHERE UPPER(TRIM(COALESCE(verified_error, ''))) IN ('Y', 'N')
+                  AND NULLIF(TRIM(COALESCE(biller_comment, '')), '') IS NULL
+                  AND NULLIF(TRIM(COALESCE(qc_explanation, '')), '') IS NULL
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM error_records er
+                      WHERE er.record_key = biller_responses.record_key
+                        AND (
+                            NULLIF(TRIM(COALESCE(er.biller_comment, '')), '') IS NOT NULL
+                            OR NULLIF(TRIM(COALESCE(er.qc_explanation, '')), '') IS NOT NULL
+                        )
+                  )
+            """)
+
+            con.execute(
+                "INSERT INTO schema_migrations (migration_name, applied_at) VALUES (?, ?)",
+                (cleanup_migration_v4, datetime.now().isoformat(timespec="seconds"))
+            )
+
+
 # =========================================================
 # PROJECT ASSIGNMENT HELPERS
 # =========================================================
@@ -7359,6 +7411,7 @@ def qc_errors():
             WHERE project_id IN ({placeholders})
             AND UPPER(TRIM(COALESCE(verified_error, '')))
                 = 'N'
+            AND NULLIF(TRIM(COALESCE(biller_comment, '')), '') IS NOT NULL
             AND billed_date IS NOT NULL
             AND TRIM(billed_date) <> ''
             ORDER BY billed_date DESC
@@ -7409,6 +7462,7 @@ def qc_errors():
             WHERE e.project_id IN ({placeholders})
             AND UPPER(TRIM(COALESCE(e.verified_error, '')))
                 = 'N'
+            AND NULLIF(TRIM(COALESCE(e.biller_comment, '')), '') IS NOT NULL
         """
 
         if selected_date:
