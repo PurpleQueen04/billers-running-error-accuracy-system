@@ -2013,10 +2013,7 @@ def get_accuracy_columns(dataframe):
 
         "external_woc_accuracy": find_col(
             columns,
-            [
-                "PER AUDITED PROJECTED ACCURACY - WOC",
-                "PER AUDITED ACCURACY - WOC"
-            ]
+            ["PROJECTED ERROR - WOC"]
         ),
 
         "project": find_col(
