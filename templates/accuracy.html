@@ -508,4 +508,27 @@
 
 </div>
 
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const storageKey = "accuracyPageScrollPosition";
+
+    document.querySelectorAll("form.filter-bar").forEach(function (form) {
+        form.addEventListener("submit", function () {
+            sessionStorage.setItem(storageKey, String(window.scrollY));
+        });
+    });
+
+    const savedPosition = sessionStorage.getItem(storageKey);
+
+    if (savedPosition !== null) {
+        sessionStorage.removeItem(storageKey);
+
+        requestAnimationFrame(function () {
+            window.scrollTo(0, Number(savedPosition));
+        });
+    }
+});
+</script>
+
 {% endblock %}
