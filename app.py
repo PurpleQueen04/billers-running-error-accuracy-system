@@ -1998,7 +1998,7 @@ def get_accuracy_columns(dataframe):
 
         "external_woc_errors": find_col(
             columns,
-            ["ERROR - WOC"]
+            ["PROJECTED ERROR - WOC", "ERROR - WOC"]
         ),
 
         "internal_accuracy": find_col(
@@ -2013,7 +2013,10 @@ def get_accuracy_columns(dataframe):
 
         "external_woc_accuracy": find_col(
             columns,
-            ["PER AUDITED ACCURACY - WOC"]
+            [
+                "PER AUDITED PROJECTED ACCURACY - WOC",
+                "PER AUDITED ACCURACY - WOC"
+            ]
         ),
 
         "project": find_col(
