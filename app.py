@@ -6466,6 +6466,12 @@ def build_accuracy_context(
         project_id = row.get("project_id")
         project_id = int(project_id) if project_id is not None else None
 
+        audited_value = number_value(row.get("audited")) or 0
+
+        # Ignore rows/dates without audited volume.
+        if audited_value <= 0:
+            continue
+
         group_key = (
             normalize_text(row.get("username")),
             project_id,
@@ -6490,13 +6496,6 @@ def build_accuracy_context(
             "accuracy_fallback_sum": 0.0,
             "accuracy_fallback_count": 0
         })
-
-        audited_value = number_value(row.get("audited")) or 0
-
-        # Ignore dates/rows without an AUDITED result. Only dates with
-        # actual audited volume inside the selected range count as records.
-        if audited_value <= 0:
-            continue
 
         accuracy_value = number_value(row.get("accuracy_value"))
         item["audited"] += audited_value
@@ -6535,11 +6534,25 @@ def build_accuracy_context(
             key=lambda item: item["record_date"]
         )
 
-        first_record = daily_items[0]
-        latest_record = daily_items[-1]
+        # INITIAL and LATEST compare the first and last dates with
+        # valid accuracy results. Totals below cover the entire selected range.
+        accuracy_items = [
+            item for item in daily_items
+            if item.get("accuracy") is not None
+        ]
+
+        if not accuracy_items:
+            continue
+
+        first_record = accuracy_items[0]
+        latest_record = accuracy_items[-1]
 
         first_accuracy = first_record["accuracy"]
         latest_accuracy = latest_record["accuracy"]
+
+        range_audited = sum(item["audited"] for item in daily_items)
+        range_errors = sum(item["errors"] for item in daily_items)
+        range_bills_processed = sum(item["bills_processed"] for item in daily_items)
 
         if latest_accuracy is not None and latest_accuracy >= 90:
             continue
@@ -6574,6 +6587,9 @@ def build_accuracy_context(
 
         below_90[display_type].append({
             **latest_record,
+            "audited": range_audited,
+            "errors": range_errors,
+            "bills_processed": range_bills_processed,
             "initial_date": first_record["record_date"],
             "latest_date": latest_record["record_date"],
             "initial_accuracy": first_accuracy,
