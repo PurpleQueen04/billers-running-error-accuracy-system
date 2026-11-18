@@ -6535,21 +6535,27 @@ def build_accuracy_context(
         first_accuracy = first_record["accuracy"]
         latest_accuracy = latest_record["accuracy"]
 
-        if latest_accuracy is None or latest_accuracy >= 90:
+        if latest_accuracy is not None and latest_accuracy >= 90:
             continue
 
-        if first_accuracy is None:
+        if latest_accuracy is None:
+            # No latest result in the selected date range:
+            # do not calculate a change or classify it as Decreased.
+            change = None
+            status = "No Latest Data"
+
+        elif first_accuracy is None:
             change = None
             status = "New Record"
 
         else:
-            # Positive CHANGE means accuracy decreased.
-            # Negative CHANGE means accuracy improved.
-            change = first_accuracy - latest_accuracy
+            # CHANGE = LATEST ACCURACY - INITIAL ACCURACY.
+            # Negative means accuracy decreased; positive means improved.
+            change = latest_accuracy - first_accuracy
 
-            if change > 0:
+            if change < 0:
                 status = "Decreased"
-            elif change < 0:
+            elif change > 0:
                 status = "Improved"
             else:
                 status = "No Change"
@@ -6591,7 +6597,8 @@ def build_accuracy_context(
         "Decreased": 0,
         "No Change": 1,
         "New Record": 2,
-        "Improved": 3
+        "No Latest Data": 3,
+        "Improved": 4
     }
 
     for accuracy_type in ("INTERNAL", "EXTERNAL"):
