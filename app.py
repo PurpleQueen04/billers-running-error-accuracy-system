@@ -6091,14 +6091,43 @@ def get_accuracy_records(project_ids=None):
 # BUILD ACCURACY SUMMARY
 # =========================================================
 
+
 def build_accuracy_context(
     allowed_project_ids=None,
     selected_project="all",
     period_type="monthly",
-    selected_period=None
+    selected_period=None,
+    below_from_date=None,
+    below_to_date=None
 ):
     if period_type not in ("daily", "weekly", "monthly"):
         period_type = "monthly"
+
+    
+    # -----------------------------------------------------
+    # INDEPENDENT BELOW 90% DATE RANGE
+    # -----------------------------------------------------
+
+    today = date.today()
+
+    try:
+        below_from = (
+            date.fromisoformat(below_from_date)
+            if below_from_date else None
+        )
+    except (TypeError, ValueError):
+        below_from = None
+
+    try:
+        below_to = (
+            date.fromisoformat(below_to_date)
+            if below_to_date else None
+        )
+    except (TypeError, ValueError):
+        below_to = None
+
+    if below_from and below_to and below_from > below_to:
+        below_from, below_to = below_to, below_from
 
     allowed_set = None
     if allowed_project_ids is not None:
