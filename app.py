@@ -6548,7 +6548,7 @@ def build_accuracy_context(
             if change > 0:
                 status = "Improved"
             elif change < 0:
-                status = "Declined"
+                status = "NEED IMPROVEMENT"
             else:
                 status = "No Change"
 
@@ -6580,13 +6580,13 @@ def build_accuracy_context(
         below_90["INTERNAL"] = []
 
     # Prioritize billers who need the most attention:
-    # 1) Declining accuracy, especially the largest drop
+    # 1) NEED IMPROVEMENT, especially the largest accuracy drop
     # 2) No improvement
     # 3) New records with no earlier result to compare
     # 4) Improving billers (still below 90%, but showing progress)
     # Within each group, lower latest accuracy comes first.
     attention_priority = {
-        "Declined": 0,
+        "NEED IMPROVEMENT": 0,
         "No Change": 1,
         "New Record": 2,
         "Improved": 3
