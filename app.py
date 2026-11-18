@@ -850,7 +850,7 @@ def init_db():
                     pro TEXT,
                     zb_field TEXT,
                     error_details TEXT,
-                    verified_error TEXT DEFAULT 'N',
+                    verified_error TEXT DEFAULT 'Y',
                     biller_comment TEXT,
                     qc_explanation TEXT,
                     qc_name TEXT,
@@ -874,7 +874,7 @@ def init_db():
                     pro TEXT,
                     zb_field TEXT,
                     error_details TEXT,
-                    verified_error TEXT DEFAULT 'N',
+                    verified_error TEXT DEFAULT 'Y',
                     biller_comment TEXT,
                     qc_explanation TEXT,
                     qc_name TEXT,
@@ -2057,7 +2057,7 @@ def import_error_sheet(
             username, id_number, auditor, pro, zb_field, error_details,
             project_id, verified_error, imported_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'N', ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Y', ?)
         ON CONFLICT (record_key) DO UPDATE SET
             billed_date = EXCLUDED.billed_date,
             week = EXCLUDED.week,
