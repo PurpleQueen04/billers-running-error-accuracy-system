@@ -7072,7 +7072,8 @@ def biller_external_accuracy():
         url_for(
             "biller_dashboard",
             accuracy_type="EXTERNAL",
-            month=request.args.get("month", "")
+            period=request.args.get("period", "monthly"),
+            date=request.args.get("date", "")
         )
     )
 
