@@ -6543,12 +6543,14 @@ def build_accuracy_context(
             status = "New Record"
 
         else:
-            change = latest_accuracy - first_accuracy
+            # Positive CHANGE means accuracy decreased.
+            # Negative CHANGE means accuracy improved.
+            change = first_accuracy - latest_accuracy
 
             if change > 0:
-                status = "Improved"
-            elif change < 0:
                 status = "Decreased"
+            elif change < 0:
+                status = "Improved"
             else:
                 status = "No Change"
 
@@ -6580,7 +6582,7 @@ def build_accuracy_context(
         below_90["INTERNAL"] = []
 
     # Prioritize billers who need the most attention:
-    # 1) NEED IMPROVEMENT, especially the largest accuracy drop
+    # 1) Decreased, especially the largest accuracy drop
     # 2) No improvement
     # 3) New records with no earlier result to compare
     # 4) Improving billers (still below 90%, but showing progress)
@@ -6596,7 +6598,7 @@ def build_accuracy_context(
         below_90[accuracy_type].sort(
             key=lambda item: (
                 attention_priority.get(item.get("status"), 4),
-                item.get("change") if item.get("change") is not None else 0,
+                -(item.get("change") or 0),
                 item.get("accuracy") if item.get("accuracy") is not None else 101
             )
         )
