@@ -339,13 +339,15 @@
                                         </td>
                                     
                                         <td>
-                                            <span class="status-badge
+                                            <span class="badge
                                                 {% if biller.status == 'Improved' %}
-                                                    status-success
+                                                    badge-success
                                                 {% elif biller.status == 'Declined' %}
-                                                    status-danger
+                                                    badge-danger
+                                                {% elif biller.status == 'No Change' %}
+                                                    badge-warning
                                                 {% else %}
-                                                    status-warning
+                                                    badge-secondary
                                                 {% endif %}">
                                                 {{ biller.status }}
                                             </span>
