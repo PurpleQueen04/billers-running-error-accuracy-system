@@ -6108,7 +6108,8 @@ def build_accuracy_context(
     period_type="monthly",
     selected_period=None,
     below_from_date=None,
-    below_to_date=None
+    below_to_date=None,
+    below_category="all"
 ):
     if period_type not in ("daily", "weekly", "monthly"):
         period_type = "monthly"
@@ -6136,6 +6137,13 @@ def build_accuracy_context(
 
     if below_from and below_to and below_from > below_to:
         below_from, below_to = below_to, below_from
+    
+    below_category = normalize_text(
+        below_category
+    ).lower() or "all"
+
+    if below_category not in ("all", "internal", "external"):
+        below_category = "all"
 
     allowed_set = None
     if allowed_project_ids is not None:
@@ -6519,6 +6527,22 @@ def build_accuracy_context(
             "accuracy_display": format_accuracy(latest_accuracy)
         })
 
+    # -----------------------------------------------------
+    # FILTER BELOW 90% BY CATEGORY
+    # -----------------------------------------------------
+
+    if below_category == "internal":
+
+        for accuracy_type in below_90:
+            if accuracy_type != "INTERNAL":
+                below_90[accuracy_type] = []
+
+    elif below_category == "external":
+
+        for accuracy_type in below_90:
+            if not accuracy_type.startswith("EXTERNAL"):
+                below_90[accuracy_type] = []
+
     for accuracy_type in ACCURACY_TYPES:
         below_90[accuracy_type].sort(
             key=lambda item: item["accuracy"]
@@ -6549,6 +6573,7 @@ def build_accuracy_context(
             below_to.isoformat()
             if below_to else ""
         ),
+        "below_category": below_category,
         "below_90": below_90,
         "format_accuracy": format_accuracy,
         "improvements": improvements,
