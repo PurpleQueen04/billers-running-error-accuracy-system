@@ -302,6 +302,46 @@
         <span class="section-tag warning-tag">NEEDS IMPROVEMENT</span>
     </div>
 
+        <!-- INDEPENDENT BELOW 90% DATE FILTER -->
+    <form method="GET"
+          action="{{ url_for('admin_dashboard') }}"
+          class="filter-bar">
+
+        <!-- PRESERVE MAIN ACCURACY FILTERS -->
+        <input type="hidden"
+               name="project_id"
+               value="{{ selected_project }}">
+
+        <input type="hidden"
+               name="period"
+               value="{{ period_type }}">
+
+        <input type="hidden"
+               name="date"
+               value="{{ selected_period }}">
+
+        <div class="form-group">
+            <label for="below_from">From Date</label>
+            <input type="date"
+                   id="below_from"
+                   name="below_from"
+                   value="{{ below_from_date }}">
+        </div>
+
+        <div class="form-group">
+            <label for="below_to">To Date</label>
+            <input type="date"
+                   id="below_to"
+                   name="below_to"
+                   value="{{ below_to_date }}">
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+            Apply Filters
+        </button>
+
+    </form>
+
     {% for type, billers in below_90.items() %}
 
     <div class="table-section">
