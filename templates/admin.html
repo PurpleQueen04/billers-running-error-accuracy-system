@@ -358,15 +358,20 @@
                         <th>PROJECT</th>
                         <th>AUDITED</th>
                         <th>ERRORS</th>
-                        <th>ACCURACY</th>
+                        <th>BILLS PROCESSED</th>
+                        <th>INITIAL DATE</th>
+                        <th>LATEST DATE</th>
+                        <th>INITIAL ACCURACY</th>
+                        <th>LATEST ACCURACY</th>
+                        <th>CHANGE</th>
                         <th>STATUS</th>
                     </tr>
                 </thead>
-
+                
                 <tbody>
-
+                
                     {% for biller in billers %}
-
+                
                     <tr>
                         <td>
                             <strong>{{ biller.biller_name }}</strong>
@@ -374,38 +379,62 @@
                                 {{ biller.username }}
                             </small>
                         </td>
-
-                        <td>{{ biller.project_name }}</td>
-
+                
+                        <td>{{ biller.project_name or '—' }}</td>
                         <td>{{ biller.audited|int }}</td>
-
                         <td>{{ biller.errors|int }}</td>
-
+                        <td>{{ biller.bills_processed }}</td>
+                
+                        <td>{{ biller.initial_date or '—' }}</td>
+                        <td>{{ biller.latest_date or '—' }}</td>
+                
+                        <td>
+                            {% if biller.initial_accuracy is not none %}
+                                {{ "%.2f%%"|format(biller.initial_accuracy) }}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                
                         <td>
                             <span class="accuracy-low-text">
                                 {{ biller.accuracy_display }}
                             </span>
                         </td>
-
+                
                         <td>
-                            <span class="status-badge status-warning">
-                                Below Target
+                            {% if biller.change is not none %}
+                                {{ "%+.2f"|format(biller.change) }}%
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                
+                        <td>
+                            <span class="status-badge
+                                {% if biller.status == 'Improved' %}
+                                    status-success
+                                {% elif biller.status == 'Declined' %}
+                                    status-danger
+                                {% else %}
+                                    status-warning
+                                {% endif %}">
+                                {{ biller.status }}
                             </span>
                         </td>
                     </tr>
-
+                
                     {% else %}
-
+                
                     <tr>
-                        <td colspan="6" class="empty-state">
+                        <td colspan="11" class="empty-state">
                             No billers below 90% for this category.
                         </td>
                     </tr>
-
+                
                     {% endfor %}
-
+                
                 </tbody>
-
             </table>
 
         </div>
