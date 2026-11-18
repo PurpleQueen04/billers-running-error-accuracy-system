@@ -285,7 +285,7 @@
                                             <label>VERIFIED ERROR</label>
                                             <select name="verified_error" required>
                                                 <option value="">Select Y or N</option>
-                                                <option value="Y" {% if verification == 'Y' %}selected{% endif %}>Y — Yes</option>
+                                                <option value="Y" {% if verification != 'N' %}selected{% endif %}>Y — Yes</option>
                                                 <option value="N" {% if verification == 'N' %}selected{% endif %}>N — No</option>
                                             </select>
                                         </div>
