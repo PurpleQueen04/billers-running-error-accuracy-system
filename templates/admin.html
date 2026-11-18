@@ -161,6 +161,15 @@
 
     <form method="GET" action="{{ url_for('admin_dashboard') }}"
           class="filter-bar">
+    
+        <!-- PRESERVE BELOW 90% DATE FILTER -->
+        <input type="hidden"
+               name="below_from"
+               value="{{ below_from_date }}">
+    
+        <input type="hidden"
+               name="below_to"
+               value="{{ below_to_date }}">
 
         <div class="form-group">
             <label for="project_id">Project</label>
