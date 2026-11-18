@@ -6372,11 +6372,6 @@ def build_accuracy_context(
     for key, current in current_aggregates.items():
         current_accuracy = calculate_weighted_accuracy(current["audited"], current["errors"])
         current["accuracy"] = current_accuracy
-        if current_accuracy is not None and current_accuracy < 90:
-            below_90[current["accuracy_type"]].append({
-                **current,
-                "accuracy_display": format_accuracy(current_accuracy)
-            })
 
         previous = previous_aggregates.get(key)
         previous_accuracy = (
@@ -6413,8 +6408,113 @@ def build_accuracy_context(
             "note": note
         })
 
+        # -----------------------------------------------------
+    # INDEPENDENT BELOW 90% DATE RANGE FILTER
+    # -----------------------------------------------------
+
+    below_date_aggregates = {}
+
+    for row in records:
+
+        accuracy_type = normalize_accuracy_type(
+            row.get("accuracy_type")
+        )
+
+        if accuracy_type not in ACCURACY_TYPES:
+            continue
+
+        record_day = parse_accuracy_date(
+            row.get("record_date"),
+            row.get("month")
+        )
+
+        if not record_day:
+            continue
+
+        if below_from and record_day < below_from:
+            continue
+
+        if below_to and record_day > below_to:
+            continue
+
+        project_id = row.get("project_id")
+        project_id = int(project_id) if project_id is not None else None
+
+        group_key = (
+            normalize_text(row.get("username")),
+            project_id,
+            accuracy_type
+        )
+
+        date_key = record_day.isoformat()
+
+        aggregate_key = (group_key, date_key)
+
+        aggregate_record(
+            below_date_aggregates,
+            aggregate_key,
+            row
+        )
+
+    # Group daily aggregates by biller, project, and accuracy type.
+    below_groups = {}
+
+    for (group_key, date_key), item in below_date_aggregates.items():
+
+        below_groups.setdefault(group_key, []).append({
+            **item,
+            "record_date": date_key,
+            "accuracy": calculate_weighted_accuracy(
+                item["audited"],
+                item["errors"]
+            )
+        })
+
+    # Compare first available date against latest available date.
+    for group_key, daily_items in below_groups.items():
+
+        daily_items.sort(
+            key=lambda item: item["record_date"]
+        )
+
+        first_record = daily_items[0]
+        latest_record = daily_items[-1]
+
+        first_accuracy = first_record["accuracy"]
+        latest_accuracy = latest_record["accuracy"]
+
+        if latest_accuracy is None or latest_accuracy >= 90:
+            continue
+
+        if first_accuracy is None:
+            change = None
+            status = "New Record"
+
+        else:
+            change = latest_accuracy - first_accuracy
+
+            if change > 0:
+                status = "Improved"
+            elif change < 0:
+                status = "Declined"
+            else:
+                status = "No Change"
+
+        below_90[latest_record["accuracy_type"]].append({
+            **latest_record,
+            "initial_date": first_record["record_date"],
+            "latest_date": latest_record["record_date"],
+            "initial_accuracy": first_accuracy,
+            "latest_accuracy": latest_accuracy,
+            "change": change,
+            "status": status,
+            "accuracy_display": format_accuracy(latest_accuracy)
+        })
+
     for accuracy_type in ACCURACY_TYPES:
-        below_90[accuracy_type].sort(key=lambda item: item["accuracy"])
+        below_90[accuracy_type].sort(
+            key=lambda item: item["accuracy"]
+        )
 
     improvements.sort(key=lambda item: (
         item["project_name"], item["biller_name"], item["accuracy_type"]
