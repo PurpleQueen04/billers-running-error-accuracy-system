@@ -6492,6 +6492,12 @@ def build_accuracy_context(
         })
 
         audited_value = number_value(row.get("audited")) or 0
+
+        # Ignore dates/rows without an AUDITED result. Only dates with
+        # actual audited volume inside the selected range count as records.
+        if audited_value <= 0:
+            continue
+
         accuracy_value = number_value(row.get("accuracy_value"))
         item["audited"] += audited_value
         item["errors"] += number_value(row.get("errors")) or 0
