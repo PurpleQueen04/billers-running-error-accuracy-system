@@ -6808,126 +6808,112 @@ def get_biller_project_ids():
 # BILLER: ACCURACY SUMMARY FOR SELECTED MONTH
 # =========================================================
 
-def get_biller_accuracy_summary(username, project_ids, selected_month=None):
+def get_biller_accuracy_summary(
+    username,
+    project_ids,
+    period_type="monthly",
+    selected_period=None
+):
+    if period_type not in ("daily", "weekly", "monthly"):
+        period_type = "monthly"
+
+    empty_summary = {
+        "accuracy": None,
+        "audited": 0,
+        "errors": 0
+    }
 
     if not project_ids:
         return {
-            "months": [],
-            "selected_month": "",
-            "internal_summary": {
-                "accuracy": None,
-                "audited": 0,
-                "errors": 0
-            },
-            "external_wc_summary": {
-                "accuracy": None,
-                "audited": 0,
-                "errors": 0
-            },
-            "external_woc_summary": {
-                "accuracy": None,
-                "audited": 0,
-                "errors": 0
-            }
+            "periods": [],
+            "selected_period": "",
+            "period_type": period_type,
+            "internal_summary": dict(empty_summary),
+            "external_wc_summary": dict(empty_summary),
+            "external_woc_summary": dict(empty_summary)
         }
 
-    placeholders = ", ".join(
-        ["?"] * len(project_ids)
-    )
+    placeholders = ", ".join(["?"] * len(project_ids))
 
     with db() as con:
-
         rows = con.execute(
             f"""
             SELECT
                 record_date,
                 month,
+                weekly,
+                sheet,
+                imported_at,
                 accuracy_type,
                 audited,
                 errors,
                 project_id
             FROM accuracy_records
             WHERE LOWER(TRIM(username)) = LOWER(TRIM(?))
-            AND project_id IN ({placeholders})
+              AND project_id IN ({placeholders})
             ORDER BY record_date
             """,
             (username, *project_ids)
         ).fetchall()
 
-    months = set()
-
+    # Only use records from the latest imported workbook batch
+    # for each assigned project and accuracy sheet. Older rows remain
+    # in the database for history but cannot create stale filter dates.
+    latest_imports = {}
     for row in rows:
+        project_key = int(row["project_id"]) if row["project_id"] is not None else None
+        sheet_key = normalize_text(row["sheet"]).upper()
+        imported_at = normalize_text(row["imported_at"])
+        if not imported_at:
+            continue
+        key = (project_key, sheet_key)
+        if imported_at > latest_imports.get(key, ""):
+            latest_imports[key] = imported_at
 
-        record_month = month_from_date(
-            row["record_date"]
+    current_rows = []
+    for row in rows:
+        project_key = int(row["project_id"]) if row["project_id"] is not None else None
+        sheet_key = normalize_text(row["sheet"]).upper()
+        if normalize_text(row["imported_at"]) != latest_imports.get((project_key, sheet_key)):
+            continue
+        current_rows.append(dict(row))
+
+    periods = set()
+    row_periods = {}
+    for index, row in enumerate(current_rows):
+        period_key = accuracy_period_key(
+            row.get("record_date"),
+            period_type,
+            row.get("month")
         )
+        if period_key:
+            periods.add(period_key)
+            row_periods[index] = period_key
 
-        if not record_month:
-            record_month = normalize_text(
-                row["month"]
-            )
+    periods = sorted(periods)
 
-        if record_month:
-            months.add(record_month)
-
-    months = sorted(months)
-
-    if selected_month not in months:
-
-        selected_month = (
-            months[-1]
-            if months
-            else ""
-        )
+    if selected_period not in periods:
+        selected_period = periods[-1] if periods else ""
 
     totals = {
-        "INTERNAL": {
-            "audited": 0.0,
-            "errors": 0.0
-        },
-        "EXTERNAL_WC": {
-            "audited": 0.0,
-            "errors": 0.0
-        },
-        "EXTERNAL_WOC": {
-            "audited": 0.0,
-            "errors": 0.0
-        }
+        "INTERNAL": {"audited": 0.0, "errors": 0.0},
+        "EXTERNAL_WC": {"audited": 0.0, "errors": 0.0},
+        "EXTERNAL_WOC": {"audited": 0.0, "errors": 0.0}
     }
 
-    for row in rows:
-
-        record_month = month_from_date(
-            row["record_date"]
-        )
-
-        if not record_month:
-            record_month = normalize_text(
-                row["month"]
-            )
-
-        if record_month != selected_month:
+    for index, row in enumerate(current_rows):
+        if row_periods.get(index) != selected_period:
             continue
 
-        accuracy_type = normalize_accuracy_type(
-            row["accuracy_type"]
-        )
-
+        accuracy_type = normalize_accuracy_type(row.get("accuracy_type"))
         if accuracy_type not in totals:
             continue
 
-        totals[accuracy_type]["audited"] += (
-            number_value(row["audited"]) or 0
-        )
-
-        totals[accuracy_type]["errors"] += (
-            number_value(row["errors"]) or 0
-        )
+        totals[accuracy_type]["audited"] += number_value(row.get("audited")) or 0
+        totals[accuracy_type]["errors"] += number_value(row.get("errors")) or 0
 
     summaries = {}
-
     for accuracy_type, values in totals.items():
-
         summaries[accuracy_type] = {
             "audited": values["audited"],
             "errors": values["errors"],
@@ -6938,13 +6924,13 @@ def get_biller_accuracy_summary(username, project_ids, selected_month=None):
         }
 
     return {
-        "months": months,
-        "selected_month": selected_month,
+        "periods": periods,
+        "selected_period": selected_period,
+        "period_type": period_type,
         "internal_summary": summaries["INTERNAL"],
         "external_wc_summary": summaries["EXTERNAL_WC"],
         "external_woc_summary": summaries["EXTERNAL_WOC"]
     }
-
 
 # =========================================================
 # BILLER DASHBOARD
@@ -6976,7 +6962,8 @@ def biller_dashboard():
         accuracy_context = get_biller_accuracy_summary(
             username,
             [],
-            request.args.get("month")
+            request.args.get("period", "monthly"),
+            request.args.get("date")
         )
 
         return render_template(
@@ -7034,7 +7021,8 @@ def biller_dashboard():
     accuracy_context = get_biller_accuracy_summary(
         username,
         project_ids,
-        request.args.get("month")
+        request.args.get("period", "monthly"),
+        request.args.get("date")
     )
 
     return render_template(
@@ -7065,7 +7053,8 @@ def biller_internal_accuracy():
         url_for(
             "biller_dashboard",
             accuracy_type="INTERNAL",
-            month=request.args.get("month", "")
+            period=request.args.get("period", "monthly"),
+            date=request.args.get("date", "")
         )
     )
 
