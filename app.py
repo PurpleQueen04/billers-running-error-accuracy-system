@@ -1229,6 +1229,56 @@ def init_db():
                 (cleanup_migration_v2, datetime.now().isoformat(timespec="seconds"))
             )
 
+        # -------------------------------------------------
+        # CLEAR VERIFIED STATUS WHEN NO REASON WAS PROVIDED
+        # Applies to both Biller and QC response storage.
+        # -------------------------------------------------
+        cleanup_migration_v3 = "clear_verified_status_without_reason_v3"
+        cleanup_done_v3 = con.execute(
+            "SELECT migration_name FROM schema_migrations WHERE migration_name = ?",
+            (cleanup_migration_v3,)
+        ).fetchone()
+
+        if not cleanup_done_v3:
+            con.execute("""
+                UPDATE error_records
+                SET verified_error = ''
+                WHERE UPPER(TRIM(COALESCE(verified_error, ''))) IN ('Y', 'N')
+                  AND (biller_comment IS NULL OR TRIM(biller_comment) = '')
+                  AND (qc_explanation IS NULL OR TRIM(qc_explanation) = '')
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM biller_responses br
+                      WHERE br.record_key = error_records.record_key
+                        AND (
+                            NULLIF(TRIM(COALESCE(br.biller_comment, '')), '') IS NOT NULL
+                            OR NULLIF(TRIM(COALESCE(br.qc_explanation, '')), '') IS NOT NULL
+                        )
+                  )
+            """)
+
+            con.execute("""
+                UPDATE biller_responses
+                SET verified_error = ''
+                WHERE UPPER(TRIM(COALESCE(verified_error, ''))) IN ('Y', 'N')
+                  AND (biller_comment IS NULL OR TRIM(biller_comment) = '')
+                  AND (qc_explanation IS NULL OR TRIM(qc_explanation) = '')
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM error_records er
+                      WHERE er.record_key = biller_responses.record_key
+                        AND (
+                            NULLIF(TRIM(COALESCE(er.biller_comment, '')), '') IS NOT NULL
+                            OR NULLIF(TRIM(COALESCE(er.qc_explanation, '')), '') IS NOT NULL
+                        )
+                  )
+            """)
+
+            con.execute(
+                "INSERT INTO schema_migrations (migration_name, applied_at) VALUES (?, ?)",
+                (cleanup_migration_v3, datetime.now().isoformat(timespec="seconds"))
+            )
+
         migration_name = "copy_biller_responses_to_error_records_v1"
 
         migration = con.execute(
@@ -7511,6 +7561,13 @@ def save_response(record_key):
                             "biller_errors"
                         )
                     )
+
+                if not biller_comment:
+                    flash(
+                        "Please add your reason/comment before submitting verification. The status will remain Pending until a reason is provided.",
+                        "warning"
+                    )
+                    return redirect(url_for("biller_errors"))
 
                 cursor = con.execute(
                     """
