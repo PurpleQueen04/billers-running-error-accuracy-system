@@ -3613,7 +3613,9 @@ def admin_dashboard():
         allowed_project_ids=None,
         selected_project=selected_project,
         period_type=period_type,
-        selected_period=selected_period
+        selected_period=selected_period,
+        below_from_date=below_from_date,
+        below_to_date=below_to_date
     )
 
     # -----------------------------------------------------
@@ -6108,8 +6110,6 @@ def build_accuracy_context(
     # INDEPENDENT BELOW 90% DATE RANGE
     # -----------------------------------------------------
 
-    today = date.today()
-
     try:
         below_from = (
             date.fromisoformat(below_from_date)
@@ -6408,7 +6408,7 @@ def build_accuracy_context(
             "note": note
         })
 
-        # -----------------------------------------------------
+    # -----------------------------------------------------
     # INDEPENDENT BELOW 90% DATE RANGE FILTER
     # -----------------------------------------------------
 
@@ -6581,11 +6581,21 @@ def admin_accuracy():
         request.args.get("date")
     )
 
+    below_from_date = normalize_text(
+        request.args.get("below_from")
+    )
+
+    below_to_date = normalize_text(
+        request.args.get("below_to")
+    )
+
     context = build_accuracy_context(
         allowed_project_ids=None,
         selected_project=selected_project,
         period_type=period_type,
-        selected_period=selected_period
+        selected_period=selected_period,
+        below_from_date=below_from_date,
+        below_to_date=below_to_date
     )
 
     return render_template(
@@ -6618,11 +6628,21 @@ def qc_accuracy():
         request.args.get("date")
     )
 
+    below_from_date = normalize_text(
+        request.args.get("below_from")
+    )
+
+    below_to_date = normalize_text(
+        request.args.get("below_to")
+    )
+
     context = build_accuracy_context(
         allowed_project_ids=allowed_ids,
         selected_project=selected_project,
         period_type=period_type,
-        selected_period=selected_period
+        selected_period=selected_period,
+        below_from_date=below_from_date,
+        below_to_date=below_to_date
     )
 
     return render_template(
