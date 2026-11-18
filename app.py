@@ -3609,6 +3609,14 @@ def admin_dashboard():
         request.args.get("date")
     )
 
+    below_from_date = normalize_text(
+        request.args.get("below_from")
+    )
+
+    below_to_date = normalize_text(
+        request.args.get("below_to")
+    )
+
     accuracy_context = build_accuracy_context(
         allowed_project_ids=None,
         selected_project=selected_project,
