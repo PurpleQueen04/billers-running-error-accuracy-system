@@ -171,6 +171,10 @@
                name="below_to"
                value="{{ below_to_date }}">
 
+        <input type="hidden"
+               name="below_category"
+               value="{{ below_category }}">
+
         <div class="form-group">
             <label for="project_id">Project</label>
 
@@ -334,6 +338,25 @@
                    id="below_to"
                    name="below_to"
                    value="{{ below_to_date }}">
+        </div>
+
+        <div class="form-group">
+            <label for="below_category">Category</label>
+            <select id="below_category"
+                    name="below_category">
+                <option value="all"
+                    {% if below_category == 'all' %}selected{% endif %}>
+                    All
+                </option>
+                <option value="internal"
+                    {% if below_category == 'internal' %}selected{% endif %}>
+                    INTERNAL
+                </option>
+                <option value="external"
+                    {% if below_category == 'external' %}selected{% endif %}>
+                    EXTERNAL
+                </option>
+            </select>
         </div>
 
         <button type="submit" class="btn btn-primary">
