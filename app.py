@@ -2013,7 +2013,7 @@ def get_accuracy_columns(dataframe):
 
         "external_woc_accuracy": find_col(
             columns,
-            ["PROJECTED ERROR - WOC"]
+            ["PER AUDITED ACCURACY - WOC"]
         ),
 
         "project": find_col(
@@ -6376,7 +6376,12 @@ def build_accuracy_context(
             aggregate_record(previous_aggregates, group_key, row)
 
     summary = {}
-    below_90 = {accuracy_type: [] for accuracy_type in ACCURACY_TYPES}
+    # Below 90% shows only INTERNAL and EXTERNAL (WOC source).
+    # EXTERNAL_WC is intentionally excluded from this section.
+    below_90 = {
+        "INTERNAL": [],
+        "EXTERNAL": []
+    }
     for accuracy_type in ACCURACY_TYPES:
         matching = [item for item in current_aggregates.values() if item["accuracy_type"] == accuracy_type]
         audited = sum(item["audited"] for item in matching)
@@ -6441,7 +6446,7 @@ def build_accuracy_context(
             row.get("accuracy_type")
         )
 
-        if accuracy_type not in ACCURACY_TYPES:
+        if accuracy_type not in ("INTERNAL", "EXTERNAL_WOC"):
             continue
 
         record_day = parse_accuracy_date(
@@ -6471,24 +6476,50 @@ def build_accuracy_context(
 
         aggregate_key = (group_key, date_key)
 
-        aggregate_record(
-            below_date_aggregates,
-            aggregate_key,
-            row
-        )
+        item = below_date_aggregates.setdefault(aggregate_key, {
+            "username": normalize_text(row.get("username")),
+            "biller_name": normalize_text(row.get("biller_name")) or normalize_text(row.get("username")),
+            "project_id": project_id,
+            "project_name": project_names.get(project_id, "Unassigned") if project_id is not None else "Unassigned",
+            "accuracy_type": accuracy_type,
+            "audited": 0.0,
+            "errors": 0.0,
+            "bills_processed": 0.0,
+            "accuracy_weighted_sum": 0.0,
+            "accuracy_weight": 0.0,
+            "accuracy_fallback_sum": 0.0,
+            "accuracy_fallback_count": 0
+        })
+
+        audited_value = number_value(row.get("audited")) or 0
+        accuracy_value = number_value(row.get("accuracy_value"))
+        item["audited"] += audited_value
+        item["errors"] += number_value(row.get("errors")) or 0
+        item["bills_processed"] += number_value(row.get("bills_processed")) or 0
+
+        if accuracy_value is not None and 0 <= accuracy_value <= 100:
+            if audited_value > 0:
+                item["accuracy_weighted_sum"] += accuracy_value * audited_value
+                item["accuracy_weight"] += audited_value
+            item["accuracy_fallback_sum"] += accuracy_value
+            item["accuracy_fallback_count"] += 1
 
     # Group daily aggregates by biller, project, and accuracy type.
     below_groups = {}
 
     for (group_key, date_key), item in below_date_aggregates.items():
 
+        if item["accuracy_weight"] > 0:
+            daily_accuracy = item["accuracy_weighted_sum"] / item["accuracy_weight"]
+        elif item["accuracy_fallback_count"] > 0:
+            daily_accuracy = item["accuracy_fallback_sum"] / item["accuracy_fallback_count"]
+        else:
+            daily_accuracy = None
+
         below_groups.setdefault(group_key, []).append({
             **item,
             "record_date": date_key,
-            "accuracy": calculate_weighted_accuracy(
-                item["audited"],
-                item["errors"]
-            )
+            "accuracy": daily_accuracy
         })
 
     # Compare first available date against latest available date.
@@ -6521,7 +6552,13 @@ def build_accuracy_context(
             else:
                 status = "No Change"
 
-        below_90[latest_record["accuracy_type"]].append({
+        display_type = (
+            "INTERNAL"
+            if latest_record["accuracy_type"] == "INTERNAL"
+            else "EXTERNAL"
+        )
+
+        below_90[display_type].append({
             **latest_record,
             "initial_date": first_record["record_date"],
             "latest_date": latest_record["record_date"],
@@ -6537,18 +6574,12 @@ def build_accuracy_context(
     # -----------------------------------------------------
 
     if below_category == "internal":
-
-        for accuracy_type in below_90:
-            if accuracy_type != "INTERNAL":
-                below_90[accuracy_type] = []
+        below_90["EXTERNAL"] = []
 
     elif below_category == "external":
+        below_90["INTERNAL"] = []
 
-        for accuracy_type in below_90:
-            if not accuracy_type.startswith("EXTERNAL"):
-                below_90[accuracy_type] = []
-
-    for accuracy_type in ACCURACY_TYPES:
+    for accuracy_type in ("INTERNAL", "EXTERNAL"):
         below_90[accuracy_type].sort(
             key=lambda item: item["accuracy"]
         )
