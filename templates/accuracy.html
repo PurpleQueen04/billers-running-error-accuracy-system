@@ -27,8 +27,17 @@
     </div>
 
     <form method="GET"
-          action="{{ url_for('qc_accuracy') }}"
-          class="filter-bar">
+      action="{{ url_for(accuracy_endpoint) }}"
+      class="filter-bar">
+
+    <!-- PRESERVE BELOW 90% DATE FILTER -->
+    <input type="hidden"
+           name="below_from"
+           value="{{ below_from_date }}">
+
+    <input type="hidden"
+           name="below_to"
+           value="{{ below_to_date }}">
 
         <div class="filter-group">
             <label for="project_id">Project</label>
@@ -86,7 +95,7 @@
             Apply Filters
         </button>
 
-        <a href="{{ url_for('qc_accuracy') }}"
+        <a href="{{ url_for(accuracy_endpoint) }}"
            class="btn btn-secondary">
             Reset
         </a>
