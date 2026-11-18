@@ -7485,10 +7485,21 @@ def save_response(record_key):
 
                     abort(403)
 
+                verified_error = normalize_text(
+                    request.form.get("verified_error")
+                ).upper()
+
                 qc_explanation = (
                     request.form.get("qc_explanation")
                     or ""
                 ).strip()
+
+                if verified_error not in ("Y", "N"):
+                    flash(
+                        "Please select Y or N for Verified Error.",
+                        "warning"
+                    )
+                    return redirect(url_for("qc_errors"))
 
                 if not qc_explanation:
 
@@ -7513,6 +7524,7 @@ def save_response(record_key):
                     """
                     UPDATE error_records
                     SET
+                        verified_error = ?,
                         qc_explanation = ?,
                         qc_name = ?,
                         updated_at = ?,
@@ -7523,6 +7535,7 @@ def save_response(record_key):
                         = 'N'
                     """,
                     (
+                        verified_error,
                         qc_explanation,
                         qc_name,
                         response_updated_at,
@@ -7576,6 +7589,7 @@ def save_response(record_key):
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT (record_key)
                     DO UPDATE SET
+                        verified_error = excluded.verified_error,
                         qc_explanation = excluded.qc_explanation,
                         qc_name = excluded.qc_name,
                         updated_by = excluded.updated_by,
