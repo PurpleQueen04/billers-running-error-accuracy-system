@@ -1165,6 +1165,38 @@ def init_db():
                 (assignment_migration, datetime.now().isoformat(timespec="seconds"))
             )
 
+        # -------------------------------------------------
+        # CLEAR LEGACY AUTO-DISPUTED DEFAULTS
+        # Only clear N values that have no saved Biller response
+        # and no evidence of a manual Biller update.
+        # -------------------------------------------------
+        cleanup_migration = "clear_legacy_auto_disputed_defaults_v1"
+        cleanup_done = con.execute(
+            "SELECT migration_name FROM schema_migrations WHERE migration_name = ?",
+            (cleanup_migration,)
+        ).fetchone()
+
+        if not cleanup_done:
+            con.execute("""
+                UPDATE error_records
+                SET verified_error = ''
+                WHERE UPPER(TRIM(COALESCE(verified_error, ''))) = 'N'
+                  AND (biller_comment IS NULL OR TRIM(biller_comment) = '')
+                  AND (updated_by IS NULL OR TRIM(updated_by) = '')
+                  AND (updated_at IS NULL OR TRIM(updated_at) = '')
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM biller_responses br
+                      WHERE br.record_key = error_records.record_key
+                        AND NULLIF(TRIM(COALESCE(br.verified_error, '')), '') IS NOT NULL
+                  )
+            """)
+
+            con.execute(
+                "INSERT INTO schema_migrations (migration_name, applied_at) VALUES (?, ?)",
+                (cleanup_migration, datetime.now().isoformat(timespec="seconds"))
+            )
+
         migration_name = "copy_biller_responses_to_error_records_v1"
 
         migration = con.execute(
