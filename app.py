@@ -6699,7 +6699,7 @@ def qc_accuracy():
         period_type=period_type,
         selected_period=selected_period,
         below_from_date=below_from_date,
-        below_to_date=below_to_date
+        below_to_date=below_to_date,
         below_category=below_category
     )
 
