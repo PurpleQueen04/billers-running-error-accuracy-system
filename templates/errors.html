@@ -201,6 +201,7 @@
                         <th>QC EXPLANATION</th>
                         <th>QC NAME</th>
                         <th>LAST UPDATED</th>
+                        <th>ACTION</th>
                     </tr>
                 </thead>
 
@@ -273,6 +274,42 @@
 
                             <td>
                                 {{ error.updated_at or '—' }}
+                            </td>
+
+                            <td>
+                                <details class="response-editor">
+                                    <summary class="btn btn-primary">＋ Add</summary>
+
+                                    <form method="POST"
+                                          action="{{ url_for('save_response', record_key=error.record_key) }}"
+                                          class="response-form">
+                                        <input type="hidden" name="csrf_token"
+                                               value="{{ session.get('csrf_token', '') }}">
+
+                                        <div class="form-group">
+                                            <label>VERIFIED ERROR</label>
+                                            <select name="verified_error" required>
+                                                <option value="">Select Y or N</option>
+                                                <option value="Y" {% if (error.verified_error or '')|trim|upper == 'Y' %}selected{% endif %}>Y — Yes</option>
+                                                <option value="N" {% if (error.verified_error or '')|trim|upper == 'N' %}selected{% endif %}>N — No</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label>QC EXPLANATION</label>
+                                            <textarea name="qc_explanation"
+                                                      rows="3"
+                                                      required
+                                                      placeholder="Enter QC explanation...">{{ error.qc_explanation or '' }}</textarea>
+                                        </div>
+
+                                        <p class="form-hint">QC Name is automatically recorded from your logged-in account.</p>
+
+                                        <button type="submit" class="btn btn-primary">
+                                            Save Response
+                                        </button>
+                                    </form>
+                                </details>
                             </td>
                         </tr>
 
