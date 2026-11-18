@@ -6839,6 +6839,7 @@ def get_biller_accuracy_summary(
         rows = con.execute(
             f"""
             SELECT
+                username,
                 record_date,
                 month,
                 weekly,
@@ -6849,11 +6850,10 @@ def get_biller_accuracy_summary(
                 errors,
                 project_id
             FROM accuracy_records
-            WHERE LOWER(TRIM(username)) = LOWER(TRIM(?))
-              AND project_id IN ({placeholders})
+            WHERE project_id IN ({placeholders})
             ORDER BY record_date
             """,
-            (username, *project_ids)
+            tuple(project_ids)
         ).fetchall()
 
     # Only use records from the latest imported workbook batch
@@ -6875,6 +6875,8 @@ def get_biller_accuracy_summary(
         project_key = int(row["project_id"]) if row["project_id"] is not None else None
         sheet_key = normalize_text(row["sheet"]).upper()
         if normalize_text(row["imported_at"]) != latest_imports.get((project_key, sheet_key)):
+            continue
+        if normalize_text(row["username"]).casefold() != normalize_text(username).casefold():
             continue
         current_rows.append(dict(row))
 
