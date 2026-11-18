@@ -6541,6 +6541,14 @@ def build_accuracy_context(
         ]
 
     return {
+        "below_from_date": (
+            below_from.isoformat()
+            if below_from else ""
+        ),
+        "below_to_date": (
+            below_to.isoformat()
+            if below_to else ""
+        ),
         "below_90": below_90,
         "format_accuracy": format_accuracy,
         "improvements": improvements,
