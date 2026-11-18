@@ -3617,13 +3617,18 @@ def admin_dashboard():
         request.args.get("below_to")
     )
 
+    below_category = normalize_text(
+        request.args.get("below_category")
+    ).lower() or "all"
+
     accuracy_context = build_accuracy_context(
         allowed_project_ids=None,
         selected_project=selected_project,
         period_type=period_type,
         selected_period=selected_period,
         below_from_date=below_from_date,
-        below_to_date=below_to_date
+        below_to_date=below_to_date,
+        below_category=below_category
     )
 
     # -----------------------------------------------------
@@ -6630,6 +6635,10 @@ def admin_accuracy():
         request.args.get("below_to")
     )
 
+    below_category = normalize_text(
+        request.args.get("below_category")
+    ).lower() or "all"
+
     context = build_accuracy_context(
         allowed_project_ids=None,
         selected_project=selected_project,
@@ -6637,6 +6646,7 @@ def admin_accuracy():
         selected_period=selected_period,
         below_from_date=below_from_date,
         below_to_date=below_to_date
+        below_category=below_category
     )
 
     context["accuracy_endpoint"] = "admin_accuracy"
@@ -6679,6 +6689,10 @@ def qc_accuracy():
         request.args.get("below_to")
     )
 
+    below_category = normalize_text(
+        request.args.get("below_category")
+    ).lower() or "all"
+
     context = build_accuracy_context(
         allowed_project_ids=allowed_ids,
         selected_project=selected_project,
@@ -6686,6 +6700,7 @@ def qc_accuracy():
         selected_period=selected_period,
         below_from_date=below_from_date,
         below_to_date=below_to_date
+        below_category=below_category
     )
 
     context["accuracy_endpoint"] = "qc_accuracy"
