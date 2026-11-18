@@ -93,206 +93,165 @@
 </div>
 
 
-<!-- MONTHLY ACCURACY -->
+<!-- ACCURACY PERFORMANCE -->
 <div class="content-card">
 
     <div class="section-heading">
         <div>
             <h2>My Accuracy Performance</h2>
             <p>
-                Review your monthly accuracy based on recorded audits.
+                Review your accuracy by daily, weekly, or monthly reporting period.
             </p>
         </div>
 
         <span class="section-tag">
-            Monthly Summary
+            Accuracy Summary
         </span>
     </div>
 
-
-    <!-- MONTH FILTER -->
+    <!-- PERIOD FILTERS -->
     <form method="GET"
           action="{{ url_for('biller_dashboard') }}"
           class="filter-bar">
 
         <div class="filter-group">
-            <label for="month">Select Month</label>
+            <label for="period">View By</label>
+            <select name="period" id="period" onchange="this.form.submit()">
+                <option value="daily" {% if period_type == 'daily' %}selected{% endif %}>Daily</option>
+                <option value="weekly" {% if period_type == 'weekly' %}selected{% endif %}>Weekly</option>
+                <option value="monthly" {% if period_type == 'monthly' %}selected{% endif %}>Monthly</option>
+            </select>
+        </div>
 
-            <select name="month"
-                    id="month"
-                    {% if not months %}disabled{% endif %}>
-
-                {% if months %}
-
-                    {% for month in months %}
-                        <option value="{{ month }}"
-                            {% if month == selected_month %}selected{% endif %}>
-                            {{ month }}
+        <div class="filter-group">
+            <label for="date">Select Period</label>
+            <select name="date" id="date" {% if not periods %}disabled{% endif %}>
+                {% if periods %}
+                    {% for period in periods %}
+                        <option value="{{ period }}"
+                            {% if period == selected_period %}selected{% endif %}>
+                            {% if period_type == 'weekly' %}
+                                Week of {{ period }}
+                            {% elif period_type == 'daily' %}
+                                {{ period }}
+                            {% else %}
+                                {{ period }}
+                            {% endif %}
                         </option>
                     {% endfor %}
-
                 {% else %}
-
-                    <option value="">
-                        No available accuracy records
-                    </option>
-
+                    <option value="">No available accuracy records</option>
                 {% endif %}
-
             </select>
         </div>
 
         <button type="submit"
                 class="btn btn-primary"
-                {% if not months %}disabled{% endif %}>
+                {% if not periods %}disabled{% endif %}>
             Apply Filter
         </button>
 
-        <a href="{{ url_for('biller_dashboard') }}"
+        <a href="{{ url_for('biller_dashboard', period=period_type) }}"
            class="btn btn-secondary">
             Reset
         </a>
-
     </form>
 
-
-    {% if selected_month %}
-
+    {% if selected_period %}
         <div class="selected-period">
-            <span class="stat-label">Selected Reporting Month</span>
-            <strong>{{ selected_month }}</strong>
+            <span class="stat-label">
+                Selected {{ period_type|capitalize }} Period
+            </span>
+            <strong>
+                {% if period_type == 'weekly' %}Week of {% endif %}{{ selected_period }}
+            </strong>
         </div>
-
     {% endif %}
-
 
     <!-- ACCURACY CARDS -->
     <div class="accuracy-summary-grid">
 
-
         <!-- INTERNAL -->
         <div class="accuracy-summary-card">
-
             <div class="stat-card-top">
                 <span class="stat-label">INTERNAL</span>
-
                 <span class="stat-icon">
                     <i class="fa-solid fa-file-lines"></i>
                 </span>
             </div>
-
             <div class="stat-value">
                 {{ format_accuracy(internal_summary.accuracy) }}
             </div>
-
             <div class="accuracy-progress">
                 <div class="accuracy-progress-fill"
                      style="width: {{ internal_summary.accuracy if internal_summary.accuracy is not none else 0 }}%;">
                 </div>
             </div>
-
             <div class="accuracy-details">
-                <span>
-                    Audited: {{ "%.0f"|format(internal_summary.audited) }}
-                </span>
-
-                <span>
-                    Errors: {{ "%.0f"|format(internal_summary.errors) }}
-                </span>
+                <span>Audited: {{ "%.0f"|format(internal_summary.audited) }}</span>
+                <span>Errors: {{ "%.0f"|format(internal_summary.errors) }}</span>
             </div>
-
         </div>
-
 
         <!-- EXTERNAL WC -->
         <div class="accuracy-summary-card">
-
             <div class="stat-card-top">
                 <span class="stat-label">EXTERNAL WC</span>
-
                 <span class="stat-icon">
                     <i class="fa-solid fa-file-circle-check"></i>
                 </span>
             </div>
-
             <div class="stat-value">
                 {{ format_accuracy(external_wc_summary.accuracy) }}
             </div>
-
             <div class="accuracy-progress">
                 <div class="accuracy-progress-fill"
                      style="width: {{ external_wc_summary.accuracy if external_wc_summary.accuracy is not none else 0 }}%;">
                 </div>
             </div>
-
             <div class="accuracy-details">
-                <span>
-                    Audited: {{ "%.0f"|format(external_wc_summary.audited) }}
-                </span>
-
-                <span>
-                    Errors: {{ "%.0f"|format(external_wc_summary.errors) }}
-                </span>
+                <span>Audited: {{ "%.0f"|format(external_wc_summary.audited) }}</span>
+                <span>Errors: {{ "%.0f"|format(external_wc_summary.errors) }}</span>
             </div>
-
         </div>
-
 
         <!-- EXTERNAL WOC -->
         <div class="accuracy-summary-card">
-
             <div class="stat-card-top">
                 <span class="stat-label">EXTERNAL WOC</span>
-
                 <span class="stat-icon">
                     <i class="fa-solid fa-file-circle-exclamation"></i>
                 </span>
             </div>
-
             <div class="stat-value">
                 {{ format_accuracy(external_woc_summary.accuracy) }}
             </div>
-
             <div class="accuracy-progress">
                 <div class="accuracy-progress-fill"
                      style="width: {{ external_woc_summary.accuracy if external_woc_summary.accuracy is not none else 0 }}%;">
                 </div>
             </div>
-
             <div class="accuracy-details">
-                <span>
-                    Audited: {{ "%.0f"|format(external_woc_summary.audited) }}
-                </span>
-
-                <span>
-                    Errors: {{ "%.0f"|format(external_woc_summary.errors) }}
-                </span>
+                <span>Audited: {{ "%.0f"|format(external_woc_summary.audited) }}</span>
+                <span>Errors: {{ "%.0f"|format(external_woc_summary.errors) }}</span>
             </div>
-
         </div>
 
     </div>
 
-
-    {% if not months %}
-
+    {% if not periods %}
         <div class="empty-state">
             <div class="empty-state-icon">
                 <i class="fa-solid fa-chart-line"></i>
             </div>
-
             <h3>No Accuracy Records Yet</h3>
-
             <p>
-                Your monthly accuracy information will appear here
-                once records are available.
+                Your accuracy information will appear here once the latest workbook data is available.
             </p>
         </div>
-
     {% endif %}
 
 </div>
-
 
 <!-- PERFORMANCE TARGET -->
 <div class="content-card">
