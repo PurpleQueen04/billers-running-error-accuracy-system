@@ -1047,7 +1047,7 @@ def init_db():
                 "error_details": "TEXT",
                 "source_row": "INTEGER",
                 "imported_at": "TEXT",
-                "verified_error": "TEXT DEFAULT 'N'",
+                "verified_error": "TEXT DEFAULT ''",
                 "biller_comment": "TEXT",
                 "qc_explanation": "TEXT",
                 "qc_name": "TEXT",
