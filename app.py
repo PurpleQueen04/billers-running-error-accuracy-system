@@ -6614,6 +6614,8 @@ def admin_accuracy():
         below_to_date=below_to_date
     )
 
+    context["accuracy_endpoint"] = "admin_accuracy"
+
     return render_template(
         "accuracy.html",
         **context
@@ -6661,6 +6663,8 @@ def qc_accuracy():
         below_to_date=below_to_date
     )
 
+    context["accuracy_endpoint"] = "qc_accuracy"
+    
     return render_template(
         "accuracy.html",
         **context
