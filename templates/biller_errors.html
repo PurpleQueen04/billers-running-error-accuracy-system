@@ -178,7 +178,7 @@
                         <th>BILLER NAME</th>
                         <th>ZB FIELD</th>
                         <th>ERROR DETAILS</th>
-                        <th>VERIFICATION STATUS</th>
+                        <th>VERIFIED (Y/N)</th>
                         <th>MY COMMENT</th>
                         <th>QC EXPLANATION</th>
                         <th>QC NAME</th>
@@ -282,10 +282,10 @@
                                                value="{{ session.get('csrf_token', '') }}">
 
                                         <div class="form-group">
-                                            <label>VERIFIED ERROR</label>
+                                            <label>VERIFIED (Y/N)</label>
                                             <select name="verified_error" required>
                                                 <option value="">Select Y or N</option>
-                                                <option value="Y" {% if verification != 'N' %}selected{% endif %}>Y — Yes</option>
+                                                <option value="Y" {% if verification == 'Y' %}selected{% endif %}>Y — Yes</option>
                                                 <option value="N" {% if verification == 'N' %}selected{% endif %}>N — No</option>
                                             </select>
                                         </div>
