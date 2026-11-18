@@ -7555,8 +7555,8 @@ def save_response(record_key):
                         record_key,
                         verified_error,
                         biller_comment,
-                        latest_record["qc_explanation"],
-                        latest_record["qc_name"],
+                        latest_record["qc_explanation"] or "",
+                        latest_record["qc_name"] or "",
                         response_updated_by,
                         response_updated_at
                     )
@@ -7701,8 +7701,8 @@ def save_response(record_key):
                     (
                         record_key,
                         latest_record["verified_error"],
-                        latest_record["biller_comment"],
-                        qc_explanation,
+                        latest_record["biller_comment"] or "",
+                        qc_explanation or "",
                         qc_name,
                         response_updated_by,
                         response_updated_at
