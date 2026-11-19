@@ -8120,6 +8120,73 @@ def internal_server_error(error):
 
 
 # =========================================================
+# PRODUCTION ROLE CONSTRAINT MIGRATION
+# Runs automatically when the web app starts on Render.
+# =========================================================
+
+def ensure_supervisor_role_constraint():
+
+    if not is_postgres():
+        return
+
+    with db() as con:
+
+        # Serialize startup migrations across Gunicorn workers.
+        con.execute("""
+            SELECT pg_advisory_xact_lock(746282)
+        """)
+
+        current_constraint = con.execute("""
+            SELECT pg_get_constraintdef(c.oid) AS definition
+            FROM pg_constraint c
+            INNER JOIN pg_class t
+                ON t.oid = c.conrelid
+            INNER JOIN pg_namespace n
+                ON n.oid = t.relnamespace
+            WHERE n.nspname = 'public'
+            AND t.relname = 'users'
+            AND c.conname = 'users_role_check'
+            AND c.contype = 'c'
+        """).fetchone()
+
+        definition = (
+            current_constraint["definition"].lower()
+            if current_constraint
+            else ""
+        )
+
+        if "supervisor" not in definition:
+
+            con.execute("""
+                ALTER TABLE users
+                DROP CONSTRAINT IF EXISTS users_role_check
+            """)
+
+            con.execute("""
+                ALTER TABLE users
+                ADD CONSTRAINT users_role_check
+                CHECK (
+                    LOWER(role) IN (
+                        'admin',
+                        'qc',
+                        'biller',
+                        'supervisor'
+                    )
+                )
+            """)
+
+            app.logger.info(
+                "Updated users_role_check to allow Supervisor role."
+            )
+
+
+# Apply the small, idempotent migration automatically on Render.
+# This avoids requiring access to the Render Shell.
+if is_postgres():
+    ensure_supervisor_role_constraint()
+
+
+# =========================================================
 # MANUAL DATABASE INITIALIZATION COMMAND
 # =========================================================
 
