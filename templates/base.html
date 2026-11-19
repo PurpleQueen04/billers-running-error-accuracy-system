@@ -266,6 +266,21 @@
 <script>
 document.addEventListener("DOMContentLoaded", function () {
 
+    // Keep the user's current scroll position after applying GET filters.
+    const filterScrollKey = "billersFilterScroll:" + window.location.pathname;
+    const savedFilterScroll = sessionStorage.getItem(filterScrollKey);
+
+    if (savedFilterScroll !== null) {
+        sessionStorage.removeItem(filterScrollKey);
+        window.scrollTo(0, Number(savedFilterScroll) || 0);
+    }
+
+    document.querySelectorAll("form.filter-bar").forEach(function (form) {
+        form.addEventListener("submit", function () {
+            sessionStorage.setItem(filterScrollKey, String(window.scrollY));
+        });
+    });
+
     const toggle = document.getElementById("sidebarToggle");
     const sidebar = document.getElementById("sidebar");
 
