@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block page_heading %}Accuracy Improvement Monitoring{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Accuracy Improvement Monitoring</h1>
+        <p>Compare current accuracy against the previous period.</p>
+    </div>
+</div>
+
+<!-- =====================================================
+     ACCURACY IMPROVEMENT COMPARISON
+===================================================== -->
+
+<section class="content-card">
+
+    <div class="section-heading">
+        <div>
+            <h2>Accuracy Improvement Monitoring</h2>
+            <p>Compare current accuracy against the previous period.</p>
+        </div>
+    </div>
+
+    <div class="table-container">
+
+        <table class="data-table">
+
+            <thead>
+                <tr>
+                    <th>BILLER NAME</th>
+                    <th>PROJECT</th>
+                    <th>TYPE</th>
+                    <th>PREVIOUS</th>
+                    <th>CURRENT</th>
+                    <th>CHANGE</th>
+                    <th>STATUS</th>
+                    <th>COACHING NOTES</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for item in improvements %}
+
+                <tr>
+
+                    <td>
+                        <strong>{{ item.biller_name }}</strong>
+                        <small class="table-subtext">
+                            {{ item.username }}
+                        </small>
+                    </td>
+
+                    <td>{{ item.project_name }}</td>
+
+                    <td>{{ item.accuracy_type }}</td>
+
+                    <td>
+                        {% if item.previous_accuracy is not none %}
+                            {{ format_accuracy(item.previous_accuracy) }}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if item.current_accuracy is not none %}
+                            {{ format_accuracy(item.current_accuracy) }}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if item.change is not none %}
+                            {% if item.change > 0 %}
+                                <span class="change-positive">
+                                    +{{ "%.2f"|format(item.change) }}%
+                                </span>
+                            {% elif item.change < 0 %}
+                                <span class="change-negative">
+                                    {{ "%.2f"|format(item.change) }}%
+                                </span>
+                            {% else %}
+                                <span class="change-neutral">0.00%</span>
+                            {% endif %}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if item.status == 'Improved' %}
+                            <span class="status-badge status-success">
+                                Improved
+                            </span>
+                        {% elif item.status == 'Declined' %}
+                            <span class="status-badge status-danger">
+                                Declined
+                            </span>
+                        {% elif item.status == 'No Change' %}
+                            <span class="status-badge status-neutral">
+                                No Change
+                            </span>
+                        {% else %}
+                            <span class="status-badge status-warning">
+                                {{ item.status }}
+                            </span>
+                        {% endif %}
+                    </td>
+
+                    <td class="coaching-note">
+                        {{ item.note }}
+                    </td>
+
+                </tr>
+
+                {% else %}
+
+                <tr>
+                    <td colspan="8" class="empty-state">
+                        No accuracy comparison records available.
+                    </td>
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+
+{% endblock %}

@@ -3701,138 +3701,115 @@ def logout():
 @login_required
 @admin_required
 def admin_dashboard():
-
     with db() as con:
-
-        # -------------------------------------------------
-        # DASHBOARD COUNTS
-        # -------------------------------------------------
-
-        total_errors_row = con.execute(
+        total_errors = con.execute(
+            "SELECT COUNT(*) AS total FROM error_records"
+        ).fetchone()
+        disputed = con.execute(
             """
             SELECT COUNT(*) AS total
             FROM error_records
+            WHERE UPPER(TRIM(COALESCE(verified_error, ''))) = 'N'
             """
         ).fetchone()
-
-        active_billers_row = con.execute(
-            """
-            SELECT COUNT(*) AS total
-            FROM users
-            WHERE LOWER(role) = 'biller'
-            AND active = 1
-            """
-        ).fetchone()
-
-        verified_row = con.execute(
+        pending = con.execute(
             """
             SELECT COUNT(*) AS total
             FROM error_records
-            WHERE UPPER(TRIM(COALESCE(verified_error, '')))
-                = 'Y'
+            WHERE verified_error IS NULL OR TRIM(verified_error) = ''
             """
         ).fetchone()
-
-        disputed_row = con.execute(
+        imports = con.execute(
+            "SELECT COUNT(*) AS total FROM import_history"
+        ).fetchone()
+        verified = con.execute(
             """
             SELECT COUNT(*) AS total
             FROM error_records
-            WHERE UPPER(TRIM(COALESCE(verified_error, '')))
-                = 'N'
+            WHERE UPPER(TRIM(COALESCE(verified_error, ''))) = 'Y'
             """
         ).fetchone()
-
-        pending_row = con.execute(
-            """
-            SELECT COUNT(*) AS total
-            FROM error_records
-            WHERE verified_error IS NULL
-            OR TRIM(verified_error) = ''
-            """
+        active_users = con.execute(
+            "SELECT COUNT(*) AS total FROM users WHERE active = 1"
         ).fetchone()
 
-        imports_row = con.execute(
-            """
-            SELECT COUNT(*) AS total
-            FROM import_history
-            """
-        ).fetchone()
-
-        counts = {
-            "imports": int(imports_row["total"] or 0),
-            "errors": int(total_errors_row["total"] or 0),
-            "billers": int(active_billers_row["total"] or 0),
-            "verified": int(verified_row["total"] or 0),
-            "disputed": int(disputed_row["total"] or 0),
-            "pending": int(pending_row["total"] or 0)
-        }
-
-        # -------------------------------------------------
-        # RECENT IMPORTS
-        # -------------------------------------------------
-
-        history = con.execute(
-            """
-            SELECT
-                id,
-                filename,
-                uploaded_by,
-                records_imported,
-                imported_at
-            FROM import_history
-            ORDER BY id DESC
-            LIMIT 10
-            """
-        ).fetchall()
-
-    # -----------------------------------------------------
-    # BILLER ACCURACY MONITORING
-    # -----------------------------------------------------
-
-    period_type = normalize_text(
-        request.args.get("period")
-    ).lower() or "monthly"
-
-    selected_project = normalize_text(
-        request.args.get("project_id")
-    ) or "all"
-
-    selected_period = normalize_text(
-        request.args.get("date")
-    )
-
-    below_from_date = normalize_text(
-        request.args.get("below_from")
-    )
-
-    below_to_date = normalize_text(
-        request.args.get("below_to")
-    )
-
-    below_category = normalize_text(
-        request.args.get("below_category")
-    ).lower() or "all"
+    counts = {
+        "errors": int(total_errors["total"] or 0),
+        "disputed": int(disputed["total"] or 0),
+        "pending": int(pending["total"] or 0),
+        "imports": int(imports["total"] or 0),
+        "verified": int(verified["total"] or 0),
+        "active_users": int(active_users["total"] or 0)
+    }
 
     accuracy_context = build_accuracy_context(
         allowed_project_ids=None,
-        selected_project=selected_project,
-        period_type=period_type,
-        selected_period=selected_period,
-        below_from_date=below_from_date,
-        below_to_date=below_to_date,
-        below_category=below_category
+        selected_project=normalize_text(request.args.get("project_id")) or "all",
+        period_type=normalize_text(request.args.get("period")).lower() or "monthly",
+        selected_period=normalize_text(request.args.get("date")),
+        below_from_date=normalize_text(request.args.get("below_from")),
+        below_to_date=normalize_text(request.args.get("below_to")),
+        below_category=normalize_text(request.args.get("below_category")).lower() or "all"
     )
-
-    # -----------------------------------------------------
-    # RENDER ADMIN DASHBOARD
-    # -----------------------------------------------------
 
     return render_template(
         "admin.html",
         counts=counts,
-        history=history,
         **accuracy_context
     )
+
+
+@app.route("/admin/workbook-import")
+@login_required
+@admin_required
+def admin_workbook_import():
+    with db() as con:
+        projects = con.execute(
+            """
+            SELECT id, project_name
+            FROM projects
+            WHERE active = 1
+            ORDER BY project_name
+            """
+        ).fetchall()
+
+    return render_template(
+        "workbook_import.html",
+        projects=projects
+    )
+
+
+@app.route("/admin/billers-below-90")
+@login_required
+@admin_required
+def admin_billers_below_90():
+    accuracy_context = build_accuracy_context(
+        allowed_project_ids=None,
+        selected_project=normalize_text(request.args.get("project_id")) or "all",
+        period_type=normalize_text(request.args.get("period")).lower() or "monthly",
+        selected_period=normalize_text(request.args.get("date")),
+        below_from_date=normalize_text(request.args.get("below_from")),
+        below_to_date=normalize_text(request.args.get("below_to")),
+        below_category=normalize_text(request.args.get("below_category")).lower() or "all"
+    )
+    return render_template("billers_below_90.html", **accuracy_context)
+
+
+@app.route("/admin/accuracy-improvement")
+@login_required
+@admin_required
+def admin_accuracy_improvement():
+    accuracy_context = build_accuracy_context(
+        allowed_project_ids=None,
+        selected_project=normalize_text(request.args.get("project_id")) or "all",
+        period_type=normalize_text(request.args.get("period")).lower() or "monthly",
+        selected_period=normalize_text(request.args.get("date")),
+        below_from_date=normalize_text(request.args.get("below_from")),
+        below_to_date=normalize_text(request.args.get("below_to")),
+        below_category=normalize_text(request.args.get("below_category")).lower() or "all"
+    )
+    return render_template("accuracy_improvement.html", **accuracy_context)
+
 
 # =========================================================
 # ADMIN WORKBOOK UPLOAD
@@ -3846,17 +3823,17 @@ def upload_workbook():
     uploaded_file = request.files.get("source_file")
     if not uploaded_file or not uploaded_file.filename:
         flash("Please select a workbook or CSV file.", "warning")
-        return redirect(url_for("admin_dashboard"))
+        return redirect(url_for("admin_workbook_import"))
 
     filename = secure_filename(uploaded_file.filename)
     if not allowed_file(filename):
         flash("Unsupported file type. Allowed: ODS, XLSX, XLS, and CSV.", "danger")
-        return redirect(url_for("admin_dashboard"))
+        return redirect(url_for("admin_workbook_import"))
 
     csv_sheet = normalize_text(request.form.get("csv_sheet", "ERROR")).upper()
     if csv_sheet not in ("ERROR", "INTERNAL", "EXTERNAL"):
         flash("Invalid CSV sheet selection.", "danger")
-        return redirect(url_for("admin_dashboard"))
+        return redirect(url_for("admin_workbook_import"))
 
     selected_project = normalize_text(request.form.get("project_id")) or "all"
     default_project_id = None
@@ -3865,7 +3842,7 @@ def upload_workbook():
             default_project_id = int(selected_project)
         except ValueError:
             flash("Invalid project selection.", "danger")
-            return redirect(url_for("admin_dashboard"))
+            return redirect(url_for("admin_workbook_import"))
         with db() as con:
             valid = con.execute(
                 "SELECT id FROM projects WHERE id = ? AND active = 1",
@@ -3873,7 +3850,7 @@ def upload_workbook():
             ).fetchone()
         if not valid:
             flash("Selected project does not exist or is inactive.", "danger")
-            return redirect(url_for("admin_dashboard"))
+            return redirect(url_for("admin_workbook_import"))
 
     try:
         sheets = read_source(uploaded_file, csv_sheet=csv_sheet)
@@ -3891,7 +3868,7 @@ def upload_workbook():
     except Exception:
         app.logger.exception("Admin workbook import failed")
         flash("Workbook import failed. No successful import was confirmed. Please check the workbook format and server logs.", "danger")
-    return redirect(url_for("admin_dashboard"))
+    return redirect(url_for("admin_workbook_import"))
 
 
 @app.route("/qc/upload", methods=["POST"])

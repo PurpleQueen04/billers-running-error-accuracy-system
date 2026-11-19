@@ -73,6 +73,12 @@
                     <span>Accounts</span>
                 </a>
 
+                <a href="/admin/workbook-import"
+                   class="nav-link {% if request.path.startswith('/admin/workbook-import') %}active{% endif %}">
+                    <span class="nav-icon">▤</span>
+                    <span>Workbook Import</span>
+                </a>
+
                 <div class="nav-section-label">MONITORING</div>
 
                 <a href="/admin/errors"
@@ -81,10 +87,16 @@
                     <span>Error Records</span>
                 </a>
 
-                <a href="/admin/accuracy"
-                   class="nav-link {% if request.path.startswith('/admin/accuracy') %}active{% endif %}">
+                <a href="/admin/billers-below-90"
+                   class="nav-link {% if request.path.startswith('/admin/billers-below-90') %}active{% endif %}">
+                    <span class="nav-icon">↘</span>
+                    <span>Billers Below 90% Accuracy</span>
+                </a>
+
+                <a href="/admin/accuracy-improvement"
+                   class="nav-link {% if request.path.startswith('/admin/accuracy-improvement') %}active{% endif %}">
                     <span class="nav-icon">↗</span>
-                    <span>Accuracy Monitoring</span>
+                    <span>Accuracy Improvement Monitoring</span>
                 </a>
 
                 <div class="nav-section-label">SYSTEM</div>
