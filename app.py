@@ -4341,7 +4341,7 @@ def edit_account():
         )
         return redirect(url_for("admin_accounts"))
 
-    if role not in ("admin", "biller", "qc"):
+    if role not in ("admin", "biller", "qc", "supervisor"):
 
         flash("Invalid account role.", "danger")
         return redirect(url_for("admin_accounts"))
@@ -4598,7 +4598,7 @@ def edit_account():
                 (user_id,)
             )
 
-            if role in ("biller", "qc"):
+            if role in ("biller", "qc", "supervisor"):
 
                 con.executemany(
                     """
