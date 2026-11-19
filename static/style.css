@@ -897,8 +897,7 @@ input[type="radio"] {
 
     overflow-x: auto;
     overflow-y: hidden;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);    border-radius: var(--radius-lg);
 
     scrollbar-width: thin;
     scrollbar-color: var(--border-light) var(--bg-card);
@@ -1797,8 +1796,7 @@ input[type="radio"] {
     min-width: 0;
     padding: 18px;
     background: rgba(13, 22, 17, .34);    border: 1px solid var(--border);
-    border-radius: 13px;
-}
+    border-radius: 13px;}
 .accuracy-summary-header, .accuracy-details {
     display: flex;
     align-items: center;
@@ -2505,4 +2503,35 @@ input[type="radio"] {
     margin-top: 0;
     font-size: 10px;
     line-height: 1.35;
+}
+
+/* Extra-compact dashboard metrics: reduce card height while keeping text legible. */
+.dashboard-stats-column .stats-grid {
+    gap: 7px;
+}
+.dashboard-stats-column .stat-card {
+    padding: 8px 11px;
+    gap: 2px;
+    border-radius: 10px;
+}
+.dashboard-stats-column .stat-icon {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    border-radius: 7px;
+    font-size: 13px;
+}
+.dashboard-stats-column .stat-label {
+    font-size: 9px;
+    letter-spacing: .25px;
+    line-height: 1.2;
+}
+.dashboard-stats-column .stat-value {
+    font-size: 18px;
+    line-height: 1.15;
+}
+.dashboard-stats-column .stat-description,
+.dashboard-stats-column .stat-subtitle {
+    font-size: 9px;
+    line-height: 1.2;
 }
