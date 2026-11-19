@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Supervisor Error Records{% endblock %}
+{% block page_heading %}Error Records{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Error Records</h1>
+        <p>Read-only view of error records belonging to your assigned projects.</p>
+    </div>
+    <span class="section-tag">{{ records|length }} Records</span>
+</div>
+
+<section class="content-card">
+    <div class="filter-bar">
+        <div class="filter-group search-group">
+            <label for="recordSearch">Search Records</label>
+            <input type="search" id="recordSearch" placeholder="Search project, biller, username, PRO, or QC..." autocomplete="off">
+        </div>
+    </div>
+
+    {% if records %}
+    <div class="table-container">
+        <table class="data-table" id="supervisorErrorsTable">
+            <thead>
+                <tr>
+                    <th>BILLED DATE</th><th>PROJECT</th><th>BILLER NAME</th><th>USERNAME</th>
+                    <th>PRO</th><th>SOURCE</th><th>AUDITOR</th><th>AUDIT TYPE</th>
+                    <th>VERIFIED ERROR</th><th>BILLER COMMENT</th><th>QC EXPLANATION</th><th>QC NAME</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in records %}
+                <tr>
+                    <td>{{ record.billed_date or '—' }}</td>
+                    <td>{{ record.project_name or '—' }}</td>
+                    <td>{{ record.biller_name or '—' }}</td>
+                    <td>{{ record.username or '—' }}</td>
+                    <td>{{ record.pro or '—' }}</td>
+                    <td>{{ record.source or '—' }}</td>
+                    <td>{{ record.auditor or '—' }}</td>
+                    <td>{{ record.audit_type or '—' }}</td>
+                    <td>{{ record.verified_error or '—' }}</td>
+                    <td class="comment-cell">{{ record.biller_comment or '—' }}</td>
+                    <td class="comment-cell">{{ record.qc_explanation or '—' }}</td>
+                    <td>{{ record.qc_name or '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="table-footer"><span id="recordResultCount">Showing {{ records|length }} records</span></div>
+    {% else %}
+    <div class="empty-state"><h3>No Error Records Found</h3><p>No error records are currently available in your assigned projects.</p></div>
+    {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const input = document.getElementById("recordSearch");
+    const table = document.getElementById("supervisorErrorsTable");
+    const count = document.getElementById("recordResultCount");
+    if (!input || !table) return;
+    const rows = Array.from(table.querySelectorAll("tbody tr"));
+    input.addEventListener("input", function () {
+        const term = input.value.toLowerCase().trim();
+        let visible = 0;
+        rows.forEach(function (row) {
+            const match = row.innerText.toLowerCase().includes(term);
+            row.style.display = match ? "" : "none";
+            if (match) visible++;
+        });
+        if (count) count.textContent = "Showing " + visible + " of " + rows.length + " records";
+    });
+});
+</script>
+{% endblock %}
