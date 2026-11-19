@@ -77,7 +77,7 @@
         <div class="form-group">
             <label for="project_id">Project</label>
 
-            <select name="project_id" id="project_id">
+            <select name="project_id" id="project_id" onchange="this.form.submit()">
                 <option value="all"
                     {% if selected_project == 'all' %}selected{% endif %}>
                     All Projects
@@ -95,7 +95,7 @@
         <div class="form-group">
             <label for="period">Period Type</label>
 
-            <select name="period" id="period">
+            <select name="period" id="period" onchange="this.form.submit()">
                 <option value="daily"
                     {% if period_type == 'daily' %}selected{% endif %}>
                     Daily
@@ -113,22 +113,7 @@
             </select>
         </div>
 
-        <div class="form-group">
-            <label for="date">Selected Period</label>
 
-            <select name="date" id="date">
-                {% for period in periods %}
-                    <option value="{{ period }}"
-                        {% if selected_period == period %}selected{% endif %}>
-                        {{ period }}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <button type="submit" class="btn btn-primary">
-            Apply Filters
-        </button>
 
     </form>
 
@@ -186,6 +171,32 @@
 
         {% endfor %}
 
+    </div>
+
+    <div class="section-heading" style="margin-top:24px;">
+        <div>
+            <h3>Accuracy History</h3>
+            <p>All available periods, newest first.</p>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead><tr>
+                <th>Period</th><th>INTERNAL</th><th>EXTERNAL_WC</th><th>EXTERNAL_WOC</th>
+            </tr></thead>
+            <tbody>
+            {% for item in period_history %}
+                <tr>
+                    <td>{{ item.period }}</td>
+                    <td>{{ format_accuracy(item.INTERNAL) }}</td>
+                    <td>{{ format_accuracy(item.EXTERNAL_WC) }}</td>
+                    <td>{{ format_accuracy(item.EXTERNAL_WOC) }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="4">No accuracy history available.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
     </div>
 
 </section>
