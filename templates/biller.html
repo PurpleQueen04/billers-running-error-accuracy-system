@@ -124,32 +124,14 @@
         </div>
 
         <div class="filter-group">
-            <label for="date">Select Period</label>
-            <select name="date" id="date" {% if not periods %}disabled{% endif %}>
-                {% if periods %}
-                    {% for period in periods %}
-                        <option value="{{ period }}"
-                            {% if period == selected_period %}selected{% endif %}>
-                            {% if period_type == 'weekly' %}
-                                Week of {{ period }}
-                            {% elif period_type == 'daily' %}
-                                {{ period }}
-                            {% else %}
-                                {{ period }}
-                            {% endif %}
-                        </option>
-                    {% endfor %}
-                {% else %}
-                    <option value="">No available accuracy records</option>
-                {% endif %}
+            <label for="project_id">Project</label>
+            <select name="project_id" id="project_id" onchange="this.form.submit()">
+                <option value="all" {% if selected_project == 'all' %}selected{% endif %}>All Assigned Projects</option>
+                {% for project in projects %}
+                    <option value="{{ project.id }}" {% if selected_project == project.id|string %}selected{% endif %}>{{ project.project_name }}</option>
+                {% endfor %}
             </select>
         </div>
-
-        <button type="submit"
-                class="btn btn-primary"
-                {% if not periods %}disabled{% endif %}>
-            Apply Filter
-        </button>
 
         <a href="{{ url_for('biller_dashboard', period=period_type) }}"
            class="btn btn-secondary">
@@ -237,6 +219,32 @@
             </div>
         </div>
 
+    </div>
+
+    <div class="section-heading" style="margin-top:24px;">
+        <div>
+            <h3>Accuracy History</h3>
+            <p>All available periods, newest first.</p>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead><tr>
+                <th>Period</th><th>INTERNAL</th><th>EXTERNAL_WC</th><th>EXTERNAL_WOC</th>
+            </tr></thead>
+            <tbody>
+            {% for item in period_history %}
+                <tr>
+                    <td>{{ item.period }}</td>
+                    <td>{{ format_accuracy(item.INTERNAL) }}</td>
+                    <td>{{ format_accuracy(item.EXTERNAL_WC) }}</td>
+                    <td>{{ format_accuracy(item.EXTERNAL_WOC) }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="4">No accuracy history available.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
     </div>
 
     {% if not periods %}
