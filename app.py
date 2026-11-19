@@ -7041,6 +7041,16 @@ def get_biller_accuracy_summary(
             "external_woc_summary": dict(empty_summary)
         }
 
+    with db() as con:
+        project_rows = con.execute(
+            "SELECT id, project_name FROM projects WHERE id IN (" +
+            ", ".join(["?"] * len(project_ids)) + ")",
+            tuple(project_ids)
+        ).fetchall()
+    project_names = {
+        int(row["id"]): row["project_name"] for row in project_rows
+    }
+
     placeholders = ", ".join(["?"] * len(project_ids))
 
     with db() as con:
