@@ -6504,6 +6504,27 @@ def build_accuracy_context(
 
     periods = sorted(period_keys)
 
+    # Full period history, aggregated with the same weighted-accuracy formula.
+    period_history_map = {
+        key: {kind: {"audited": 0.0, "errors": 0.0} for kind in ACCURACY_TYPES}
+        for key in periods
+    }
+    for row in records:
+        key = row_periods.get(id(row))
+        kind = normalize_accuracy_type(row.get("accuracy_type"))
+        if key not in period_history_map or kind not in ACCURACY_TYPES:
+            continue
+        period_history_map[key][kind]["audited"] += number_value(row.get("audited")) or 0
+        period_history_map[key][kind]["errors"] += number_value(row.get("errors")) or 0
+
+    period_history = []
+    for key in sorted(period_history_map, reverse=True):
+        item = {"period": key}
+        for kind in ACCURACY_TYPES:
+            totals = period_history_map[key][kind]
+            item[kind] = calculate_weighted_accuracy(totals["audited"], totals["errors"])
+        period_history.append(item)
+
     if selected_period not in period_keys:
         selected_period = periods[-1] if periods else ""
 
@@ -6833,6 +6854,7 @@ def build_accuracy_context(
         "format_accuracy": format_accuracy,
         "improvements": improvements,
         "period_type": period_type,
+        "period_history": period_history,
         "periods": periods,
         "projects": visible_projects,
         "selected_period": selected_period,
@@ -6983,7 +7005,8 @@ def get_biller_accuracy_summary(
     username,
     project_ids,
     period_type="monthly",
-    selected_period=None
+    selected_period=None,
+    selected_project="all"
 ):
     if period_type not in ("daily", "weekly", "monthly"):
         period_type = "monthly"
@@ -6994,9 +7017,23 @@ def get_biller_accuracy_summary(
         "errors": 0
     }
 
+    all_project_ids = [int(value) for value in project_ids]
+    if selected_project != "all":
+        try:
+            requested_project = int(selected_project)
+        except (TypeError, ValueError):
+            requested_project = None
+        if requested_project in all_project_ids:
+            project_ids = [requested_project]
+        else:
+            selected_project = "all"
+
     if not project_ids:
         return {
             "periods": [],
+            "period_history": [],
+            "projects": [],
+            "selected_project": "all",
             "selected_period": "",
             "period_type": period_type,
             "internal_summary": dict(empty_summary),
@@ -7065,6 +7102,27 @@ def get_biller_accuracy_summary(
 
     periods = sorted(periods)
 
+    history_map = {
+        key: {kind: {"audited": 0.0, "errors": 0.0}
+              for kind in ("INTERNAL", "EXTERNAL_WC", "EXTERNAL_WOC")}
+        for key in periods
+    }
+    for index, row in enumerate(current_rows):
+        key = row_periods.get(index)
+        kind = normalize_accuracy_type(row.get("accuracy_type"))
+        if key not in history_map or kind not in history_map[key]:
+            continue
+        history_map[key][kind]["audited"] += number_value(row.get("audited")) or 0
+        history_map[key][kind]["errors"] += number_value(row.get("errors")) or 0
+
+    period_history = []
+    for key in sorted(history_map, reverse=True):
+        item = {"period": key}
+        for kind in ("INTERNAL", "EXTERNAL_WC", "EXTERNAL_WOC"):
+            totals = history_map[key][kind]
+            item[kind] = calculate_weighted_accuracy(totals["audited"], totals["errors"])
+        period_history.append(item)
+
     if selected_period not in periods:
         selected_period = periods[-1] if periods else ""
 
@@ -7098,6 +7156,13 @@ def get_biller_accuracy_summary(
 
     return {
         "periods": periods,
+        "period_history": period_history,
+        "projects": [
+            {"id": project_id, "project_name": project_name}
+            for project_id, project_name in project_names.items()
+            if project_id in all_project_ids
+        ],
+        "selected_project": str(project_ids[0]) if len(project_ids) == 1 and selected_project != "all" else "all",
         "selected_period": selected_period,
         "period_type": period_type,
         "internal_summary": summaries["INTERNAL"],
@@ -7195,7 +7260,8 @@ def biller_dashboard():
         username,
         project_ids,
         request.args.get("period", "monthly"),
-        request.args.get("date")
+        request.args.get("date"),
+        normalize_text(request.args.get("project_id")) or "all"
     )
 
     return render_template(
