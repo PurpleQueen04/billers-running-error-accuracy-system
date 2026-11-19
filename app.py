@@ -7775,6 +7775,9 @@ def render_supervisor_accuracy_page(page_title, page_description):
     context["page_title"] = page_title
     context["page_description"] = page_description
     context["page_tag"] = "SUPERVISOR VIEW"
+    context["show_accuracy_summary"] = request.endpoint == "supervisor_accuracy"
+    context["show_below_90"] = request.endpoint == "supervisor_biller_performance"
+    context["show_improvements"] = False
 
     return render_template("accuracy.html", **context)
 
