@@ -114,9 +114,15 @@
                 <div class="nav-section-label">MONITORING</div>
 
                 <a href="/qc/errors"
-                   class="nav-link {% if request.path.startswith('/qc/errors') %}active{% endif %}">
+                   class="nav-link {% if request.path == '/qc/errors' %}active{% endif %}">
                     <span class="nav-icon">⚑</span>
                     <span>Error Verification</span>
+                </a>
+
+                <a href="/qc/error-details"
+                   class="nav-link {% if request.path.startswith('/qc/error-details') %}active{% endif %}">
+                    <span class="nav-icon">▤</span>
+                    <span>Error Details</span>
                 </a>
 
                 <a href="/qc/accuracy"
