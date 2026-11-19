@@ -10,39 +10,9 @@
     </div>
 </div>
 
-<section class="stats-grid admin-stats-grid">
-    <div class="stat-card">
-        <div class="stat-card-top"><span class="stat-label">TOTAL ERROR RECORDS</span><span class="stat-icon">▤</span></div>
-        <div class="stat-value">{{ counts.errors|default(0) }}</div>
-        <div class="stat-description">All recorded error records</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-card-top"><span class="stat-label">DISPUTED RECORDS</span><span class="stat-icon">!</span></div>
-        <div class="stat-value">{{ counts.disputed|default(0) }}</div>
-        <div class="stat-description">Records marked as disputed</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-card-top"><span class="stat-label">PENDING VERIFICATION</span><span class="stat-icon">◷</span></div>
-        <div class="stat-value">{{ counts.pending|default(0) }}</div>
-        <div class="stat-description">Awaiting QC verification</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-card-top"><span class="stat-label">TOTAL IMPORTS</span><span class="stat-icon">⇧</span></div>
-        <div class="stat-value">{{ counts.imports|default(0) }}</div>
-        <div class="stat-description">Recorded workbook imports</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-card-top"><span class="stat-label">VERIFIED ERRORS</span><span class="stat-icon">✓</span></div>
-        <div class="stat-value">{{ counts.verified|default(0) }}</div>
-        <div class="stat-description">Confirmed error records</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-card-top"><span class="stat-label">ACTIVE USERS</span><span class="stat-icon">♙</span></div>
-        <div class="stat-value">{{ counts.active_users|default(0) }}</div>
-        <div class="stat-description">Currently active accounts</div>
-    </div>
-</section>
 
+<div class="dashboard-focus-layout">
+    <div class="dashboard-graph-column">
 <!-- ACCURACY PERFORMANCE OVERVIEW -->
 <section class="content-card accuracy-graph-card">
     <div class="section-heading"><div><h2>Accuracy Performance Overview</h2><p>Compare weighted accuracy trends across reporting periods.</p></div><span class="section-tag">PERFORMANCE TREND</span></div>
@@ -77,5 +47,41 @@ document.addEventListener("DOMContentLoaded",function(){
 });
 </script>
 <style>.accuracy-graph-legend{display:flex;flex-wrap:wrap;gap:18px;margin-top:16px;font-size:12px;font-weight:700;color:#64748b}.accuracy-graph-legend span{display:inline-flex;align-items:center;gap:7px}.accuracy-graph-legend i{display:inline-block;width:9px;height:9px;border-radius:50%}</style>
+    </div>
+    <aside class="dashboard-stats-column">
+<section class="stats-grid admin-stats-grid">
+    <div class="stat-card">
+        <div class="stat-card-top"><span class="stat-label">TOTAL ERROR RECORDS</span><span class="stat-icon">▤</span></div>
+        <div class="stat-value">{{ counts.errors|default(0) }}</div>
+        <div class="stat-description">All recorded error records</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-top"><span class="stat-label">DISPUTED RECORDS</span><span class="stat-icon">!</span></div>
+        <div class="stat-value">{{ counts.disputed|default(0) }}</div>
+        <div class="stat-description">Records marked as disputed</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-top"><span class="stat-label">PENDING VERIFICATION</span><span class="stat-icon">◷</span></div>
+        <div class="stat-value">{{ counts.pending|default(0) }}</div>
+        <div class="stat-description">Awaiting QC verification</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-top"><span class="stat-label">TOTAL IMPORTS</span><span class="stat-icon">⇧</span></div>
+        <div class="stat-value">{{ counts.imports|default(0) }}</div>
+        <div class="stat-description">Recorded workbook imports</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-top"><span class="stat-label">VERIFIED ERRORS</span><span class="stat-icon">✓</span></div>
+        <div class="stat-value">{{ counts.verified|default(0) }}</div>
+        <div class="stat-description">Confirmed error records</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-top"><span class="stat-label">ACTIVE USERS</span><span class="stat-icon">♙</span></div>
+        <div class="stat-value">{{ counts.active_users|default(0) }}</div>
+        <div class="stat-description">Currently active accounts</div>
+    </div>
+</section>
+    </aside>
+</div>
 
 {% endblock %}
