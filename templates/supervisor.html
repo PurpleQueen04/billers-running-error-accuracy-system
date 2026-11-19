@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Supervisor Dashboard{% endblock %}
+{% block page_heading %}Supervisor Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Supervisor Dashboard</h1>
+        <p>View monitoring summaries for your assigned projects.</p>
+    </div>
+    <span class="section-tag">VIEW ONLY</span>
+</div>
+
+<section class="content-card">
+    <form method="GET" action="{{ url_for('supervisor_dashboard') }}" class="filter-bar">
+        <div class="filter-group">
+            <label for="project_id">Project</label>
+            <select name="project_id" id="project_id">
+                <option value="all" {% if selected_project == 'all' %}selected{% endif %}>All Assigned Projects</option>
+                {% for project in projects %}
+                    <option value="{{ project.id }}" {% if selected_project|string == project.id|string %}selected{% endif %}>{{ project.project_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Apply Filter</button>
+        <a href="{{ url_for('supervisor_dashboard') }}" class="btn btn-secondary">Reset</a>
+    </form>
+</section>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-card-top"><span class="stat-label">Total Error Records</span><span class="stat-icon">⚑</span></div>
+        <div class="stat-value">{{ counts.errors }}</div>
+        <div class="stat-description">Records in selected assigned project scope</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-top"><span class="stat-label">Overall Accuracy</span><span class="stat-icon">↗</span></div>
+        <div class="stat-value">{{ format_accuracy(counts.accuracy) }}</div>
+        <div class="stat-description">Based on available assigned-project accuracy data</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-top"><span class="stat-label">Billers Monitored</span><span class="stat-icon">♙</span></div>
+        <div class="stat-value">{{ counts.billers }}</div>
+        <div class="stat-description">Distinct Biller usernames in accuracy records</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-card-top"><span class="stat-label">QC Monitored</span><span class="stat-icon">✓</span></div>
+        <div class="stat-value">{{ counts.qcs }}</div>
+        <div class="stat-description">Distinct QC names in assigned-project error records</div>
+    </div>
+</div>
+
+{% if not projects %}
+<section class="content-card">
+    <div class="empty-state">
+        <h3>No Assigned Active Projects</h3>
+        <p>Please contact Admin to assign one or more active projects to your Supervisor account.</p>
+    </div>
+</section>
+{% endif %}
+{% endblock %}
