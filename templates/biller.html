@@ -110,6 +110,8 @@
     </div>
 
     <!-- PERIOD FILTERS -->
+    <input type="hidden" name="history_project_id" value="{{ history_project|default('all') }}">
+    <input type="hidden" name="history_period" value="{{ history_period_type|default('monthly') }}">
     <form method="GET"
           action="{{ url_for('biller_dashboard') }}"
           class="filter-bar">
@@ -129,6 +131,15 @@
                 <option value="all" {% if selected_project == 'all' %}selected{% endif %}>All Assigned Projects</option>
                 {% for project in projects %}
                     <option value="{{ project.id }}" {% if selected_project == project.id|string %}selected{% endif %}>{{ project.project_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="date">Period</label>
+            <select name="date" id="date" onchange="this.form.submit()">
+                {% for item in periods %}
+                    <option value="{{ item }}" {% if selected_period == item %}selected{% endif %}>{{ item }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -227,6 +238,28 @@
             <p>All available periods, newest first.</p>
         </div>
     </div>
+    <form method="GET" action="{{ url_for('biller_dashboard') }}" class="filter-bar">
+        <input type="hidden" name="project_id" value="{{ selected_project }}">
+        <input type="hidden" name="period" value="{{ period_type }}">
+        <input type="hidden" name="date" value="{{ selected_period }}">
+        <div class="filter-group">
+            <label for="history_project_id">History Project</label>
+            <select name="history_project_id" id="history_project_id" onchange="this.form.submit()">
+                <option value="all" {% if history_project == 'all' %}selected{% endif %}>All Assigned Projects</option>
+                {% for project in projects %}
+                    <option value="{{ project.id }}" {% if history_project|string == project.id|string %}selected{% endif %}>{{ project.project_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="history_period">History Period Type</label>
+            <select name="history_period" id="history_period" onchange="this.form.submit()">
+                <option value="daily" {% if history_period_type == 'daily' %}selected{% endif %}>Daily</option>
+                <option value="weekly" {% if history_period_type == 'weekly' %}selected{% endif %}>Weekly</option>
+                <option value="monthly" {% if history_period_type == 'monthly' %}selected{% endif %}>Monthly</option>
+            </select>
+        </div>
+    </form>
     <div class="table-responsive">
         <table class="data-table">
             <thead><tr>
