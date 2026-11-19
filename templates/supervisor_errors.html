@@ -41,7 +41,13 @@
                     <td>{{ record.source or '—' }}</td>
                     <td>{{ record.auditor or '—' }}</td>
                     <td>{{ record.audit_type or '—' }}</td>
-                    <td>{{ record.verified_error or '—' }}</td>
+                    <td>
+                        {% if record.biller_comment and record.biller_comment|trim %}
+                            {{ record.verified_error or '—' }}
+                        {% else %}
+                            PENDING
+                        {% endif %}
+                    </td>
                     <td class="comment-cell">{{ record.biller_comment or '—' }}</td>
                     <td class="comment-cell">{{ record.qc_explanation or '—' }}</td>
                     <td>{{ record.qc_name or '—' }}</td>
