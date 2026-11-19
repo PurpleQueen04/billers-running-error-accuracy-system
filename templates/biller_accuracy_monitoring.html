@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Biller Accuracy Monitoring{% endblock %}
+{% block page_heading %}Biller Accuracy Monitoring{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Biller Accuracy Monitoring</h1><p>View accuracy summary and historical performance using independent filters.</p></div><span class="section-tag">{{ role|upper }} VIEW</span></div>
+<section class="content-card">
+ <div class="section-heading"><div><h2>Biller Accuracy Summary</h2><p>These filters control only the summary below.</p></div></div>
+ <form method="GET" class="filter-bar">
+  <div class="filter-group"><label for="project_id">Project</label><select name="project_id" id="project_id" onchange="this.form.submit()"><option value="all" {% if selected_project == 'all' %}selected{% endif %}>{% if role == 'admin' %}All Projects{% else %}All Assigned Projects{% endif %}</option>{% for project in projects %}<option value="{{ project.id }}" {% if selected_project|string == project.id|string %}selected{% endif %}>{{ project.project_name }}</option>{% endfor %}</select></div>
+  <div class="filter-group"><label for="period">Period Type</label><select name="period" id="period" onchange="this.form.submit()"><option value="daily" {% if period_type == 'daily' %}selected{% endif %}>Daily</option><option value="weekly" {% if period_type == 'weekly' %}selected{% endif %}>Weekly</option><option value="monthly" {% if period_type == 'monthly' %}selected{% endif %}>Monthly</option></select></div>
+  <div class="filter-group"><label for="date">Period</label><select name="date" id="date" onchange="this.form.submit()">{% for item in periods %}<option value="{{ item }}" {% if selected_period == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></div>
+  <input type="hidden" name="history_project_id" value="{{ history_project|default('all') }}"><input type="hidden" name="history_period" value="{{ history_period_type|default('monthly') }}">
+ </form>
+ <div class="accuracy-summary-grid">
+ {% if role == 'biller' %}{% set cards = [('INTERNAL',internal_summary),('EXTERNAL_WC',external_wc_summary),('EXTERNAL_WOC',external_woc_summary)] %}
+ {% else %}{% set cards = [('INTERNAL',summary.get('INTERNAL',{})),('EXTERNAL_WC',summary.get('EXTERNAL_WC',{})),('EXTERNAL_WOC',summary.get('EXTERNAL_WOC',{}))] %}{% endif %}
+ {% for label,item in cards %}<div class="accuracy-summary-card"><div class="stat-card-top"><span class="stat-label">{{ label }}</span></div><div class="stat-value">{{ format_accuracy(item.accuracy) }}</div><div class="accuracy-progress"><div class="accuracy-progress-fill" style="width:{{ item.accuracy if item.accuracy is not none else 0 }}%;"></div></div><div class="accuracy-details"><span>Audited: {{ item.audited|default(0)|int }}</span><span>Errors: {{ item.errors|default(0)|int }}</span></div></div>{% endfor %}
+ </div>
+</section>
+<section class="content-card">
+ <div class="section-heading"><div><h2>Accuracy History</h2><p>All available periods, newest first. These filters are independent of the Summary.</p></div></div>
+ <form method="GET" class="filter-bar">
+  <input type="hidden" name="project_id" value="{{ selected_project }}"><input type="hidden" name="period" value="{{ period_type }}"><input type="hidden" name="date" value="{{ selected_period }}">
+  <div class="filter-group"><label for="history_project_id">Project</label><select name="history_project_id" id="history_project_id" onchange="this.form.submit()"><option value="all" {% if history_project == 'all' %}selected{% endif %}>{% if role == 'admin' %}All Projects{% else %}All Assigned Projects{% endif %}</option>{% for project in projects %}<option value="{{ project.id }}" {% if history_project|string == project.id|string %}selected{% endif %}>{{ project.project_name }}</option>{% endfor %}</select></div>
+  <div class="filter-group"><label for="history_period">Period Type</label><select name="history_period" id="history_period" onchange="this.form.submit()"><option value="daily" {% if history_period_type == 'daily' %}selected{% endif %}>Daily</option><option value="weekly" {% if history_period_type == 'weekly' %}selected{% endif %}>Weekly</option><option value="monthly" {% if history_period_type == 'monthly' %}selected{% endif %}>Monthly</option></select></div>
+ </form>
+ <div class="table-responsive"><table class="data-table"><thead><tr><th>Period</th><th>INTERNAL</th><th>EXTERNAL_WC</th><th>EXTERNAL_WOC</th></tr></thead><tbody>{% for item in period_history %}<tr><td>{{ item.period }}</td><td>{{ format_accuracy(item.INTERNAL) }}</td><td>{{ format_accuracy(item.EXTERNAL_WC) }}</td><td>{{ format_accuracy(item.EXTERNAL_WOC) }}</td></tr>{% else %}<tr><td colspan="4">No accuracy history available.</td></tr>{% endfor %}</tbody></table></div>
+</section>
+{% endblock %}
