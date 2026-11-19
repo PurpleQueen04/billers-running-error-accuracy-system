@@ -68,16 +68,33 @@
 <section class="content-card">
     <form method="GET" action="{{ url_for('supervisor_errors') }}" class="filter-bar supervisor-error-filters">
         <div class="filter-group">
-            <label for="date_from">Date From</label>
-            <input type="date" id="date_from" name="date_from" value="{{ date_from or '' }}">
+            <label for="period">Reporting Period</label>
+            <select name="period" id="period">
+                <option value="daily" {% if period_type == 'daily' %}selected{% endif %}>Daily</option>
+                <option value="weekly" {% if period_type == 'weekly' %}selected{% endif %}>Weekly</option>
+                <option value="monthly" {% if period_type == 'monthly' %}selected{% endif %}>Monthly</option>
+            </select>
         </div>
         <div class="filter-group">
-            <label for="date_to">Date To</label>
-            <input type="date" id="date_to" name="date_to" value="{{ date_to or '' }}">
+            <label for="date">Select Period</label>
+            <select name="date" id="date">
+                {% for period in periods %}
+                    <option value="{{ period }}" {% if selected_period == period %}selected{% endif %}>{{ period }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="source">Source</label>
+            <select name="source" id="source">
+                <option value="all" {% if selected_source == 'all' %}selected{% endif %}>All Sources</option>
+                {% for source in sources %}
+                    <option value="{{ source }}" {% if selected_source == source %}selected{% endif %}>{{ source }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div class="filter-actions">
-            <button type="submit" class="btn btn-primary">Apply Date Range</button>
-            <a href="{{ url_for('supervisor_errors') }}" class="btn btn-secondary">Clear</a>
+            <button type="submit" class="btn btn-primary">Apply Filters</button>
+            <a href="{{ url_for('supervisor_errors') }}" class="btn btn-secondary">Reset</a>
         </div>
         <div class="filter-group search-group">
             <label for="recordSearch">Search Records</label>
@@ -131,7 +148,7 @@
     {% else %}
     <div class="empty-state">
         <h3>No Error Records Found</h3>
-        <p>No error records match the selected date range in your assigned projects.</p>
+        <p>No error records match the selected reporting period and source in your assigned projects.</p>
     </div>
     {% endif %}
 </section>
