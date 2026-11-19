@@ -5,13 +5,13 @@
 
 <div class="page-header">
     <div>
-        <h1>QC Error Verification</h1>
-        <p>Review disputed error records from your assigned projects.</p>
+        <h1>{% if page_mode|default('pending') == 'completed' %}Error Details{% else %}QC Error Verification{% endif %}</h1>
+        <p>{% if page_mode|default('pending') == 'completed' %}Review QC responses already submitted for your assigned projects.{% else %}Review and submit explanations for disputed error records from your assigned projects.{% endif %}</p>
     </div>
 
     <div class="section-tag">
         <span class="status-dot warning"></span>
-        Pending Verification
+        {% if page_mode|default('pending') == 'completed' %}Completed Responses{% else %}Pending Verification{% endif %}
     </div>
 </div>
 
@@ -19,7 +19,7 @@
 <div class="stats-grid qc-stats-grid">
     <div class="stat-card">
         <div class="stat-card-top">
-            <span class="stat-label">Pending Error Records</span>
+            <span class="stat-label">{% if page_mode|default('pending') == 'completed' %}Completed Error Details{% else %}Pending Error Records{% endif %}</span>
             <span class="stat-icon warning">
                 <i class="fa-solid fa-triangle-exclamation"></i>
             </span>
@@ -30,7 +30,7 @@
         </div>
 
         <div class="stat-description">
-            Records marked VERIFIED ERROR = N
+            {% if page_mode|default('pending') == 'completed' %}Records with a submitted QC explanation{% else %}Records awaiting a QC explanation{% endif %}
         </div>
     </div>
 
@@ -47,7 +47,7 @@
         </div>
 
         <div class="stat-description">
-            Dates with pending error records
+            Dates with {% if page_mode|default('pending') == 'completed' %}completed{% else %}pending{% endif %} QC responses
         </div>
     </div>
 </div>
@@ -112,7 +112,7 @@
 
     <div class="section-heading">
         <div>
-            <h2>Error Records</h2>
+            <h2>{% if page_mode|default('pending') == 'completed' %}Error Details{% else %}Error Verification{% endif %}</h2>
             <p>Filter records by billed date.</p>
         </div>
 
@@ -122,7 +122,7 @@
     </div>
 
     <form method="GET"
-          action="{{ url_for('qc_errors') }}"
+          action="{% if page_mode|default('pending') == 'completed' %}{{ url_for('qc_error_details') }}{% else %}{{ url_for('qc_errors') }}{% endif %}"
           class="filter-bar">
 
         <div class="filter-group">
@@ -153,7 +153,7 @@
         </noscript>
 
         {% if selected_date %}
-            <a href="{{ url_for('qc_errors') }}"
+            <a href="{% if page_mode|default('pending') == 'completed' %}{{ url_for('qc_error_details') }}{% else %}{{ url_for('qc_errors') }}{% endif %}"
                class="btn btn-secondary">
                 Clear Filter
             </a>
@@ -169,10 +169,10 @@
 
     <div class="section-heading">
         <div>
-            <h2>Pending Error Details</h2>
+            <h2>{% if page_mode|default('pending') == 'completed' %}Error Details{% else %}Pending Error Details{% endif %}</h2>
             <p>
                 Only records assigned to your QC account
-                with VERIFIED ERROR = N are displayed.
+                {% if page_mode|default('pending') == 'completed' %}with a submitted QC explanation are displayed.{% else %}awaiting a QC explanation are displayed.{% endif %}
             </p>
         </div>
     </div>
@@ -201,7 +201,7 @@
                         <th>QC EXPLANATION</th>
                         <th>QC NAME</th>
                         <th>LAST UPDATED</th>
-                        <th>ACTION</th>
+                        {% if page_mode|default('pending') != 'completed' %}<th>ACTION</th>{% endif %}
                     </tr>
                 </thead>
 
@@ -276,6 +276,7 @@
                                 {{ error.updated_at or '—' }}
                             </td>
 
+                            {% if page_mode|default('pending') != 'completed' %}
                             <td>
                                 <button type="button"
                                         class="btn btn-primary"
@@ -363,6 +364,7 @@
                                     </div>
                                 </dialog>
                             </td>
+                            {% endif %}
                         </tr>
 
                     {% endfor %}
@@ -380,7 +382,7 @@
                 <i class="fa-solid fa-circle-check"></i>
             </div>
 
-            <h3>No Pending Error Records</h3>
+            <h3>{% if page_mode|default('pending') == 'completed' %}No Completed Error Details{% else %}No Pending Error Records{% endif %}</h3>
 
             <p>
                 {% if selected_date %}
