@@ -131,6 +131,42 @@
                     <span>Import History</span>
                 </a>
 
+            {% elif current_role == 'supervisor' %}
+
+                <div class="nav-section-label">SUPERVISOR WORKSPACE</div>
+
+                <a href="/supervisor"
+                   class="nav-link {% if request.path == '/supervisor' %}active{% endif %}">
+                    <span class="nav-icon">▦</span>
+                    <span>Dashboard</span>
+                </a>
+
+                <div class="nav-section-label">MONITORING</div>
+
+                <a href="/supervisor/errors"
+                   class="nav-link {% if request.path.startswith('/supervisor/errors') %}active{% endif %}">
+                    <span class="nav-icon">⚑</span>
+                    <span>Error Records</span>
+                </a>
+
+                <a href="/supervisor/accuracy"
+                   class="nav-link {% if request.path == '/supervisor/accuracy' %}active{% endif %}">
+                    <span class="nav-icon">↗</span>
+                    <span>Accuracy Reports</span>
+                </a>
+
+                <a href="/supervisor/biller-performance"
+                   class="nav-link {% if request.path.startswith('/supervisor/biller-performance') %}active{% endif %}">
+                    <span class="nav-icon">♙</span>
+                    <span>Biller Performance</span>
+                </a>
+
+                <a href="/supervisor/qc-performance"
+                   class="nav-link {% if request.path.startswith('/supervisor/qc-performance') %}active{% endif %}">
+                    <span class="nav-icon">✓</span>
+                    <span>QC Performance</span>
+                </a>
+
             {% elif current_role == 'biller' %}
 
                 <div class="nav-section-label">MY WORKSPACE</div>
