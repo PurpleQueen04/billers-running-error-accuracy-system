@@ -7673,9 +7673,28 @@ def supervisor_errors():
 
     project_ids = get_user_project_ids()
     records = []
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
 
     if project_ids:
         placeholders = ", ".join(["?"] * len(project_ids))
+        date_filters = []
+        params = list(project_ids)
+
+        # Billed dates are stored in ISO YYYY-MM-DD format.
+        if date_from:
+            date_filters.append("e.billed_date >= ?")
+            params.append(date_from)
+
+        if date_to:
+            date_filters.append("e.billed_date <= ?")
+            params.append(date_to)
+
+        date_sql = ""
+        if date_filters:
+            date_sql = " AND " + " AND ".join(date_filters)
+
+        limit_sql = "" if date_filters else " LIMIT 500"
 
         with db() as con:
             rows = con.execute(
@@ -7699,6 +7718,7 @@ def supervisor_errors():
                 INNER JOIN projects p
                     ON p.id = e.project_id
                 WHERE e.project_id IN ({placeholders})
+                    {date_sql}
                 ORDER BY
                     CASE
                         WHEN e.billed_date IS NULL OR e.billed_date = ''
@@ -7706,16 +7726,18 @@ def supervisor_errors():
                     END,
                     e.billed_date DESC,
                     e.record_key DESC
-                LIMIT 500
+                {limit_sql}
                 """,
-                tuple(project_ids)
+                tuple(params)
             ).fetchall()
 
         records = [dict(row) for row in rows]
 
     return render_template(
         "supervisor_errors.html",
-        records=records
+        records=records,
+        date_from=date_from,
+        date_to=date_to
     )
 
 
