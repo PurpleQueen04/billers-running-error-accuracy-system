@@ -99,6 +99,8 @@
                     <span>Accuracy Improvement Monitoring</span>
                 </a>
 
+                <a href="/admin/biller-accuracy" class="nav-link {% if request.path == '/admin/biller-accuracy' %}active{% endif %}"><span class="nav-icon">↗</span><span>Biller Accuracy Monitoring</span></a>
+
                 <div class="nav-section-label">SYSTEM</div>
 
                 <a href="/admin/import-history"
@@ -137,11 +139,7 @@
                     <span>Error Details</span>
                 </a>
 
-                <a href="/qc/accuracy"
-                   class="nav-link {% if request.path.startswith('/qc/accuracy') %}active{% endif %}">
-                    <span class="nav-icon">↗</span>
-                    <span>Accuracy Monitoring</span>
-                </a>
+                <a href="/qc/biller-accuracy" class="nav-link {% if request.path == '/qc/biller-accuracy' %}active{% endif %}"><span class="nav-icon">↗</span><span>Biller Accuracy Monitoring</span></a>
 
                 <a href="/qc/import-history"
                    class="nav-link {% if request.path.startswith('/qc/import-history') %}active{% endif %}">
@@ -167,11 +165,7 @@
                     <span>Error Records</span>
                 </a>
 
-                <a href="/supervisor/accuracy"
-                   class="nav-link {% if request.path == '/supervisor/accuracy' %}active{% endif %}">
-                    <span class="nav-icon">↗</span>
-                    <span>Accuracy Reports</span>
-                </a>
+                <a href="/supervisor/biller-accuracy" class="nav-link {% if request.path == '/supervisor/biller-accuracy' %}active{% endif %}"><span class="nav-icon">↗</span><span>Biller Accuracy Monitoring</span></a>
 
                 <a href="/supervisor/biller-performance"
                    class="nav-link {% if request.path.startswith('/supervisor/biller-performance') %}active{% endif %}">
@@ -203,11 +197,7 @@
                     <span>My Error Records</span>
                 </a>
 
-                <a href="/biller/accuracy"
-                   class="nav-link {% if request.path.startswith('/biller/accuracy') %}active{% endif %}">
-                    <span class="nav-icon">↗</span>
-                    <span>My Accuracy</span>
-                </a>
+                <a href="/biller/biller-accuracy" class="nav-link {% if request.path == '/biller/biller-accuracy' %}active{% endif %}"><span class="nav-icon">↗</span><span>Biller Accuracy Monitoring</span></a>
 
 
             {% endif %}

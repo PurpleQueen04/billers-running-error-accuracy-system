@@ -3693,6 +3693,72 @@ def logout():
 
 
 
+
+# =========================================================
+# DASHBOARD ACCURACY TREND GRAPH
+# =========================================================
+def build_dashboard_graph_context(allowed_project_ids=None, username=None):
+    graph_period = normalize_text(request.args.get("graph_period")).lower() or "monthly"
+    if graph_period not in ("daily", "weekly", "monthly"):
+        graph_period = "monthly"
+    allowed_set = None if allowed_project_ids is None else {int(v) for v in allowed_project_ids}
+    with db() as con:
+        project_rows = con.execute("SELECT id, project_name, active FROM projects ORDER BY project_name").fetchall()
+    projects = []
+    for row in project_rows:
+        pid = int(row["id"])
+        if not bool(con_value(row, "active", 1)):
+            continue
+        if allowed_set is not None and pid not in allowed_set:
+            continue
+        projects.append({"id": pid, "project_name": row["project_name"]})
+    selected_project = normalize_text(request.args.get("graph_project_id")) or "all"
+    visible_ids = {p["id"] for p in projects}
+    if selected_project != "all":
+        try:
+            selected_id = int(selected_project)
+        except (TypeError, ValueError):
+            selected_id = None
+        if selected_id not in visible_ids:
+            selected_project = "all"
+    records = get_accuracy_records(sorted(allowed_set) if allowed_set is not None else None)
+    if username:
+        records = [r for r in records if normalize_text(r.get("username")).casefold() == normalize_text(username).casefold()]
+    if selected_project != "all":
+        selected_id = int(selected_project)
+        records = [r for r in records if r.get("project_id") is not None and int(r["project_id"]) == selected_id]
+    latest_imports = {}
+    for row in records:
+        pid = int(row["project_id"]) if row.get("project_id") is not None else None
+        sheet = normalize_text(row.get("sheet")).upper()
+        imported_at = normalize_text(row.get("imported_at"))
+        if imported_at and imported_at > latest_imports.get((pid, sheet), ""):
+            latest_imports[(pid, sheet)] = imported_at
+    period_totals = {}
+    for row in records:
+        pid = int(row["project_id"]) if row.get("project_id") is not None else None
+        sheet = normalize_text(row.get("sheet")).upper()
+        if normalize_text(row.get("imported_at")) != latest_imports.get((pid, sheet)):
+            continue
+        key = accuracy_period_key(row.get("record_date"), graph_period, row.get("month"))
+        kind = normalize_accuracy_type(row.get("accuracy_type"))
+        if not key or kind not in ("INTERNAL", "EXTERNAL_WC", "EXTERNAL_WOC"):
+            continue
+        totals = period_totals.setdefault(key, {k: {"audited": 0.0, "errors": 0.0} for k in ("INTERNAL", "EXTERNAL_WC", "EXTERNAL_WOC")})
+        totals[kind]["audited"] += number_value(row.get("audited")) or 0
+        totals[kind]["errors"] += number_value(row.get("errors")) or 0
+    labels = sorted(period_totals)
+    def series(kind):
+        return [calculate_weighted_accuracy(period_totals[k][kind]["audited"], period_totals[k][kind]["errors"]) for k in labels]
+    return {
+        "graph_projects": projects, "graph_selected_project": selected_project,
+        "graph_period": graph_period, "graph_labels": labels,
+        "graph_internal": series("INTERNAL"),
+        "graph_external_wc": series("EXTERNAL_WC"),
+        "graph_external_woc": series("EXTERNAL_WOC")
+    }
+
+
 # =========================================================
 # ADMIN DASHBOARD
 # =========================================================
@@ -3742,23 +3808,8 @@ def admin_dashboard():
         "active_users": int(active_users["total"] or 0)
     }
 
-    accuracy_context = build_accuracy_context(
-        allowed_project_ids=None,
-        selected_project=normalize_text(request.args.get("project_id")) or "all",
-        period_type=normalize_text(request.args.get("period")).lower() or "monthly",
-        selected_period=normalize_text(request.args.get("date")),
-        below_from_date=normalize_text(request.args.get("below_from")),
-        below_to_date=normalize_text(request.args.get("below_to")),
-        below_category=normalize_text(request.args.get("below_category")).lower() or "all",
-        history_project=normalize_text(request.args.get("history_project_id")) or "all",
-        history_period_type=normalize_text(request.args.get("history_period")).lower() or "monthly"
-    )
-
-    return render_template(
-        "admin.html",
-        counts=counts,
-        **accuracy_context
-    )
+    graph_context = build_dashboard_graph_context(allowed_project_ids=None)
+    return render_template("admin.html", counts=counts, **graph_context)
 
 
 @app.route("/admin/workbook-import")
@@ -7224,6 +7275,44 @@ def get_biller_accuracy_summary(
         "external_woc_summary": summaries["EXTERNAL_WOC"]
     }
 
+
+# =========================================================
+# BILLER ACCURACY MONITORING
+# =========================================================
+@app.route("/admin/biller-accuracy")
+@app.route("/qc/biller-accuracy")
+@app.route("/supervisor/biller-accuracy")
+@app.route("/biller/biller-accuracy")
+@login_required
+def biller_accuracy_monitoring():
+    role = normalize_text(session.get("role")).lower()
+    requested_role = request.path.strip("/").split("/", 1)[0]
+    if role not in ("admin", "qc", "supervisor", "biller") or role != requested_role:
+        abort(403)
+    allowed_ids = None if role == "admin" else (
+        get_biller_project_ids() if role == "biller" else get_user_project_ids()
+    )
+    selected_project = normalize_text(request.args.get("project_id")) or "all"
+    period_type = normalize_text(request.args.get("period")).lower() or "monthly"
+    selected_period = normalize_text(request.args.get("date"))
+    history_project = normalize_text(request.args.get("history_project_id")) or "all"
+    history_period_type = normalize_text(request.args.get("history_period")).lower() or "monthly"
+    if role == "biller":
+        context = get_biller_accuracy_summary(
+            session.get("username", ""), allowed_ids or [], period_type,
+            selected_period, selected_project, history_project=history_project,
+            history_period_type=history_period_type
+        )
+    else:
+        context = build_accuracy_context(
+            allowed_project_ids=allowed_ids, selected_project=selected_project,
+            period_type=period_type, selected_period=selected_period,
+            history_project=history_project, history_period_type=history_period_type
+        )
+    return render_template("biller_accuracy_monitoring.html", role=role,
+                           format_accuracy=format_accuracy, **context)
+
+
 # =========================================================
 # BILLER DASHBOARD
 # =========================================================
@@ -7261,12 +7350,9 @@ def biller_dashboard():
             history_period_type=normalize_text(request.args.get("history_period")).lower() or "monthly"
         )
 
-        return render_template(
-            "biller.html",
-            response_counts=response_counts,
-            **accuracy_context,
-            format_accuracy=format_accuracy
-        )
+        graph_context = build_dashboard_graph_context(allowed_project_ids=[], username=username)
+        return render_template("biller.html", response_counts=response_counts,
+                               format_accuracy=format_accuracy, **graph_context)
 
     placeholders = ", ".join(
         ["?"] * len(project_ids)
@@ -7323,12 +7409,9 @@ def biller_dashboard():
         history_period_type=normalize_text(request.args.get("history_period")).lower() or "monthly"
     )
 
-    return render_template(
-        "biller.html",
-        response_counts=response_counts,
-        **accuracy_context,
-        format_accuracy=format_accuracy
-    )
+    graph_context = build_dashboard_graph_context(allowed_project_ids=project_ids, username=username)
+    return render_template("biller.html", response_counts=response_counts,
+                           format_accuracy=format_accuracy, **graph_context)
 
 
 # =========================================================
@@ -7514,10 +7597,8 @@ def qc_dashboard():
             ).fetchall()
         projects = [dict(row) for row in rows]
 
-    return render_template(
-        "qc_dashboard.html",
-        projects=projects
-    )
+    graph_context = build_dashboard_graph_context(allowed_project_ids=project_ids)
+    return render_template("qc_dashboard.html", projects=projects, **graph_context)
 
 
 # =========================================================
@@ -7848,12 +7929,11 @@ def supervisor_dashboard():
             "qcs": int(qc_row["total"] or 0)
         }
 
+    graph_context = build_dashboard_graph_context(allowed_project_ids=project_ids)
     return render_template(
-        "supervisor.html",
-        counts=counts,
-        projects=projects,
-        selected_project=selected_project,
-        format_accuracy=format_accuracy
+        "supervisor.html", counts=counts, projects=projects,
+        selected_project=selected_project, format_accuracy=format_accuracy,
+        **graph_context
     )
 
 
