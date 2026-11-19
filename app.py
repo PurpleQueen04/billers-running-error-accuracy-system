@@ -7629,22 +7629,17 @@ def supervisor_dashboard():
                 tuple(scoped_ids)
             ).fetchone()
 
-            accuracy_rows = con.execute(
-                f"""
-                SELECT audited, errors
-                FROM accuracy_records
-                WHERE project_id IN ({placeholders})
-                """,
-                tuple(scoped_ids)
-            ).fetchall()
+        accuracy_context = build_accuracy_context(
+            allowed_project_ids=scoped_ids
+        )
 
         total_audited = sum(
-            number_value(row["audited"]) or 0
-            for row in accuracy_rows
+            item["audited"]
+            for item in accuracy_context["summary"].values()
         )
         total_accuracy_errors = sum(
-            number_value(row["errors"]) or 0
-            for row in accuracy_rows
+            item["errors"]
+            for item in accuracy_context["summary"].values()
         )
 
         counts = {
