@@ -16,6 +16,7 @@
 </div>
 
 
+{% if show_accuracy_summary|default(true) %}
 <!-- FILTERS -->
 <div class="content-card">
 
@@ -181,6 +182,9 @@
 </div>
 
 
+{% endif %}
+
+{% if show_below_90|default(true) %}
 <!-- BELOW 90% ACCURACY -->
 <div class="content-card">
 
@@ -202,18 +206,20 @@
           action="{{ url_for(accuracy_endpoint) }}"
           class="filter-bar">
 
-        <!-- PRESERVE MAIN ACCURACY FILTERS -->
-        <input type="hidden"
-               name="project_id"
-               value="{{ selected_project }}">
-
-        <input type="hidden"
-               name="period"
-               value="{{ period_type }}">
-
-        <input type="hidden"
-               name="date"
-               value="{{ selected_period }}">
+        <div class="filter-group">
+            <label for="below_project_id">Project</label>
+            <select name="project_id" id="below_project_id">
+                <option value="all" {% if selected_project == 'all' %}selected{% endif %}>
+                    All Assigned Projects
+                </option>
+                {% for project in projects %}
+                    <option value="{{ project.id }}"
+                        {% if selected_project|string == project.id|string %}selected{% endif %}>
+                        {{ project.project_name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
 
         <div class="filter-group">
             <label for="below_from">From Date</label>
@@ -386,6 +392,9 @@
 </div>
 
 
+{% endif %}
+
+{% if show_improvements|default(true) %}
 <!-- ACCURACY IMPROVEMENTS -->
 <div class="content-card">
 
@@ -508,6 +517,8 @@
 
 </div>
 
+
+{% endif %}
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
