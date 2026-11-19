@@ -7349,7 +7349,7 @@ def biller_dashboard():
             history_period_type=normalize_text(request.args.get("history_period")).lower() or "monthly"
         )
 
-            graph_context = build_dashboard_graph_context(allowed_project_ids=[], username=username)
+        graph_context = build_dashboard_graph_context(allowed_project_ids=[], username=username)
         return render_template("biller.html", response_counts=response_counts,
                                format_accuracy=format_accuracy, **graph_context)
 
