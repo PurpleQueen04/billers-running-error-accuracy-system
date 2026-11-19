@@ -110,11 +110,12 @@
     </div>
 
     <!-- PERIOD FILTERS -->
-    <input type="hidden" name="history_project_id" value="{{ history_project|default('all') }}">
-    <input type="hidden" name="history_period" value="{{ history_period_type|default('monthly') }}">
     <form method="GET"
           action="{{ url_for('biller_dashboard') }}"
           class="filter-bar">
+
+        <input type="hidden" name="history_project_id" value="{{ history_project|default('all') }}">
+        <input type="hidden" name="history_period" value="{{ history_period_type|default('monthly') }}">
 
         <div class="filter-group">
             <label for="period">View By</label>
