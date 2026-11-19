@@ -123,7 +123,7 @@ document.addEventListener("DOMContentLoaded",function(){
  {label:"INTERNAL",data:{{ graph_internal|tojson }},borderColor:"#2563eb",backgroundColor:"#2563eb",tension:.25,spanGaps:true},
  {label:"EXTERNAL_WC",data:{{ graph_external_wc|tojson }},borderColor:"#16a34a",backgroundColor:"#16a34a",tension:.25,spanGaps:true},
  {label:"EXTERNAL_WOC",data:{{ graph_external_woc|tojson }},borderColor:"#f97316",backgroundColor:"#f97316",tension:.25,spanGaps:true}
- ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},plugins:{legend:{display:false}},scales:{y:{min:0,max:100,ticks:{callback:v=>v+"%"}},x:{grid:{display:false}}}}});
+ ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},plugins:{legend:{display:false}},scales:{y:{min:70,max:100,ticks:{callback:v=>v+"%"}},x:{grid:{display:false}}}}});
 });
 </script>
 <style>.accuracy-graph-legend{display:flex;flex-wrap:wrap;gap:18px;margin-top:16px;font-size:12px;font-weight:700;color:#64748b}.accuracy-graph-legend span{display:inline-flex;align-items:center;gap:7px}.accuracy-graph-legend i{display:inline-block;width:9px;height:9px;border-radius:50%}</style>
