@@ -7309,8 +7309,16 @@ def biller_accuracy_monitoring():
             period_type=period_type, selected_period=selected_period,
             history_project=history_project, history_period_type=history_period_type
         )
-    return render_template("biller_accuracy_monitoring.html", role=role,
-                           format_accuracy=format_accuracy, **context)
+    # Keep one authoritative context dictionary. build_accuracy_context()
+    # already includes format_accuracy; passing it again as an explicit
+    # keyword causes a duplicate-keyword TypeError for Admin, QC, and Supervisor.
+    context["role"] = role
+    context["format_accuracy"] = format_accuracy
+
+    return render_template(
+        "biller_accuracy_monitoring.html",
+        **context
+    )
 
 
 # =========================================================
