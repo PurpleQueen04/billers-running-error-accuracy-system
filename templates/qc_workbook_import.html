@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block page_heading %}Workbook Import{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Workbook Import</h1>
+        <p>Upload CSV, XLS, XLSX, or ODS files for your assigned active projects only.</p>
+    </div>
+    <span class="section-tag">QC WORKSPACE</span>
+</div>
+
+<section class="content-card upload-section">
+    <div class="section-heading">
+        <div>
+            <h2>Workbook Import</h2>
+            <p>Imports are restricted to projects assigned to your QC account.</p>
+        </div>
+        <span class="section-tag">QC ACCESS</span>
+    </div>
+
+    <form method="POST"
+          action="{{ url_for('qc_upload_workbook') }}"
+          enctype="multipart/form-data"
+          class="upload-form">
+        <input type="hidden" name="csrf_token" value="{{ session.get('csrf_token', '') }}">
+
+        <div class="form-group">
+            <label for="qc_source_file">Select Workbook</label>
+            <input type="file" name="source_file" id="qc_source_file"
+                   accept=".csv,.xls,.xlsx,.ods" required>
+            <small>Supported formats: CSV, XLS, XLSX, ODS</small>
+        </div>
+
+        <div class="form-group">
+            <label for="qc_upload_project">Target Project</label>
+            <select name="project_id" id="qc_upload_project" required>
+                <option value="">Select assigned project</option>
+                {% if projects|length > 1 %}
+                    <option value="all">All Assigned Projects — use PROJECT column</option>
+                {% endif %}
+                {% for project in projects %}
+                    <option value="{{ project.id }}">{{ project.project_name }}</option>
+                {% endfor %}
+            </select>
+            <small>When selecting All Assigned Projects, every imported row must identify its PROJECT.</small>
+        </div>
+
+        <div class="form-group">
+            <label for="qc_csv_sheet">Import Type</label>
+            <select name="csv_sheet" id="qc_csv_sheet" required>
+                <option value="ERROR">Error Records</option>
+                <option value="INTERNAL">Internal Accuracy</option>
+                <option value="EXTERNAL">External Accuracy</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" {% if not projects %}disabled{% endif %}>
+            ⇧ Upload Workbook
+        </button>
+    </form>
+
+    {% if not projects %}
+        <p class="form-hint">Your QC account has no assigned active projects. Please contact Admin.</p>
+    {% endif %}
+</section>
+{% endblock %}

@@ -3832,6 +3832,34 @@ def admin_workbook_import():
     )
 
 
+@app.route("/qc/workbook-import")
+@login_required
+@qc_required
+def qc_workbook_import():
+    project_ids = get_user_project_ids()
+    projects = []
+
+    if project_ids:
+        placeholders = ", ".join(["?"] * len(project_ids))
+        with db() as con:
+            rows = con.execute(
+                f"""
+                SELECT id, project_name
+                FROM projects
+                WHERE active = 1
+                  AND id IN ({placeholders})
+                ORDER BY project_name
+                """,
+                tuple(project_ids)
+            ).fetchall()
+        projects = [dict(row) for row in rows]
+
+    return render_template(
+        "qc_workbook_import.html",
+        projects=projects
+    )
+
+
 @app.route("/admin/billers-below-90")
 @login_required
 @admin_required
@@ -3932,22 +3960,22 @@ def qc_upload_workbook():
     allowed_ids = get_user_project_ids(session.get("user_id"))
     if not allowed_ids:
         flash("Your QC account has no assigned active project.", "warning")
-        return redirect(url_for("qc_dashboard"))
+        return redirect(url_for("qc_workbook_import"))
 
     uploaded_file = request.files.get("source_file")
     if not uploaded_file or not uploaded_file.filename:
         flash("Please select a workbook or CSV file.", "warning")
-        return redirect(url_for("qc_dashboard"))
+        return redirect(url_for("qc_workbook_import"))
 
     filename = secure_filename(uploaded_file.filename)
     if not allowed_file(filename):
         flash("Unsupported file type. Allowed: ODS, XLSX, XLS, and CSV.", "danger")
-        return redirect(url_for("qc_dashboard"))
+        return redirect(url_for("qc_workbook_import"))
 
     csv_sheet = normalize_text(request.form.get("csv_sheet", "ERROR")).upper()
     if csv_sheet not in ("ERROR", "INTERNAL", "EXTERNAL"):
         flash("Invalid import type.", "danger")
-        return redirect(url_for("qc_dashboard"))
+        return redirect(url_for("qc_workbook_import"))
 
     selected_project = normalize_text(request.form.get("project_id")) or ""
     default_project_id = None
@@ -3956,14 +3984,14 @@ def qc_upload_workbook():
             default_project_id = int(selected_project)
         except ValueError:
             flash("Invalid project selection.", "danger")
-            return redirect(url_for("qc_dashboard"))
+            return redirect(url_for("qc_workbook_import"))
         if default_project_id not in allowed_ids:
             abort(403)
     elif selected_project == "all":
         default_project_id = None
     else:
         flash("Please select an assigned project, or choose All Assigned Projects and include a PROJECT column.", "warning")
-        return redirect(url_for("qc_dashboard"))
+        return redirect(url_for("qc_workbook_import"))
 
     try:
         sheets = read_source(uploaded_file, csv_sheet=csv_sheet)
@@ -3981,7 +4009,7 @@ def qc_upload_workbook():
     except Exception:
         app.logger.exception("QC workbook import failed")
         flash("Workbook import failed. No successful import was confirmed. Please check the workbook format and server logs.", "danger")
-    return redirect(url_for("qc_dashboard"))
+    return redirect(url_for("qc_workbook_import"))
 
 # =========================================================
 # ADMIN ACCOUNT MANAGEMENT
