@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}QC Performance{% endblock %}
+{% block page_heading %}QC Performance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>QC Performance</h1>
+        <p>View QC activity summaries for your assigned projects. This page is view only.</p>
+    </div>
+    <span class="section-tag">{{ rows|length }} QC / Project Rows</span>
+</div>
+
+<section class="content-card">
+    {% if rows %}
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr><th>PROJECT</th><th>QC NAME</th><th>TOTAL ERROR RECORDS</th><th>VERIFIED ERRORS</th><th>DISPUTED ERRORS</th></tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td>{{ row.project_name }}</td>
+                    <td><strong>{{ row.qc_name }}</strong></td>
+                    <td>{{ row.total_records or 0 }}</td>
+                    <td>{{ row.verified_errors or 0 }}</td>
+                    <td>{{ row.disputed_errors or 0 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state"><h3>No QC Performance Data</h3><p>No QC-assigned error records are available in your assigned projects yet.</p></div>
+    {% endif %}
+</section>
+{% endblock %}
