@@ -99,7 +99,7 @@
     <form method="GET" class="filter-bar">
         <div class="filter-group"><label for="graph_project_id">Project</label>
             <select name="graph_project_id" id="graph_project_id" onchange="this.form.submit()">
-                <option value="all" {% if session.get('role')|lower == 'admin' %}selected{% if graph_selected_project == 'all' %} selected{% endif %}{% else %} {% if graph_selected_project == 'all' %}selected{% endif %}{% endif %}>{% if session.get('role')|lower == 'admin' %}All Projects{% else %}All Assigned Projects{% endif %}</option>
+                <option value="all" {% if graph_selected_project == 'all' %}selected{% endif %}>{% if session.get('role')|lower == 'admin' %}All Projects{% else %}All Assigned Projects{% endif %}</option>
                 {% for project in graph_projects %}<option value="{{ project.id }}" {% if graph_selected_project|string == project.id|string %}selected{% endif %}>{{ project.project_name }}</option>{% endfor %}
             </select>
         </div>
