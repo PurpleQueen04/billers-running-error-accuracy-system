@@ -1649,7 +1649,7 @@ def get_active_session_user():
         user["role"]
     ).lower()
 
-    if current_role not in ("admin", "qc", "biller"):
+    if current_role not in ("admin", "qc", "biller", "supervisor"):
         session.clear()
         return None
 
@@ -3600,7 +3600,7 @@ def login():
             user["role"]
         ).lower()
 
-        if role not in ("admin", "biller", "qc"):
+        if role not in ("admin", "biller", "qc", "supervisor"):
 
             flash(
                 "This account has an invalid role.",
@@ -3954,7 +3954,8 @@ def admin_accounts():
                 CASE LOWER(role)
                     WHEN 'admin' THEN 1
                     WHEN 'qc' THEN 2
-                    ELSE 3
+                    WHEN 'supervisor' THEN 3
+                    ELSE 4
                 END,
                 display_name,
                 username
@@ -4053,7 +4054,7 @@ def admin_accounts():
 
 # =========================================================
 # CREATE ACCOUNT
-# BILLER / QC / ADMIN
+# BILLER / QC / ADMIN / SUPERVISOR
 # =========================================================
 
 @app.route(
@@ -4111,7 +4112,8 @@ def create_account():
     if role not in (
         "admin",
         "biller",
-        "qc"
+        "qc",
+        "supervisor"
     ):
 
         flash(
@@ -4134,7 +4136,7 @@ def create_account():
         )
         return redirect(url_for("admin_accounts"))
 
-    if role in ("biller", "qc") and not clean_project_ids:
+    if role in ("biller", "qc", "supervisor") and not clean_project_ids:
 
         flash(
             "Select at least one project for this account.",
@@ -4167,7 +4169,7 @@ def create_account():
 
                 return redirect(url_for("admin_accounts"))
 
-            if role in ("biller", "qc"):
+            if role in ("biller", "qc", "supervisor"):
 
                 placeholders = ",".join(
                     ["?"] * len(clean_project_ids)
@@ -4228,7 +4230,7 @@ def create_account():
 
             # Admin accounts automatically have access
             # to all active projects.
-            if role in ("biller", "qc"):
+            if role in ("biller", "qc", "supervisor"):
 
                 con.executemany(
                     """
@@ -4473,7 +4475,7 @@ def edit_account():
 
             final_project_ids = set()
 
-            if role in ("biller", "qc"):
+            if role in ("biller", "qc", "supervisor"):
 
                 # Submitted assignments must be active.
                 if clean_project_ids:
@@ -4531,7 +4533,7 @@ def edit_account():
 
                     raise ValueError(
                         "Select at least one project "
-                        "for QC and Biller accounts."
+                        "for QC, Biller, and Supervisor accounts."
                     )
 
             # Admin accounts use global active-project access.
