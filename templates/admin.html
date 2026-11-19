@@ -43,197 +43,41 @@
     </div>
 </section>
 
-<!-- =====================================================
-     BILLER ACCURACY MONITORING
-===================================================== -->
-
-<section class="content-card accuracy-section">
-
-    <div class="section-heading">
-        <div>
-            <h2>Biller Accuracy Monitoring</h2>
-            <p>Monitor accuracy performance by project, period, and accuracy type.</p>
-        </div>
-
-        <span class="section-tag">TARGET: 90%</span>
-    </div>
-
-    <form method="GET" action="{{ url_for('admin_dashboard') }}"
-          class="filter-bar">
-    
-        <!-- PRESERVE BELOW 90% DATE FILTER -->
-        <input type="hidden"
-               name="below_from"
-               value="{{ below_from_date }}">
-    
-        <input type="hidden"
-               name="below_to"
-               value="{{ below_to_date }}">
-
-        <input type="hidden"
-               name="below_category"
-               value="{{ below_category }}">
-
-        <div class="form-group">
-            <label for="project_id">Project</label>
-
-            <select name="project_id" id="project_id" onchange="this.form.submit()">
-                <option value="all"
-                    {% if selected_project == 'all' %}selected{% endif %}>
-                    All Projects
-                </option>
-
-                {% for project in projects %}
-                    <option value="{{ project.id }}"
-                        {% if selected_project == project.id|string %}selected{% endif %}>
-                        {{ project.project_name }}
-                    </option>
-                {% endfor %}
+<!-- ACCURACY PERFORMANCE OVERVIEW -->
+<section class="content-card accuracy-graph-card">
+    <div class="section-heading"><div><h2>Accuracy Performance Overview</h2><p>Compare weighted accuracy trends across reporting periods.</p></div><span class="section-tag">PERFORMANCE TREND</span></div>
+    <form method="GET" class="filter-bar">
+        <div class="filter-group"><label for="graph_project_id">Project</label>
+            <select name="graph_project_id" id="graph_project_id" onchange="this.form.submit()">
+                <option value="all" {% if session.get('role')|lower == 'admin' %}selected{% if graph_selected_project == 'all' %} selected{% endif %}{% else %} {% if graph_selected_project == 'all' %}selected{% endif %}{% endif %}>{% if session.get('role')|lower == 'admin' %}All Projects{% else %}All Assigned Projects{% endif %}</option>
+                {% for project in graph_projects %}<option value="{{ project.id }}" {% if graph_selected_project|string == project.id|string %}selected{% endif %}>{{ project.project_name }}</option>{% endfor %}
             </select>
         </div>
-
-        <input type="hidden" name="history_project_id" value="{{ history_project|default('all') }}">
-        <input type="hidden" name="history_period" value="{{ history_period_type|default('monthly') }}">
-
-        <div class="form-group">
-            <label for="period">Period Type</label>
-
-            <select name="period" id="period" onchange="this.form.submit()">
-                <option value="daily"
-                    {% if period_type == 'daily' %}selected{% endif %}>
-                    Daily
-                </option>
-
-                <option value="weekly"
-                    {% if period_type == 'weekly' %}selected{% endif %}>
-                    Weekly
-                </option>
-
-                <option value="monthly"
-                    {% if period_type == 'monthly' %}selected{% endif %}>
-                    Monthly
-                </option>
-            </select>
-        </div>
-
-        <div class="form-group">
-            <label for="date">Period</label>
-            <select name="date" id="date" onchange="this.form.submit()">
-                {% for item in periods %}
-                    <option value="{{ item }}" {% if selected_period == item %}selected{% endif %}>{{ item }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-    </form>
-
-
-    <!-- ACCURACY TYPE SUMMARY -->
-
-    <div class="accuracy-summary-grid">
-
-        {% for type, data in summary.items() %}
-
-        <div class="accuracy-summary-card">
-
-            <div class="accuracy-summary-header">
-                <span>{{ type }} ACCURACY</span>
-                <span class="summary-indicator">●</span>
-            </div>
-
-            <div class="accuracy-percentage">
-                {% if data.accuracy is not none %}
-                    {{ format_accuracy(data.accuracy) }}
-                {% else %}
-                    N/A
-                {% endif %}
-            </div>
-
-            <div class="accuracy-progress">
-                <div class="accuracy-progress-fill
-                    {% if data.accuracy is not none and data.accuracy >= 90 %}
-                        progress-good
-                    {% elif data.accuracy is not none %}
-                        progress-low
-                    {% endif %}"
-                    style="width: {{ [data.accuracy or 0, 100]|min }}%;">
-                </div>
-            </div>
-
-            <div class="accuracy-details">
-                <div>
-                    <span>Audited</span>
-                    <strong>{{ data.audited|int }}</strong>
-                </div>
-
-                <div>
-                    <span>Errors</span>
-                    <strong>{{ data.errors|int }}</strong>
-                </div>
-
-                <div>
-                    <span>Bills Processed</span>
-                    <strong>{{ data.bills_processed|int }}</strong>
-                </div>
-            </div>
-
-        </div>
-
-        {% endfor %}
-
-    </div>
-
-    <div class="section-heading" style="margin-top:24px;">
-        <div>
-            <h3>Accuracy History</h3>
-            <p>All available periods, newest first.</p>
-        </div>
-    </div>
-    <form method="GET" action="{{ url_for('admin_dashboard') }}" class="filter-bar">
-        <input type="hidden" name="project_id" value="{{ selected_project }}">
-        <input type="hidden" name="period" value="{{ period_type }}">
-        <input type="hidden" name="date" value="{{ selected_period }}">
-        <input type="hidden" name="below_from" value="{{ below_from_date }}">
-        <input type="hidden" name="below_to" value="{{ below_to_date }}">
-        <input type="hidden" name="below_category" value="{{ below_category }}">
-        <div class="form-group">
-            <label for="history_project_id">History Project</label>
-            <select name="history_project_id" id="history_project_id" onchange="this.form.submit()">
-                <option value="all" {% if history_project == 'all' %}selected{% endif %}>All Projects</option>
-                {% for project in projects %}
-                    <option value="{{ project.id }}" {% if history_project|string == project.id|string %}selected{% endif %}>{{ project.project_name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="form-group">
-            <label for="history_period">History Period Type</label>
-            <select name="history_period" id="history_period" onchange="this.form.submit()">
-                <option value="daily" {% if history_period_type == 'daily' %}selected{% endif %}>Daily</option>
-                <option value="weekly" {% if history_period_type == 'weekly' %}selected{% endif %}>Weekly</option>
-                <option value="monthly" {% if history_period_type == 'monthly' %}selected{% endif %}>Monthly</option>
+        <div class="filter-group"><label for="graph_period">Period Type</label>
+            <select name="graph_period" id="graph_period" onchange="this.form.submit()">
+                <option value="daily" {% if graph_period == 'daily' %}selected{% endif %}>Daily</option>
+                <option value="weekly" {% if graph_period == 'weekly' %}selected{% endif %}>Weekly</option>
+                <option value="monthly" {% if graph_period == 'monthly' %}selected{% endif %}>Monthly</option>
             </select>
         </div>
     </form>
-    <div class="table-responsive">
-        <table class="data-table">
-            <thead><tr>
-                <th>Period</th><th>INTERNAL</th><th>EXTERNAL_WC</th><th>EXTERNAL_WOC</th>
-            </tr></thead>
-            <tbody>
-            {% for item in period_history %}
-                <tr>
-                    <td>{{ item.period }}</td>
-                    <td>{{ format_accuracy(item.INTERNAL) }}</td>
-                    <td>{{ format_accuracy(item.EXTERNAL_WC) }}</td>
-                    <td>{{ format_accuracy(item.EXTERNAL_WOC) }}</td>
-                </tr>
-            {% else %}
-                <tr><td colspan="4">No accuracy history available.</td></tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
+    <div style="position:relative;width:100%;height:320px;"><canvas id="accuracyTrendChart"></canvas></div>
+    <div class="accuracy-graph-legend"><span><i style="background:#2563eb"></i> INTERNAL</span><span><i style="background:#16a34a"></i> EXTERNAL_WC</span><span><i style="background:#f97316"></i> EXTERNAL_WOC</span></div>
 </section>
+{% block graph_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded",function(){
+ const canvas=document.getElementById("accuracyTrendChart");
+ if(!canvas||typeof Chart==="undefined")return;
+ new Chart(canvas,{type:"line",data:{labels:{{ graph_labels|tojson }},datasets:[
+ {label:"INTERNAL",data:{{ graph_internal|tojson }},borderColor:"#2563eb",backgroundColor:"#2563eb",tension:.25,spanGaps:true},
+ {label:"EXTERNAL_WC",data:{{ graph_external_wc|tojson }},borderColor:"#16a34a",backgroundColor:"#16a34a",tension:.25,spanGaps:true},
+ {label:"EXTERNAL_WOC",data:{{ graph_external_woc|tojson }},borderColor:"#f97316",backgroundColor:"#f97316",tension:.25,spanGaps:true}
+ ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},plugins:{legend:{display:false}},scales:{y:{min:0,max:100,ticks:{callback:v=>v+"%"}},x:{grid:{display:false}}}}});
+});
+</script>
+<style>.accuracy-graph-legend{display:flex;flex-wrap:wrap;gap:18px;margin-top:16px;font-size:12px;font-weight:700;color:#64748b}.accuracy-graph-legend span{display:inline-flex;align-items:center;gap:7px}.accuracy-graph-legend i{display:inline-block;width:9px;height:9px;border-radius:50%}</style>
+{% endblock graph_scripts %}
 
 {% endblock %}
