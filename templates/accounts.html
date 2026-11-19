@@ -128,6 +128,7 @@
                 <option value="all">All Roles</option>
                 <option value="admin">Admin</option>
                 <option value="qc">QC</option>
+                <option value="supervisor">Supervisor</option>
                 <option value="biller">Biller</option>
             </select>
         </div>
@@ -195,6 +196,10 @@
                                 {% elif account.role == 'QC' %}
                                     <span class="status-badge status-success">
                                         QC
+                                    </span>
+                                {% elif account.role == 'SUPERVISOR' %}
+                                    <span class="status-badge status-info">
+                                        SUPERVISOR
                                     </span>
                                 {% else %}
                                     <span class="status-badge status-neutral">
@@ -322,7 +327,7 @@
         <div class="modal-header">
             <div>
                 <h2 class="modal-title" id="createAccountTitle">Add User</h2>
-                <p class="form-help">Create an Admin, QC, or Biller account.</p>
+                <p class="form-help">Create an Admin, QC, Biller, or Supervisor account.</p>
             </div>
             <button type="button" class="btn btn-secondary btn-small" onclick="closeCreateAccount()">Close</button>
         </div>
@@ -345,6 +350,7 @@
                 <select id="new_role" name="role" required>
                     <option value="biller">Biller</option>
                     <option value="qc">QC</option>
+                    <option value="supervisor">Supervisor</option>
                     <option value="admin">Admin</option>
                 </select>
             </div>
@@ -367,7 +373,7 @@
                         {% endif %}
                     {% endfor %}
                 </div>
-                <small class="form-help">Select one or more active projects. The same project can be assigned to multiple Biller or QC accounts. Admin accounts automatically have access to all active projects.</small>
+                <small class="form-help">Select one or more active projects. The same project can be assigned to multiple Biller, QC, or Supervisor accounts. Admin accounts automatically have access to all active projects.</small>
             </div>
 
             <div class="action-buttons">
@@ -448,6 +454,7 @@
                 >
                     <option value="admin">Admin</option>
                     <option value="qc">QC</option>
+                    <option value="supervisor">Supervisor</option>
                     <option value="biller">Biller</option>
                 </select>
             </div>
@@ -485,7 +492,7 @@
                 </div>
 
                 <small>
-                    Select one or more active projects for QC and Biller accounts.
+                    Select one or more active projects for QC, Biller, and Supervisor accounts.
                     Admin accounts automatically have access to all active projects.
                 </small>
 
@@ -743,7 +750,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     });
 
-    // CREATE ACCOUNT MODAL: show project selection only for QC/Biller.
+    // CREATE ACCOUNT MODAL: show project selection for assigned-project roles.
     const createRole = document.getElementById("new_role");
     const createProjectGroup = document.getElementById("createProjectAssignmentGroup");
     const createModal = document.getElementById("createAccountModal");
