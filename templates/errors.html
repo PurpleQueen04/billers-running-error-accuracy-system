@@ -5,7 +5,7 @@
 
 <div class="page-header">
     <div>
-        <h1>{% if page_mode|default('pending') == 'completed' %}Error Details{% else %}QC Error Verification{% endif %}</h1>
+        <h1>{% if page_mode|default('pending') == 'completed' %}Error Details{% else %}Error Records{% endif %}</h1>
         <p>{% if page_mode|default('pending') == 'completed' %}Review QC responses already submitted for your assigned projects.{% else %}Review and submit explanations for disputed error records from your assigned projects.{% endif %}</p>
     </div>
 
@@ -60,7 +60,7 @@
 
     <div class="section-heading">
         <div>
-            <h2>{% if page_mode|default('pending') == 'completed' %}Error Details{% else %}Error Verification{% endif %}</h2>
+            <h2>{% if page_mode|default('pending') == 'completed' %}Error Details{% else %}Error Records{% endif %}</h2>
             <p>Filter records by billed date.</p>
         </div>
 
