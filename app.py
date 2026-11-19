@@ -7673,28 +7673,17 @@ def supervisor_errors():
 
     project_ids = get_user_project_ids()
     records = []
-    date_from = request.args.get("date_from", "").strip()
-    date_to = request.args.get("date_to", "").strip()
+    period_type = normalize_text(request.args.get("period")).lower() or "monthly"
+    if period_type not in ("daily", "weekly", "monthly"):
+        period_type = "monthly"
+
+    selected_period = normalize_text(request.args.get("date"))
+    selected_source = normalize_text(request.args.get("source")) or "all"
+    periods = []
+    sources = []
 
     if project_ids:
         placeholders = ", ".join(["?"] * len(project_ids))
-        date_filters = []
-        params = list(project_ids)
-
-        # Billed dates are stored in ISO YYYY-MM-DD format.
-        if date_from:
-            date_filters.append("e.billed_date >= ?")
-            params.append(date_from)
-
-        if date_to:
-            date_filters.append("e.billed_date <= ?")
-            params.append(date_to)
-
-        date_sql = ""
-        if date_filters:
-            date_sql = " AND " + " AND ".join(date_filters)
-
-        limit_sql = "" if date_filters else " LIMIT 500"
 
         with db() as con:
             rows = con.execute(
@@ -7718,7 +7707,6 @@ def supervisor_errors():
                 INNER JOIN projects p
                     ON p.id = e.project_id
                 WHERE e.project_id IN ({placeholders})
-                    {date_sql}
                 ORDER BY
                     CASE
                         WHEN e.billed_date IS NULL OR e.billed_date = ''
@@ -7726,18 +7714,50 @@ def supervisor_errors():
                     END,
                     e.billed_date DESC,
                     e.record_key DESC
-                {limit_sql}
                 """,
-                tuple(params)
+                tuple(project_ids)
             ).fetchall()
 
-        records = [dict(row) for row in rows]
+        all_records = [dict(row) for row in rows]
+        period_by_key = {}
+
+        for index, record in enumerate(all_records):
+            period_key = accuracy_period_key(
+                record.get("billed_date"),
+                period_type
+            )
+            if period_key:
+                periods.append(period_key)
+                period_by_key[index] = period_key
+
+            source_value = normalize_text(record.get("source"))
+            if source_value and source_value not in sources:
+                sources.append(source_value)
+
+        periods = sorted(set(periods))
+        sources = sorted(sources, key=str.casefold)
+
+        if selected_period not in periods:
+            selected_period = periods[-1] if periods else ""
+
+        filtered_records = []
+        for index, record in enumerate(all_records):
+            if period_by_key.get(index) != selected_period:
+                continue
+            if selected_source != "all" and normalize_text(record.get("source")) != selected_source:
+                continue
+            filtered_records.append(record)
+
+        records = filtered_records
 
     return render_template(
         "supervisor_errors.html",
         records=records,
-        date_from=date_from,
-        date_to=date_to
+        periods=periods,
+        period_type=period_type,
+        selected_period=selected_period,
+        sources=sources,
+        selected_source=selected_source
     )
 
 
