@@ -775,6 +775,24 @@ def init_db():
             """)
 
         # -------------------------------------------------
+        # USERS ROLE CONSTRAINT (PostgreSQL)
+        # Keep the database role check in sync with supported roles.
+        # This safely replaces the older constraint without changing
+        # existing user records or account assignments.
+        # -------------------------------------------------
+
+        if is_postgres():
+            con.execute("""
+                ALTER TABLE users
+                DROP CONSTRAINT IF EXISTS users_role_check
+            """)
+            con.execute("""
+                ALTER TABLE users
+                ADD CONSTRAINT users_role_check
+                CHECK (role IN ('admin', 'qc', 'biller', 'supervisor'))
+            """)
+
+        # -------------------------------------------------
         # PROJECTS
         # -------------------------------------------------
 
