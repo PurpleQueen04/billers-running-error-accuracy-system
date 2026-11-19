@@ -3749,7 +3749,9 @@ def admin_dashboard():
         selected_period=normalize_text(request.args.get("date")),
         below_from_date=normalize_text(request.args.get("below_from")),
         below_to_date=normalize_text(request.args.get("below_to")),
-        below_category=normalize_text(request.args.get("below_category")).lower() or "all"
+        below_category=normalize_text(request.args.get("below_category")).lower() or "all",
+        history_project=normalize_text(request.args.get("history_project_id")) or "all",
+        history_period_type=normalize_text(request.args.get("history_period")).lower() or "monthly"
     )
 
     return render_template(
@@ -6285,10 +6287,15 @@ def build_accuracy_context(
     selected_period=None,
     below_from_date=None,
     below_to_date=None,
-    below_category="all"
+    below_category="all",
+    history_project="all",
+    history_period_type="monthly",
+    include_history=True
 ):
     if period_type not in ("daily", "weekly", "monthly"):
         period_type = "monthly"
+    if history_period_type not in ("daily", "weekly", "monthly"):
+        history_period_type = "monthly"
 
     
     # -----------------------------------------------------
@@ -6840,6 +6847,20 @@ def build_accuracy_context(
             if int(row["id"]) in allowed_set and bool(con_value(row, "active", 1))
         ]
 
+    if include_history:
+        history_context = build_accuracy_context(
+            allowed_project_ids=sorted(allowed_set) if allowed_set is not None else None,
+            selected_project=history_project,
+            period_type=history_period_type,
+            selected_period=None,
+            below_from_date=below_from_date,
+            below_to_date=below_to_date,
+            below_category=below_category,
+            include_history=False
+        )
+        period_history = history_context["period_history"]
+        history_project = history_context["selected_project"]
+
     return {
         "below_from_date": (
             below_from.isoformat()
@@ -6855,6 +6876,8 @@ def build_accuracy_context(
         "improvements": improvements,
         "period_type": period_type,
         "period_history": period_history,
+        "history_project": str(history_project),
+        "history_period_type": history_period_type,
         "periods": periods,
         "projects": visible_projects,
         "selected_period": selected_period,
@@ -6918,7 +6941,9 @@ def admin_accuracy():
         selected_period=selected_period,
         below_from_date=below_from_date,
         below_to_date=below_to_date,
-        below_category=below_category
+        below_category=below_category,
+        history_project=normalize_text(request.args.get("history_project_id")) or "all",
+        history_period_type=normalize_text(request.args.get("history_period")).lower() or "monthly"
     )
 
     context["accuracy_endpoint"] = "admin_accuracy"
@@ -6972,7 +6997,9 @@ def qc_accuracy():
         selected_period=selected_period,
         below_from_date=below_from_date,
         below_to_date=below_to_date,
-        below_category=below_category
+        below_category=below_category,
+        history_project=normalize_text(request.args.get("history_project_id")) or "all",
+        history_period_type=normalize_text(request.args.get("history_period")).lower() or "monthly"
     )
 
     context["accuracy_endpoint"] = "qc_accuracy"
@@ -7006,10 +7033,15 @@ def get_biller_accuracy_summary(
     project_ids,
     period_type="monthly",
     selected_period=None,
-    selected_project="all"
+    selected_project="all",
+    history_project="all",
+    history_period_type="monthly",
+    include_history=True
 ):
     if period_type not in ("daily", "weekly", "monthly"):
         period_type = "monthly"
+    if history_period_type not in ("daily", "weekly", "monthly"):
+        history_period_type = "monthly"
 
     empty_summary = {
         "accuracy": None,
@@ -7032,6 +7064,8 @@ def get_biller_accuracy_summary(
         return {
             "periods": [],
             "period_history": [],
+            "history_project": "all",
+            "history_period_type": history_period_type,
             "projects": [],
             "selected_project": "all",
             "selected_period": "",
@@ -7164,9 +7198,19 @@ def get_biller_accuracy_summary(
             )
         }
 
+    if include_history:
+        history_context = get_biller_accuracy_summary(
+            username, all_project_ids, history_period_type, None,
+            history_project, include_history=False
+        )
+        period_history = history_context["period_history"]
+        history_project = history_context["selected_project"]
+
     return {
         "periods": periods,
         "period_history": period_history,
+        "history_project": str(history_project),
+        "history_period_type": history_period_type,
         "projects": [
             {"id": project_id, "project_name": project_name}
             for project_id, project_name in project_names.items()
@@ -7211,7 +7255,10 @@ def biller_dashboard():
             username,
             [],
             request.args.get("period", "monthly"),
-            request.args.get("date")
+            request.args.get("date"),
+            normalize_text(request.args.get("project_id")) or "all",
+            history_project=normalize_text(request.args.get("history_project_id")) or "all",
+            history_period_type=normalize_text(request.args.get("history_period")).lower() or "monthly"
         )
 
         return render_template(
@@ -7271,7 +7318,9 @@ def biller_dashboard():
         project_ids,
         request.args.get("period", "monthly"),
         request.args.get("date"),
-        normalize_text(request.args.get("project_id")) or "all"
+        normalize_text(request.args.get("project_id")) or "all",
+        history_project=normalize_text(request.args.get("history_project_id")) or "all",
+        history_period_type=normalize_text(request.args.get("history_period")).lower() or "monthly"
     )
 
     return render_template(
@@ -7935,7 +7984,9 @@ def render_supervisor_accuracy_page(page_title, page_description):
         ),
         below_category=normalize_text(
             request.args.get("below_category")
-        ).lower() or "all"
+        ).lower() or "all",
+        history_project=normalize_text(request.args.get("history_project_id")) or "all",
+        history_period_type=normalize_text(request.args.get("history_period")).lower() or "monthly"
     )
 
     context["accuracy_endpoint"] = request.endpoint
