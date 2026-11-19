@@ -7286,7 +7286,8 @@ def get_biller_accuracy_summary(
 @login_required
 def biller_accuracy_monitoring():
     role = normalize_text(session.get("role")).lower()
-    if role not in ("admin", "qc", "supervisor", "biller"):
+    requested_role = request.path.strip("/").split("/", 1)[0]
+    if role not in ("admin", "qc", "supervisor", "biller") or role != requested_role:
         abort(403)
     allowed_ids = None if role == "admin" else (
         get_biller_project_ids() if role == "biller" else get_user_project_ids()
