@@ -1752,6 +1752,11 @@ def qc_required(function):
     return role_required("qc")(function)
 
 
+def supervisor_required(function):
+
+    return role_required("supervisor")(function)
+
+
 # =========================================================
 # ACTIVITY LOGGING
 # =========================================================
@@ -3540,6 +3545,9 @@ def index():
 
     if role == "biller":
         return redirect(url_for("biller_dashboard"))
+
+    if role == "supervisor":
+        return redirect(url_for("supervisor_dashboard"))
 
     session.clear()
 
@@ -7530,6 +7538,304 @@ def qc_errors():
         selected_date=selected_date,
         projects=projects
     )
+
+# =========================================================
+# SUPERVISOR DASHBOARD
+# Read-only access to explicitly assigned projects only.
+# =========================================================
+
+@app.route("/supervisor")
+@login_required
+@supervisor_required
+def supervisor_dashboard():
+
+    project_ids = get_user_project_ids()
+
+    projects = []
+    selected_project = normalize_text(
+        request.args.get("project_id")
+    ) or "all"
+
+    if project_ids:
+        placeholders = ", ".join(["?"] * len(project_ids))
+
+        with db() as con:
+            projects = con.execute(
+                f"""
+                SELECT id, project_name
+                FROM projects
+                WHERE active = 1
+                  AND id IN ({placeholders})
+                ORDER BY project_name
+                """,
+                tuple(project_ids)
+            ).fetchall()
+
+        if selected_project != "all":
+            try:
+                selected_id = int(selected_project)
+            except (TypeError, ValueError):
+                selected_id = None
+
+            if selected_id not in project_ids:
+                selected_project = "all"
+
+        scoped_ids = (
+            [int(selected_project)]
+            if selected_project != "all"
+            else project_ids
+        )
+    else:
+        scoped_ids = []
+        selected_project = "all"
+
+    counts = {
+        "errors": 0,
+        "accuracy": None,
+        "billers": 0,
+        "qcs": 0
+    }
+
+    if scoped_ids:
+        placeholders = ", ".join(["?"] * len(scoped_ids))
+
+        with db() as con:
+            error_row = con.execute(
+                f"""
+                SELECT COUNT(*) AS total
+                FROM error_records
+                WHERE project_id IN ({placeholders})
+                """,
+                tuple(scoped_ids)
+            ).fetchone()
+
+            biller_row = con.execute(
+                f"""
+                SELECT COUNT(DISTINCT LOWER(TRIM(username))) AS total
+                FROM accuracy_records
+                WHERE project_id IN ({placeholders})
+                  AND NULLIF(TRIM(COALESCE(username, '')), '') IS NOT NULL
+                """,
+                tuple(scoped_ids)
+            ).fetchone()
+
+            qc_row = con.execute(
+                f"""
+                SELECT COUNT(DISTINCT LOWER(TRIM(qc_name))) AS total
+                FROM error_records
+                WHERE project_id IN ({placeholders})
+                  AND NULLIF(TRIM(COALESCE(qc_name, '')), '') IS NOT NULL
+                """,
+                tuple(scoped_ids)
+            ).fetchone()
+
+            accuracy_rows = con.execute(
+                f"""
+                SELECT audited, errors
+                FROM accuracy_records
+                WHERE project_id IN ({placeholders})
+                """,
+                tuple(scoped_ids)
+            ).fetchall()
+
+        total_audited = sum(
+            number_value(row["audited"]) or 0
+            for row in accuracy_rows
+        )
+        total_accuracy_errors = sum(
+            number_value(row["errors"]) or 0
+            for row in accuracy_rows
+        )
+
+        counts = {
+            "errors": int(error_row["total"] or 0),
+            "accuracy": calculate_weighted_accuracy(
+                total_audited,
+                total_accuracy_errors
+            ),
+            "billers": int(biller_row["total"] or 0),
+            "qcs": int(qc_row["total"] or 0)
+        }
+
+    return render_template(
+        "supervisor.html",
+        counts=counts,
+        projects=projects,
+        selected_project=selected_project,
+        format_accuracy=format_accuracy
+    )
+
+
+# =========================================================
+# SUPERVISOR ERROR RECORDS
+# Read-only; excludes records without an explicit assigned project.
+# =========================================================
+
+@app.route("/supervisor/errors")
+@login_required
+@supervisor_required
+def supervisor_errors():
+
+    project_ids = get_user_project_ids()
+    records = []
+
+    if project_ids:
+        placeholders = ", ".join(["?"] * len(project_ids))
+
+        with db() as con:
+            rows = con.execute(
+                f"""
+                SELECT
+                    e.record_key,
+                    e.billed_date,
+                    e.week,
+                    e.biller_name,
+                    e.username,
+                    e.pro,
+                    e.source,
+                    e.auditor,
+                    e.audit_type,
+                    e.verified_error,
+                    e.biller_comment,
+                    e.qc_explanation,
+                    e.qc_name,
+                    p.project_name
+                FROM error_records e
+                INNER JOIN projects p
+                    ON p.id = e.project_id
+                WHERE e.project_id IN ({placeholders})
+                ORDER BY
+                    CASE
+                        WHEN e.billed_date IS NULL OR e.billed_date = ''
+                        THEN 1 ELSE 0
+                    END,
+                    e.billed_date DESC,
+                    e.record_key DESC
+                LIMIT 500
+                """,
+                tuple(project_ids)
+            ).fetchall()
+
+        records = [dict(row) for row in rows]
+
+    return render_template(
+        "supervisor_errors.html",
+        records=records
+    )
+
+
+# =========================================================
+# SUPERVISOR ACCURACY REPORTS / BILLER PERFORMANCE
+# =========================================================
+
+def render_supervisor_accuracy_page(page_title, page_description):
+
+    allowed_ids = get_user_project_ids()
+
+    context = build_accuracy_context(
+        allowed_project_ids=allowed_ids,
+        selected_project=normalize_text(
+            request.args.get("project_id")
+        ) or "all",
+        period_type=normalize_text(
+            request.args.get("period")
+        ).lower() or "monthly",
+        selected_period=normalize_text(
+            request.args.get("date")
+        ),
+        below_from_date=normalize_text(
+            request.args.get("below_from")
+        ),
+        below_to_date=normalize_text(
+            request.args.get("below_to")
+        ),
+        below_category=normalize_text(
+            request.args.get("below_category")
+        ).lower() or "all"
+    )
+
+    context["accuracy_endpoint"] = request.endpoint
+    context["page_title"] = page_title
+    context["page_description"] = page_description
+
+    return render_template("accuracy.html", **context)
+
+
+@app.route("/supervisor/accuracy")
+@login_required
+@supervisor_required
+def supervisor_accuracy():
+
+    return render_supervisor_accuracy_page(
+        "Accuracy Reports",
+        "View accuracy summaries and improvement monitoring for your assigned projects."
+    )
+
+
+@app.route("/supervisor/biller-performance")
+@login_required
+@supervisor_required
+def supervisor_biller_performance():
+
+    return render_supervisor_accuracy_page(
+        "Biller Performance",
+        "Review Biller accuracy and performance across your assigned projects."
+    )
+
+
+# =========================================================
+# SUPERVISOR QC PERFORMANCE
+# Read-only summary grouped by project and QC name.
+# =========================================================
+
+@app.route("/supervisor/qc-performance")
+@login_required
+@supervisor_required
+def supervisor_qc_performance():
+
+    project_ids = get_user_project_ids()
+    rows = []
+
+    if project_ids:
+        placeholders = ", ".join(["?"] * len(project_ids))
+
+        with db() as con:
+            result = con.execute(
+                f"""
+                SELECT
+                    p.project_name,
+                    e.qc_name,
+                    COUNT(*) AS total_records,
+                    SUM(
+                        CASE
+                            WHEN UPPER(TRIM(COALESCE(e.verified_error, ''))) = 'Y'
+                            THEN 1 ELSE 0
+                        END
+                    ) AS verified_errors,
+                    SUM(
+                        CASE
+                            WHEN UPPER(TRIM(COALESCE(e.verified_error, ''))) = 'N'
+                            THEN 1 ELSE 0
+                        END
+                    ) AS disputed_errors
+                FROM error_records e
+                INNER JOIN projects p
+                    ON p.id = e.project_id
+                WHERE e.project_id IN ({placeholders})
+                  AND NULLIF(TRIM(COALESCE(e.qc_name, '')), '') IS NOT NULL
+                GROUP BY p.id, p.project_name, LOWER(TRIM(e.qc_name)), e.qc_name
+                ORDER BY p.project_name, e.qc_name
+                """,
+                tuple(project_ids)
+            ).fetchall()
+
+        rows = [dict(row) for row in result]
+
+    return render_template(
+        "supervisor_qc_performance.html",
+        rows=rows
+    )
+
 
 # =========================================================
 # SAVE BILLER / QC RESPONSE
