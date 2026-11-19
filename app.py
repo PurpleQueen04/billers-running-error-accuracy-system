@@ -7394,8 +7394,27 @@ def biller_errors():
 @qc_required
 def qc_dashboard():
 
-    return redirect(
-        url_for("qc_errors")
+    project_ids = get_user_project_ids()
+    projects = []
+
+    if project_ids:
+        placeholders = ", ".join(["?"] * len(project_ids))
+        with db() as con:
+            rows = con.execute(
+                f"""
+                SELECT id, project_name
+                FROM projects
+                WHERE active = 1
+                  AND id IN ({placeholders})
+                ORDER BY project_name
+                """,
+                tuple(project_ids)
+            ).fetchall()
+        projects = [dict(row) for row in rows]
+
+    return render_template(
+        "qc_dashboard.html",
+        projects=projects
     )
 
 
@@ -7440,6 +7459,7 @@ def qc_errors():
             AND UPPER(TRIM(COALESCE(verified_error, '')))
                 = 'N'
             AND NULLIF(TRIM(COALESCE(biller_comment, '')), '') IS NOT NULL
+            AND NULLIF(TRIM(COALESCE(qc_explanation, '')), '') IS NULL
             AND billed_date IS NOT NULL
             AND TRIM(billed_date) <> ''
             ORDER BY billed_date DESC
@@ -7491,6 +7511,7 @@ def qc_errors():
             AND UPPER(TRIM(COALESCE(e.verified_error, '')))
                 = 'N'
             AND NULLIF(TRIM(COALESCE(e.biller_comment, '')), '') IS NOT NULL
+            AND NULLIF(TRIM(COALESCE(e.qc_explanation, '')), '') IS NULL
         """
 
         if selected_date:
@@ -7536,8 +7557,81 @@ def qc_errors():
         errors=errors,
         dates=dates,
         selected_date=selected_date,
-        projects=projects
+        projects=projects,
+        page_mode="pending"
     )
+
+
+@app.route("/qc/error-details")
+@login_required
+@qc_required
+def qc_error_details():
+
+    project_ids = get_user_project_ids()
+
+    if not project_ids:
+        return render_template(
+            "errors.html",
+            errors=[],
+            dates=[],
+            selected_date="",
+            projects=[],
+            page_mode="completed"
+        )
+
+    placeholders = ", ".join(["?"] * len(project_ids))
+
+    with db() as con:
+        date_rows = con.execute(
+            f"""
+            SELECT DISTINCT billed_date
+            FROM error_records
+            WHERE project_id IN ({placeholders})
+              AND NULLIF(TRIM(COALESCE(qc_explanation, '')), '') IS NOT NULL
+              AND billed_date IS NOT NULL
+              AND TRIM(billed_date) <> ''
+            ORDER BY billed_date DESC
+            """,
+            tuple(project_ids)
+        ).fetchall()
+
+        dates = [row["billed_date"] for row in date_rows]
+        selected_date = normalize_text(request.args.get("date"))
+
+        if selected_date and selected_date not in dates:
+            selected_date = ""
+        if not selected_date:
+            selected_date = dates[0] if dates else ""
+
+        rows = []
+        if selected_date:
+            rows = con.execute(
+                f"""
+                SELECT
+                    e.record_key, e.billed_date, e.pro, e.project_id,
+                    p.project_name, e.week, e.source, e.username,
+                    e.auditor, e.audit_type, e.biller_name, e.zb_field,
+                    e.error_details, e.verified_error, e.biller_comment,
+                    e.qc_explanation, e.qc_name, e.updated_at
+                FROM error_records e
+                LEFT JOIN projects p ON p.id = e.project_id
+                WHERE e.project_id IN ({placeholders})
+                  AND NULLIF(TRIM(COALESCE(e.qc_explanation, '')), '') IS NOT NULL
+                  AND e.billed_date = ?
+                ORDER BY e.source_row DESC
+                """,
+                (*project_ids, selected_date)
+            ).fetchall()
+
+    return render_template(
+        "errors.html",
+        errors=[dict(row) for row in rows],
+        dates=dates,
+        selected_date=selected_date,
+        projects=[],
+        page_mode="completed"
+    )
+
 
 # =========================================================
 # SUPERVISOR DASHBOARD
