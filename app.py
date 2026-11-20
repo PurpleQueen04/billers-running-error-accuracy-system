@@ -1074,6 +1074,7 @@ def init_db():
             },
 
             "accuracy_records": {
+                "batch_no": "TEXT",
                 "sheet": "TEXT",
                 "username": "TEXT",
                 "biller_name": "TEXT",
@@ -2208,6 +2209,11 @@ def get_accuracy_columns(dataframe):
         "project": find_col(
             columns,
             ["PROJECT", "PROJECT NAME"]
+        ),
+
+        "batch_no": find_col(
+            columns,
+            ["BATCH #", "BATCH NO", "BATCH NUMBER"]
         )
     }
 
@@ -2484,6 +2490,7 @@ def import_accuracy_sheet(
         date_text = record_date.isoformat() if record_date else ""
         month = record_date.strftime("%Y-%m") if record_date else source_month
         weekly = week_for_billed_date(record_date) if record_date else dataframe_value(row, columns["weekly"])
+        batch_no = dataframe_value(row, columns["batch_no"])
         audited = number_value(val(row, columns["audited"])) or 0
         bills_processed = number_value(val(row, columns["bills_processed"]))
 
@@ -2519,7 +2526,8 @@ def import_accuracy_sheet(
                 bills_processed,
                 audited,
                 errors,
-                imported_at
+                imported_at,
+                batch_no
             )
 
             existing_id = existing_by_key.get(key)
@@ -2574,15 +2582,16 @@ def import_accuracy_sheet(
             bills_processed = ?,
             audited = ?,
             errors = ?,
-            imported_at = ?
+            imported_at = ?,
+            batch_no = ?
         WHERE id = ?
     """
     insert_sql = """
         INSERT INTO accuracy_records (
             sheet, username, biller_name, month, weekly, record_date,
             accuracy_type, accuracy_value, bills_processed, audited,
-            errors, source_row, imported_at, project_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            errors, source_row, imported_at, project_id, batch_no
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
 
     batch_size = 500
