@@ -6938,6 +6938,24 @@ def build_accuracy_context(
         item["project_name"], item["biller_name"], item["accuracy_type"]
     ))
 
+    # Keep the separate Below 90% and Accuracy Improvement Monitoring
+    # sections independent from the BATCH # filter used by the summary.
+    if include_history and selected_batch != "all":
+        unfiltered_context = build_accuracy_context(
+            allowed_project_ids=sorted(allowed_set) if allowed_set is not None else None,
+            selected_project=selected_project,
+            period_type=period_type,
+            selected_period=selected_period,
+            below_from_date=below_from_date,
+            below_to_date=below_to_date,
+            below_category=below_category,
+            selected_batch="all",
+            history_batch="all",
+            include_history=False
+        )
+        below_90 = unfiltered_context["below_90"]
+        improvements = unfiltered_context["improvements"]
+
     if allowed_set is None:
         visible_projects = [
             {"id": int(row["id"]), "project_name": row["project_name"]}
