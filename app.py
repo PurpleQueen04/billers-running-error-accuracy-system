@@ -3920,7 +3920,8 @@ def admin_billers_below_90():
         selected_period=normalize_text(request.args.get("date")),
         below_from_date=normalize_text(request.args.get("below_from")),
         below_to_date=normalize_text(request.args.get("below_to")),
-        below_category=normalize_text(request.args.get("below_category")).lower() or "all"
+        below_category=normalize_text(request.args.get("below_category")).lower() or "all",
+        below_batch=normalize_text(request.args.get("below_batch")) or "all"
     )
     return render_template("billers_below_90.html", **accuracy_context)
 
@@ -6424,6 +6425,7 @@ def build_accuracy_context(
     history_period_type="monthly",
     selected_batch="all",
     history_batch="all",
+    below_batch="all",
     include_history=True
 ):
     if period_type not in ("daily", "weekly", "monthly"):
@@ -6500,6 +6502,12 @@ def build_accuracy_context(
         for row in records
         if normalize_text(row.get("batch_no"))
     }, reverse=True)
+    below_batch_options = list(batch_options)
+    below_batch = normalize_text(below_batch) or "all"
+    if below_batch != "all" and below_batch not in below_batch_options:
+        below_batch = "all"
+    below_records = list(records)
+
     if selected_batch != "all" and selected_batch not in batch_options:
         selected_batch = "all"
     if selected_batch != "all":
@@ -6784,7 +6792,10 @@ def build_accuracy_context(
 
     below_date_aggregates = {}
 
-    for row in records:
+    for row in below_records:
+
+        if below_batch != "all" and normalize_text(row.get("batch_no")) != below_batch:
+            continue
 
         accuracy_type = normalize_accuracy_type(
             row.get("accuracy_type")
@@ -6993,9 +7004,9 @@ def build_accuracy_context(
             below_category=below_category,
             selected_batch="all",
             history_batch="all",
+            below_batch=below_batch,
             include_history=False
         )
-        below_90 = unfiltered_context["below_90"]
         improvements = unfiltered_context["improvements"]
 
     if allowed_set is None:
@@ -7040,6 +7051,8 @@ def build_accuracy_context(
             if below_to else ""
         ),
         "below_category": below_category,
+        "below_batch_options": below_batch_options,
+        "below_batch": below_batch,
         "below_90": below_90,
         "format_accuracy": format_accuracy,
         "improvements": improvements,
@@ -8235,6 +8248,7 @@ def render_supervisor_accuracy_page(page_title, page_description):
         below_category=normalize_text(
             request.args.get("below_category")
         ).lower() or "all",
+        below_batch=normalize_text(request.args.get("below_batch")) or "all",
         history_project=normalize_text(request.args.get("history_project_id")) or "all",
         history_period_type=normalize_text(request.args.get("history_period")).lower() or "monthly"
     )
