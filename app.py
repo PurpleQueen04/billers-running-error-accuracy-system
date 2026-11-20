@@ -7336,8 +7336,13 @@ def get_biller_accuracy_summary(
         history_batch = "all"
     if include_history:
         history_context = get_biller_accuracy_summary(
-            username, all_project_ids, history_period_type, None,
-            history_project, history_batch, include_history=False
+            username,
+            all_project_ids,
+            period_type=history_period_type,
+            selected_period=None,
+            selected_project=history_project,
+            selected_batch=history_batch,
+            include_history=False
         )
         period_history = history_context["period_history"]
         history_project = history_context["selected_project"]
