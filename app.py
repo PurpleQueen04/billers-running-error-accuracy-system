@@ -1074,6 +1074,7 @@ def init_db():
             },
 
             "accuracy_records": {
+                "batch_no": "TEXT",
                 "sheet": "TEXT",
                 "username": "TEXT",
                 "biller_name": "TEXT",
@@ -2208,6 +2209,11 @@ def get_accuracy_columns(dataframe):
         "project": find_col(
             columns,
             ["PROJECT", "PROJECT NAME"]
+        ),
+
+        "batch_no": find_col(
+            columns,
+            ["BATCH #", "BATCH NO", "BATCH NUMBER"]
         )
     }
 
@@ -2484,6 +2490,7 @@ def import_accuracy_sheet(
         date_text = record_date.isoformat() if record_date else ""
         month = record_date.strftime("%Y-%m") if record_date else source_month
         weekly = week_for_billed_date(record_date) if record_date else dataframe_value(row, columns["weekly"])
+        batch_no = dataframe_value(row, columns["batch_no"])
         audited = number_value(val(row, columns["audited"])) or 0
         bills_processed = number_value(val(row, columns["bills_processed"]))
 
@@ -2519,7 +2526,8 @@ def import_accuracy_sheet(
                 bills_processed,
                 audited,
                 errors,
-                imported_at
+                imported_at,
+                batch_no
             )
 
             existing_id = existing_by_key.get(key)
@@ -2555,7 +2563,8 @@ def import_accuracy_sheet(
                     errors,
                     source_row,
                     imported_at,
-                    project_id
+                    project_id,
+                    batch_no
                 ))
 
             imported += 1
@@ -2574,15 +2583,16 @@ def import_accuracy_sheet(
             bills_processed = ?,
             audited = ?,
             errors = ?,
-            imported_at = ?
+            imported_at = ?,
+            batch_no = ?
         WHERE id = ?
     """
     insert_sql = """
         INSERT INTO accuracy_records (
             sheet, username, biller_name, month, weekly, record_date,
             accuracy_type, accuracy_value, bills_processed, audited,
-            errors, source_row, imported_at, project_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            errors, source_row, imported_at, project_id, batch_no
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
 
     batch_size = 500
@@ -6314,7 +6324,8 @@ def get_accuracy_records(project_ids=None):
                 errors,
                 source_row,
                 project_id,
-                imported_at
+                imported_at,
+                batch_no
             FROM accuracy_records
             WHERE record_date IS NOT NULL
               AND TRIM(record_date) != ''
@@ -6369,6 +6380,8 @@ def build_accuracy_context(
     below_category="all",
     history_project="all",
     history_period_type="monthly",
+    selected_batch="all",
+    history_batch="all",
     include_history=True
 ):
     if period_type not in ("daily", "weekly", "monthly"):
@@ -6439,6 +6452,17 @@ def build_accuracy_context(
 
 
     
+    # Batch options are sourced from both INTERNAL and EXTERNAL accuracy sheets.
+    batch_options = sorted({
+        normalize_text(row.get("batch_no"))
+        for row in records
+        if normalize_text(row.get("batch_no"))
+    }, reverse=True)
+    if selected_batch != "all" and selected_batch not in batch_options:
+        selected_batch = "all"
+    if selected_batch != "all":
+        records = [row for row in records if normalize_text(row.get("batch_no")) == selected_batch]
+
     # -----------------------------------------------------
     # GET ALL ERROR DATES
     # Use BILLED DATE from ERROR sheet
@@ -6914,6 +6938,24 @@ def build_accuracy_context(
         item["project_name"], item["biller_name"], item["accuracy_type"]
     ))
 
+    # Keep the separate Below 90% and Accuracy Improvement Monitoring
+    # sections independent from the BATCH # filter used by the summary.
+    if include_history and selected_batch != "all":
+        unfiltered_context = build_accuracy_context(
+            allowed_project_ids=sorted(allowed_set) if allowed_set is not None else None,
+            selected_project=selected_project,
+            period_type=period_type,
+            selected_period=selected_period,
+            below_from_date=below_from_date,
+            below_to_date=below_to_date,
+            below_category=below_category,
+            selected_batch="all",
+            history_batch="all",
+            include_history=False
+        )
+        below_90 = unfiltered_context["below_90"]
+        improvements = unfiltered_context["improvements"]
+
     if allowed_set is None:
         visible_projects = [
             {"id": int(row["id"]), "project_name": row["project_name"]}
@@ -6926,6 +6968,9 @@ def build_accuracy_context(
             if int(row["id"]) in allowed_set and bool(con_value(row, "active", 1))
         ]
 
+    history_batches = batch_options
+    if history_batch not in history_batches:
+        history_batch = "all"
     if include_history:
         history_context = build_accuracy_context(
             allowed_project_ids=sorted(allowed_set) if allowed_set is not None else None,
@@ -6935,10 +6980,13 @@ def build_accuracy_context(
             below_from_date=below_from_date,
             below_to_date=below_to_date,
             below_category=below_category,
+            selected_batch=history_batch,
             include_history=False
         )
         period_history = history_context["period_history"]
         history_project = history_context["selected_project"]
+        history_batches = history_context["batch_options"]
+        history_batch = history_context["selected_batch"]
 
     return {
         "below_from_date": (
@@ -6957,6 +7005,10 @@ def build_accuracy_context(
         "period_history": period_history,
         "history_project": str(history_project),
         "history_period_type": history_period_type,
+        "batch_options": batch_options,
+        "selected_batch": selected_batch,
+        "history_batches": history_batches if include_history else batch_options,
+        "history_batch": str(history_batch),
         "periods": periods,
         "projects": visible_projects,
         "selected_period": selected_period,
@@ -7115,6 +7167,8 @@ def get_biller_accuracy_summary(
     selected_project="all",
     history_project="all",
     history_period_type="monthly",
+    selected_batch="all",
+    history_batch="all",
     include_history=True
 ):
     if period_type not in ("daily", "weekly", "monthly"):
@@ -7143,6 +7197,10 @@ def get_biller_accuracy_summary(
         return {
             "periods": [],
             "period_history": [],
+            "batch_options": [],
+            "selected_batch": "all",
+            "history_batches": [],
+            "history_batch": "all",
             "history_project": "all",
             "history_period_type": history_period_type,
             "projects": [],
@@ -7179,7 +7237,8 @@ def get_biller_accuracy_summary(
                 accuracy_type,
                 audited,
                 errors,
-                project_id
+                project_id,
+                batch_no
             FROM accuracy_records
             WHERE project_id IN ({placeholders})
             ORDER BY record_date
@@ -7210,6 +7269,19 @@ def get_biller_accuracy_summary(
         if normalize_text(row["username"]).casefold() != normalize_text(username).casefold():
             continue
         current_rows.append(dict(row))
+
+    batch_options = sorted({
+        normalize_text(row.get("batch_no"))
+        for row in current_rows
+        if normalize_text(row.get("batch_no"))
+    }, reverse=True)
+    if selected_batch != "all" and selected_batch not in batch_options:
+        selected_batch = "all"
+    if selected_batch != "all":
+        current_rows = [
+            row for row in current_rows
+            if normalize_text(row.get("batch_no")) == selected_batch
+        ]
 
     periods = set()
     row_periods = {}
@@ -7277,19 +7349,33 @@ def get_biller_accuracy_summary(
             )
         }
 
+    history_batches = batch_options
+    if history_batch not in history_batches:
+        history_batch = "all"
     if include_history:
         history_context = get_biller_accuracy_summary(
-            username, all_project_ids, history_period_type, None,
-            history_project, include_history=False
+            username,
+            all_project_ids,
+            period_type=history_period_type,
+            selected_period=None,
+            selected_project=history_project,
+            selected_batch=history_batch,
+            include_history=False
         )
         period_history = history_context["period_history"]
         history_project = history_context["selected_project"]
+        history_batches = history_context["batch_options"]
+        history_batch = history_context["selected_batch"]
 
     return {
         "periods": periods,
         "period_history": period_history,
         "history_project": str(history_project),
         "history_period_type": history_period_type,
+        "batch_options": batch_options,
+        "selected_batch": selected_batch,
+        "history_batches": history_batches if include_history else batch_options,
+        "history_batch": str(history_batch),
         "projects": [
             {"id": project_id, "project_name": project_name}
             for project_id, project_name in project_names.items()
@@ -7325,17 +7411,21 @@ def biller_accuracy_monitoring():
     selected_period = normalize_text(request.args.get("date"))
     history_project = normalize_text(request.args.get("history_project_id")) or "all"
     history_period_type = normalize_text(request.args.get("history_period")).lower() or "monthly"
+    selected_batch = normalize_text(request.args.get("batch_no")) or "all"
+    history_batch = normalize_text(request.args.get("history_batch_no")) or "all"
     if role == "biller":
         context = get_biller_accuracy_summary(
             session.get("username", ""), allowed_ids or [], period_type,
             selected_period, selected_project, history_project=history_project,
-            history_period_type=history_period_type
+            history_period_type=history_period_type, selected_batch=selected_batch,
+            history_batch=history_batch
         )
     else:
         context = build_accuracy_context(
             allowed_project_ids=allowed_ids, selected_project=selected_project,
             period_type=period_type, selected_period=selected_period,
-            history_project=history_project, history_period_type=history_period_type
+            history_project=history_project, history_period_type=history_period_type,
+            selected_batch=selected_batch, history_batch=history_batch
         )
     # Keep one authoritative context dictionary. build_accuracy_context()
     # already includes format_accuracy; passing it again as an explicit
