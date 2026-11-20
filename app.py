@@ -6380,6 +6380,8 @@ def build_accuracy_context(
     below_category="all",
     history_project="all",
     history_period_type="monthly",
+    selected_batch="all",
+    history_batch="all",
     include_history=True
 ):
     if period_type not in ("daily", "weekly", "monthly"):
@@ -6948,6 +6950,9 @@ def build_accuracy_context(
             if int(row["id"]) in allowed_set and bool(con_value(row, "active", 1))
         ]
 
+    history_batches = batch_options
+    if history_batch not in history_batches:
+        history_batch = "all"
     if include_history:
         history_context = build_accuracy_context(
             allowed_project_ids=sorted(allowed_set) if allowed_set is not None else None,
@@ -6957,10 +6962,13 @@ def build_accuracy_context(
             below_from_date=below_from_date,
             below_to_date=below_to_date,
             below_category=below_category,
+            selected_batch=history_batch,
             include_history=False
         )
         period_history = history_context["period_history"]
         history_project = history_context["selected_project"]
+        history_batches = history_context["batch_options"]
+        history_batch = history_context["selected_batch"]
 
     return {
         "below_from_date": (
@@ -7141,6 +7149,8 @@ def get_biller_accuracy_summary(
     selected_project="all",
     history_project="all",
     history_period_type="monthly",
+    selected_batch="all",
+    history_batch="all",
     include_history=True
 ):
     if period_type not in ("daily", "weekly", "monthly"):
@@ -7169,6 +7179,10 @@ def get_biller_accuracy_summary(
         return {
             "periods": [],
             "period_history": [],
+            "batch_options": [],
+            "selected_batch": "all",
+            "history_batches": [],
+            "history_batch": "all",
             "history_project": "all",
             "history_period_type": history_period_type,
             "projects": [],
@@ -7317,6 +7331,9 @@ def get_biller_accuracy_summary(
             )
         }
 
+    history_batches = batch_options
+    if history_batch not in history_batches:
+        history_batch = "all"
     if include_history:
         history_context = get_biller_accuracy_summary(
             username, all_project_ids, history_period_type, None,
