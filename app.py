@@ -534,6 +534,17 @@ def add_column_if_missing(
         '''
     )
 
+
+def ensure_accuracy_batch_column(con):
+    """Safely add BATCH # storage to existing PostgreSQL or SQLite databases."""
+    add_column_if_missing(
+        con,
+        "accuracy_records",
+        "batch_no",
+        "TEXT"
+    )
+
+
 # =========================================================
 # GENERAL HELPERS
 # =========================================================
@@ -2366,6 +2377,9 @@ def import_accuracy_sheet(
     # row, which caused long-running imports and Gunicorn
     # worker timeouts on larger ODS files.
     # -----------------------------------------------------
+    # Ensure the additive BATCH # column exists before workbook upserts.
+    ensure_accuracy_batch_column(con)
+
     source_row_numbers = [int(index) + 2 for index in dataframe.index]
     first_source_row = min(source_row_numbers) if source_row_numbers else 2
     last_source_row = max(source_row_numbers) if source_row_numbers else 1
@@ -6308,6 +6322,9 @@ def get_accuracy_records(project_ids=None):
 
     with db() as con:
 
+        # Existing deployments may not have run the optional init-db CLI.
+        ensure_accuracy_batch_column(con)
+
         base_query = """
             SELECT
                 id,
@@ -7225,6 +7242,8 @@ def get_biller_accuracy_summary(
     placeholders = ", ".join(["?"] * len(project_ids))
 
     with db() as con:
+        # Apply the additive migration before reading BATCH # on older databases.
+        ensure_accuracy_batch_column(con)
         rows = con.execute(
             f"""
             SELECT
