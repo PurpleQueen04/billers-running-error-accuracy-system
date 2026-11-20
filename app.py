@@ -537,12 +537,18 @@ def add_column_if_missing(
 
 def ensure_accuracy_batch_column(con):
     """Safely add BATCH # storage to existing PostgreSQL or SQLite databases."""
-    add_column_if_missing(
-        con,
-        "accuracy_records",
-        "batch_no",
-        "TEXT"
-    )
+    if is_postgres():
+        con.execute(
+            'ALTER TABLE "accuracy_records" '
+            'ADD COLUMN IF NOT EXISTS "batch_no" TEXT'
+        )
+    else:
+        add_column_if_missing(
+            con,
+            "accuracy_records",
+            "batch_no",
+            "TEXT"
+        )
 
 
 # =========================================================
