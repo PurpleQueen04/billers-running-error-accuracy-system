@@ -3728,9 +3728,9 @@ def logout():
 # DASHBOARD ACCURACY TREND GRAPH
 # =========================================================
 def build_dashboard_graph_context(allowed_project_ids=None, username=None):
-    graph_period = normalize_text(request.args.get("graph_period")).lower() or "monthly"
+    graph_period = normalize_text(request.args.get("graph_period")).lower() or "daily"
     if graph_period not in ("daily", "weekly", "monthly"):
-        graph_period = "monthly"
+        graph_period = "daily"
     allowed_set = None if allowed_project_ids is None else {int(v) for v in allowed_project_ids}
     with db() as con:
         project_rows = con.execute("SELECT id, project_name, active FROM projects ORDER BY project_name").fetchall()
