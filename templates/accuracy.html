@@ -284,7 +284,17 @@
                    value="{{ below_to_date }}">
         </div>
 
-                <div class="filter-group">
+        <div class="filter-group">
+            <label for="below_batch">BATCH #</label>
+            <select id="below_batch" name="below_batch">
+                <option value="all" {% if below_batch == 'all' %}selected{% endif %}>All Batches</option>
+                {% for batch in below_batch_options %}
+                    <option value="{{ batch }}" {% if below_batch == batch %}selected{% endif %}>{{ batch }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="filter-group">
             <label for="below_category">Category</label>
             <select id="below_category"
                     name="below_category">
