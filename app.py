@@ -3757,6 +3757,22 @@ def build_dashboard_graph_context(allowed_project_ids=None, username=None):
     if selected_project != "all":
         selected_id = int(selected_project)
         records = [r for r in records if r.get("project_id") is not None and int(r["project_id"]) == selected_id]
+
+    # Independent BATCH # filter for the dashboard graph.
+    graph_batch_options = sorted({
+        normalize_text(r.get("batch_no"))
+        for r in records
+        if normalize_text(r.get("batch_no"))
+    }, reverse=True)
+    graph_selected_batch = normalize_text(request.args.get("graph_batch")) or "all"
+    if graph_selected_batch != "all" and graph_selected_batch not in graph_batch_options:
+        graph_selected_batch = "all"
+    if graph_selected_batch != "all":
+        records = [
+            r for r in records
+            if normalize_text(r.get("batch_no")) == graph_selected_batch
+        ]
+
     latest_imports = {}
     for row in records:
         pid = int(row["project_id"]) if row.get("project_id") is not None else None
@@ -3782,7 +3798,10 @@ def build_dashboard_graph_context(allowed_project_ids=None, username=None):
         return [calculate_weighted_accuracy(period_totals[k][kind]["audited"], period_totals[k][kind]["errors"]) for k in labels]
     return {
         "graph_projects": projects, "graph_selected_project": selected_project,
-        "graph_period": graph_period, "graph_labels": labels,
+        "graph_period": graph_period,
+        "graph_batch_options": graph_batch_options,
+        "graph_selected_batch": graph_selected_batch,
+        "graph_labels": labels,
         "graph_internal": series("INTERNAL"),
         "graph_external_wc": series("EXTERNAL_WC"),
         "graph_external_woc": series("EXTERNAL_WOC")
