@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Supervisor Dashboard
-
-{% endblock %}
+{% block title %}Supervisor Dashboard{% endblock %}
 {% block page_heading %}Supervisor Dashboard{% endblock %}
 
 {% block content %}
@@ -14,6 +12,76 @@
     <span class="section-tag">VIEW ONLY</span>
 </div>
 
+<!-- ACCURACY PERFORMANCE OVERVIEW — placed first and given full width -->
+<section class="content-card accuracy-graph-card">
+    <div class="section-heading">
+        <div>
+            <h2>Accuracy Performance Overview</h2>
+            <p>Compare weighted accuracy trends across reporting periods.</p>
+        </div>
+        <span class="section-tag">PERFORMANCE TREND</span>
+    </div>
+    <form method="GET" class="filter-bar">
+        <div class="filter-group">
+            <label for="graph_project_id">Project</label>
+            <select name="graph_project_id" id="graph_project_id" onchange="this.form.submit()">
+                <option value="all" {% if graph_selected_project == 'all' %}selected{% endif %}>{% if session.get('role')|lower == 'admin' %}All Projects{% else %}All Assigned Projects{% endif %}</option>
+                {% for project in graph_projects %}
+                    <option value="{{ project.id }}" {% if graph_selected_project|string == project.id|string %}selected{% endif %}>{{ project.project_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="graph_period">Period Type</label>
+            <select name="graph_period" id="graph_period" onchange="this.form.submit()">
+                <option value="daily" {% if graph_period == 'daily' %}selected{% endif %}>Daily</option>
+                <option value="weekly" {% if graph_period == 'weekly' %}selected{% endif %}>Weekly</option>
+                <option value="monthly" {% if graph_period == 'monthly' %}selected{% endif %}>Monthly</option>
+            </select>
+        </div>
+    </form>
+    <div style="position:relative;width:100%;height:320px;">
+        <canvas id="accuracyTrendChart"></canvas>
+    </div>
+    <div class="accuracy-graph-legend">
+        <span><i style="background:#2563eb"></i> INTERNAL</span>
+        <span><i style="background:#16a34a"></i> EXTERNAL_WC</span>
+        <span><i style="background:#f97316"></i> EXTERNAL_WOC</span>
+    </div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded",function(){
+    const canvas=document.getElementById("accuracyTrendChart");
+    if(!canvas||typeof Chart==="undefined")return;
+    new Chart(canvas,{
+        type:"line",
+        data:{
+            labels:{{ graph_labels|tojson }},
+            datasets:[
+                {label:"INTERNAL",data:{{ graph_internal|tojson }},borderColor:"#2563eb",backgroundColor:"#2563eb",tension:.25,spanGaps:true},
+                {label:"EXTERNAL_WC",data:{{ graph_external_wc|tojson }},borderColor:"#16a34a",backgroundColor:"#16a34a",tension:.25,spanGaps:true},
+                {label:"EXTERNAL_WOC",data:{{ graph_external_woc|tojson }},borderColor:"#f97316",backgroundColor:"#f97316",tension:.25,spanGaps:true}
+            ]
+        },
+        options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            interaction:{mode:"index",intersect:false},
+            plugins:{legend:{display:false}},
+            scales:{y:{min:70,max:100,ticks:{callback:v=>v+"%"}},x:{grid:{display:false}}}
+        }
+    });
+});
+</script>
+<style>
+.accuracy-graph-legend{display:flex;flex-wrap:wrap;gap:18px;margin-top:16px;font-size:12px;font-weight:700;color:#64748b}
+.accuracy-graph-legend span{display:inline-flex;align-items:center;gap:7px}
+.accuracy-graph-legend i{display:inline-block;width:9px;height:9px;border-radius:50%}
+</style>
+
+<!-- PROJECT FILTER — below Accuracy Performance Overview -->
 <section class="content-card">
     <form method="GET" action="{{ url_for('supervisor_dashboard') }}" class="filter-bar">
         <div class="filter-group">
@@ -30,45 +98,8 @@
     </form>
 </section>
 
-<div class="dashboard-focus-layout">
-    <div class="dashboard-graph-column">
-<!-- ACCURACY PERFORMANCE OVERVIEW -->
-<section class="content-card accuracy-graph-card">
-    <div class="section-heading"><div><h2>Accuracy Performance Overview</h2><p>Compare weighted accuracy trends across reporting periods.</p></div><span class="section-tag">PERFORMANCE TREND</span></div>
-    <form method="GET" class="filter-bar">
-        <div class="filter-group"><label for="graph_project_id">Project</label>
-            <select name="graph_project_id" id="graph_project_id" onchange="this.form.submit()">
-                <option value="all" {% if graph_selected_project == 'all' %}selected{% endif %}>{% if session.get('role')|lower == 'admin' %}All Projects{% else %}All Assigned Projects{% endif %}</option>
-                {% for project in graph_projects %}<option value="{{ project.id }}" {% if graph_selected_project|string == project.id|string %}selected{% endif %}>{{ project.project_name }}</option>{% endfor %}
-            </select>
-        </div>
-        <div class="filter-group"><label for="graph_period">Period Type</label>
-            <select name="graph_period" id="graph_period" onchange="this.form.submit()">
-                <option value="daily" {% if graph_period == 'daily' %}selected{% endif %}>Daily</option>
-                <option value="weekly" {% if graph_period == 'weekly' %}selected{% endif %}>Weekly</option>
-                <option value="monthly" {% if graph_period == 'monthly' %}selected{% endif %}>Monthly</option>
-            </select>
-        </div>
-    </form>
-    <div style="position:relative;width:100%;height:320px;"><canvas id="accuracyTrendChart"></canvas></div>
-    <div class="accuracy-graph-legend"><span><i style="background:#2563eb"></i> INTERNAL</span><span><i style="background:#16a34a"></i> EXTERNAL_WC</span><span><i style="background:#f97316"></i> EXTERNAL_WOC</span></div>
-</section>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-document.addEventListener("DOMContentLoaded",function(){
- const canvas=document.getElementById("accuracyTrendChart");
- if(!canvas||typeof Chart==="undefined")return;
- new Chart(canvas,{type:"line",data:{labels:{{ graph_labels|tojson }},datasets:[
- {label:"INTERNAL",data:{{ graph_internal|tojson }},borderColor:"#2563eb",backgroundColor:"#2563eb",tension:.25,spanGaps:true},
- {label:"EXTERNAL_WC",data:{{ graph_external_wc|tojson }},borderColor:"#16a34a",backgroundColor:"#16a34a",tension:.25,spanGaps:true},
- {label:"EXTERNAL_WOC",data:{{ graph_external_woc|tojson }},borderColor:"#f97316",backgroundColor:"#f97316",tension:.25,spanGaps:true}
- ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:"index",intersect:false},plugins:{legend:{display:false}},scales:{y:{min:70,max:100,ticks:{callback:v=>v+"%"}},x:{grid:{display:false}}}}});
-});
-</script>
-<style>.accuracy-graph-legend{display:flex;flex-wrap:wrap;gap:18px;margin-top:16px;font-size:12px;font-weight:700;color:#64748b}.accuracy-graph-legend span{display:inline-flex;align-items:center;gap:7px}.accuracy-graph-legend i{display:inline-block;width:9px;height:9px;border-radius:50%}</style>
-    </div>
-    <aside class="dashboard-stats-column">
-<div class="stats-grid">
+<!-- SUMMARY CARDS — below the overview and project filter -->
+<div class="stats-grid supervisor-summary-below">
     <div class="stat-card">
         <div class="stat-card-top"><span class="stat-label">Total Error Records</span><span class="stat-icon">⚑</span></div>
         <div class="stat-value">{{ counts.errors }}</div>
@@ -89,8 +120,6 @@ document.addEventListener("DOMContentLoaded",function(){
         <div class="stat-value">{{ counts.qcs }}</div>
         <div class="stat-description">Distinct QC names in assigned-project error records</div>
     </div>
-</div>
-    </aside>
 </div>
 
 {% if not projects %}
