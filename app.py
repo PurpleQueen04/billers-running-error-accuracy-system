@@ -2037,11 +2037,11 @@ class ODSWorkbookSource:
                             except (TypeError, ValueError):
                                 row_repeat = 1
 
-                            # ODS files can encode over a million trailing blank
-                            # rows as one repeated table-row element. Detect that
-                            # compactly before building a row DataFrame or expanding
-                            # any repeated cells.
-                            if headers is not None and row_repeat > 1:
+                            # Skip blank rows after the header whether they are
+                            # represented as one repeated row or as many individual
+                            # rows. Large ODS exports often contain hundreds of
+                            # thousands of individually encoded empty rows.
+                            if headers is not None:
                                 cell_tags = {
                                     table_ns + "table-cell",
                                     table_ns + "covered-table-cell",
