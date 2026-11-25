@@ -4083,73 +4083,176 @@ def build_dashboard_graph_context(allowed_project_ids=None, username=None):
     graph_period = normalize_text(request.args.get("graph_period")).lower() or "monthly"
     if graph_period not in ("daily", "weekly", "monthly"):
         graph_period = "daily"
-    allowed_set = None if allowed_project_ids is None else {int(v) for v in allowed_project_ids}
-    with db() as con:
-        project_rows = con.execute("SELECT id, project_name, active FROM projects ORDER BY project_name").fetchall()
-    projects = []
-    for row in project_rows:
-        pid = int(row["id"])
-        if not bool(con_value(row, "active", 1)):
-            continue
-        if allowed_set is not None and pid not in allowed_set:
-            continue
-        projects.append({"id": pid, "project_name": row["project_name"]})
-    selected_project = normalize_text(request.args.get("graph_project_id")) or "all"
-    visible_ids = {p["id"] for p in projects}
-    if selected_project != "all":
-        try:
-            selected_id = int(selected_project)
-        except (TypeError, ValueError):
-            selected_id = None
-        if selected_id not in visible_ids:
-            selected_project = "all"
-    records = get_accuracy_records(
-        sorted(allowed_set) if allowed_set is not None else None,
-        start_date="2026-01-01"
-    )
-    if username:
-        records = [r for r in records if normalize_text(r.get("username")).casefold() == normalize_text(username).casefold()]
-    if selected_project != "all":
-        selected_id = int(selected_project)
-        records = [r for r in records if r.get("project_id") is not None and int(r["project_id"]) == selected_id]
 
-    # Independent BATCH # filter for the dashboard graph.
-    graph_batch_options = sorted({
-        normalize_text(r.get("batch_no"))
-        for r in records
-        if normalize_text(r.get("batch_no"))
-    }, reverse=True)
-    graph_selected_batch = normalize_text(request.args.get("graph_batch")) or "all"
-    if graph_selected_batch != "all" and graph_selected_batch not in graph_batch_options:
-        graph_selected_batch = "all"
-    if graph_selected_batch != "all":
-        records = [
-            r for r in records
-            if normalize_text(r.get("batch_no")) == graph_selected_batch
+    allowed_set = None if allowed_project_ids is None else {int(v) for v in allowed_project_ids}
+
+    with db() as con:
+        project_rows = con.execute(
+            "SELECT id, project_name, active FROM projects ORDER BY project_name"
+        ).fetchall()
+
+        projects = []
+        for row in project_rows:
+            pid = int(row["id"])
+            if not bool(con_value(row, "active", 1)):
+                continue
+            if allowed_set is not None and pid not in allowed_set:
+                continue
+            projects.append({"id": pid, "project_name": row["project_name"]})
+
+        selected_project = normalize_text(request.args.get("graph_project_id")) or "all"
+        visible_ids = {p["id"] for p in projects}
+        if selected_project != "all":
+            try:
+                selected_id = int(selected_project)
+            except (TypeError, ValueError):
+                selected_id = None
+            if selected_id not in visible_ids:
+                selected_project = "all"
+
+        # The dashboard graph can contain many years of imported rows.
+        # Aggregate inside the database instead of materializing every row
+        # and parsing dates/numbers in Python on each page request.
+        ensure_accuracy_batch_column(con)
+
+        conditions = [
+            "record_date IS NOT NULL",
+            "TRIM(record_date) != ''",
+            "record_date >= ?"
+        ]
+        params = ["2026-01-01"]
+
+        if allowed_set is not None:
+            if not allowed_set:
+                conditions.append("1 = 0")
+            else:
+                placeholders = ", ".join(["?"] * len(allowed_set))
+                conditions.append(f"project_id IN ({placeholders})")
+                params.extend(sorted(allowed_set))
+
+        if selected_project != "all":
+            conditions.append("project_id = ?")
+            params.append(int(selected_project))
+
+        if username:
+            conditions.append("LOWER(COALESCE(username, '')) = LOWER(?)")
+            params.append(normalize_text(username))
+
+        where_sql = " AND ".join(conditions)
+
+        batch_rows = con.execute(
+            f"""
+            SELECT DISTINCT TRIM(COALESCE(batch_no, '')) AS batch_no
+            FROM accuracy_records
+            WHERE {where_sql}
+              AND TRIM(COALESCE(batch_no, '')) != ''
+            ORDER BY batch_no DESC
+            """,
+            tuple(params)
+        ).fetchall()
+
+        graph_batch_options = [
+            normalize_text(row["batch_no"])
+            for row in batch_rows
+            if normalize_text(row["batch_no"])
         ]
 
-    # Build trend data from all retained historical records,
-    # not only records belonging to the latest upload.
+        graph_selected_batch = normalize_text(request.args.get("graph_batch")) or "all"
+        if graph_selected_batch != "all" and graph_selected_batch not in graph_batch_options:
+            graph_selected_batch = "all"
+
+        aggregate_conditions = list(conditions)
+        aggregate_params = list(params)
+        if graph_selected_batch != "all":
+            aggregate_conditions.append("TRIM(COALESCE(batch_no, '')) = ?")
+            aggregate_params.append(graph_selected_batch)
+
+        aggregate_where = " AND ".join(aggregate_conditions)
+
+        if graph_period == "monthly":
+            period_expression = "SUBSTR(record_date, 1, 7)"
+        elif graph_period == "weekly":
+            if is_postgres():
+                period_expression = "TO_CHAR(DATE_TRUNC('week', record_date::date), 'YYYY-MM-DD')"
+            else:
+                period_expression = (
+                    "DATE(record_date, '-' || "
+                    "((CAST(STRFTIME('%w', record_date) AS INTEGER) + 6) % 7) || ' days')"
+                )
+        else:
+            period_expression = "SUBSTR(record_date, 1, 10)"
+
+        accuracy_type_expression = """
+            CASE
+                WHEN UPPER(REPLACE(REPLACE(TRIM(COALESCE(accuracy_type, '')), '-', '_'), ' ', '_'))
+                    IN ('INTERNAL', 'INTERNAL_ACCURACY', 'ACCURACY')
+                    THEN 'INTERNAL'
+                WHEN UPPER(REPLACE(REPLACE(TRIM(COALESCE(accuracy_type, '')), '-', '_'), ' ', '_'))
+                    IN ('EXTERNAL_WC', 'EXTERNAL_WC_ACCURACY', 'WC', 'PER_AUDITED_ACCURACY')
+                    THEN 'EXTERNAL_WC'
+                WHEN UPPER(REPLACE(REPLACE(TRIM(COALESCE(accuracy_type, '')), '-', '_'), ' ', '_'))
+                    IN ('EXTERNAL_WOC', 'EXTERNAL_WOC_ACCURACY', 'WOC', 'PER_AUDITED_ACCURACY___WOC')
+                    THEN 'EXTERNAL_WOC'
+                ELSE NULL
+            END
+        """
+
+        # Import normalizes audited/errors to numeric values stored as text.
+        # Removing commas keeps SQL aggregation compatible with older rows.
+        audited_expression = (
+            "CAST(COALESCE(NULLIF(REPLACE(TRIM(COALESCE(audited, '0')), ',', ''), ''), '0') "
+            "AS DOUBLE PRECISION)"
+        )
+        errors_expression = (
+            "CAST(COALESCE(NULLIF(REPLACE(TRIM(COALESCE(errors, '0')), ',', ''), ''), '0') "
+            "AS DOUBLE PRECISION)"
+        )
+
+        aggregate_rows = con.execute(
+            f"""
+            SELECT
+                {period_expression} AS period_key,
+                {accuracy_type_expression} AS accuracy_kind,
+                SUM({audited_expression}) AS audited_total,
+                SUM({errors_expression}) AS errors_total
+            FROM accuracy_records
+            WHERE {aggregate_where}
+            GROUP BY {period_expression}, {accuracy_type_expression}
+            HAVING {accuracy_type_expression} IS NOT NULL
+            ORDER BY period_key
+            """,
+            tuple(aggregate_params)
+        ).fetchall()
+
     period_totals = {}
-    for row in records:
-        key = accuracy_period_key(row.get("record_date"), graph_period, row.get("month"))
-        kind = normalize_accuracy_type(row.get("accuracy_type"))
-        # Keep every dashboard trend view focused on January 2026 onward.
-        # Daily and weekly keys are ISO dates; monthly keys are YYYY-MM.
-        # Historical records remain stored and available in the other views.
-        cutoff = "2026-01" if graph_period == "monthly" else "2026-01-01"
-        if key and key < cutoff:
-            continue
+    for row in aggregate_rows:
+        key = normalize_text(row["period_key"])
+        kind = normalize_text(row["accuracy_kind"])
         if not key or kind not in ("INTERNAL", "EXTERNAL_WC", "EXTERNAL_WOC"):
             continue
-        totals = period_totals.setdefault(key, {k: {"audited": 0.0, "errors": 0.0} for k in ("INTERNAL", "EXTERNAL_WC", "EXTERNAL_WOC")})
-        totals[kind]["audited"] += number_value(row.get("audited")) or 0
-        totals[kind]["errors"] += number_value(row.get("errors")) or 0
+        if key < ("2026-01" if graph_period == "monthly" else "2026-01-01"):
+            continue
+        totals = period_totals.setdefault(
+            key,
+            {name: {"audited": 0.0, "errors": 0.0} for name in ("INTERNAL", "EXTERNAL_WC", "EXTERNAL_WOC")}
+        )
+        totals[kind]["audited"] += number_value(row["audited_total"]) or 0
+        totals[kind]["errors"] += number_value(row["errors_total"]) or 0
+
     labels = sorted(period_totals)
+
     def series(kind):
-        return [calculate_weighted_accuracy(period_totals[k][kind]["audited"], period_totals[k][kind]["errors"]) for k in labels]
+        return [
+            calculate_weighted_accuracy(
+                period_totals[key][kind]["audited"],
+                period_totals[key][kind]["errors"]
+            )
+            for key in labels
+        ]
+
     return {
-        "graph_projects": projects, "graph_selected_project": selected_project,
+        "graph_projects": projects,
+        "graph_selected_project": selected_project,
         "graph_period": graph_period,
         "graph_batch_options": graph_batch_options,
         "graph_selected_batch": graph_selected_batch,
@@ -4158,7 +4261,6 @@ def build_dashboard_graph_context(allowed_project_ids=None, username=None):
         "graph_external_wc": series("EXTERNAL_WC"),
         "graph_external_woc": series("EXTERNAL_WOC")
     }
-
 
 # =========================================================
 # ADMIN DASHBOARD
