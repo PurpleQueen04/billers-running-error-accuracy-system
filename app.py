@@ -2409,9 +2409,6 @@ def import_accuracy_sheet(
     # row, which caused long-running imports and Gunicorn
     # worker timeouts on larger ODS files.
     # -----------------------------------------------------
-    # Ensure the additive BATCH # column exists before workbook upserts.
-    ensure_accuracy_batch_column(con)
-
     source_row_numbers = [int(index) + 2 for index in dataframe.index]
     first_source_row = min(source_row_numbers) if source_row_numbers else 2
     last_source_row = max(source_row_numbers) if source_row_numbers else 1
@@ -2662,6 +2659,9 @@ def import_workbook(
     default_project_id=None,
     allowed_project_ids=None
 ):
+    # Run the schema check once per workbook, not once per ODS chunk.
+    ensure_accuracy_batch_column(con)
+
     total_imported = 0
 
     sheet_import_counts = {
