@@ -2014,11 +2014,14 @@ class ODSWorkbookSource:
                                 raw_name = element.get(table_ns + "name", "")
                                 normalized = normalize_text(raw_name).upper()
                                 if self.forced_sheet:
-                                    if not forced_sheet_used:
-                                        current_sheet = self.forced_sheet
-                                        forced_sheet_used = True
-                                    else:
-                                        current_sheet = None
+                                    # A section-specific upload must read the worksheet
+                                    # whose actual tab name matches the requested section.
+                                    # Ignore helper tabs such as Sheet4.
+                                    current_sheet = (
+                                        self.forced_sheet
+                                        if normalized == self.forced_sheet
+                                        else None
+                                    )
                                 else:
                                     current_sheet = normalized if normalized in self.SUPPORTED_SHEETS else None
                                 headers = None
@@ -2066,17 +2069,28 @@ class ODSWorkbookSource:
                                     pass
                             element.clear()
 
-                        elif element.tag == table_ns + "table" and current_sheet:
-                            if rows:
-                                frame = pd.DataFrame(rows, columns=headers or [], index=row_indexes, dtype=object)
-                                yield current_sheet, frame
-                                yielded_for_sheet = True
-                            if not yielded_for_sheet:
-                                yield current_sheet, None
+                        elif element.tag == table_ns + "table":
+                            if current_sheet:
+                                if rows:
+                                    frame = pd.DataFrame(rows, columns=headers or [], index=row_indexes, dtype=object)
+                                    yield current_sheet, frame
+                                    yielded_for_sheet = True
+                                if not yielded_for_sheet:
+                                    yield current_sheet, None
+
                             current_sheet = None
                             headers = None
                             rows = []
                             row_indexes = []
+                            if len(stack) >= 2:
+                                try:
+                                    stack[-2].remove(element)
+                                except ValueError:
+                                    pass
+                            element.clear()
+
+                        elif element.tag == table_ns + "table-row" and not current_sheet:
+                            # Discard rows from unrelated tabs without retaining their XML.
                             if len(stack) >= 2:
                                 try:
                                     stack[-2].remove(element)
