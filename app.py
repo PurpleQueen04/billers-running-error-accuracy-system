@@ -4103,7 +4103,10 @@ def build_dashboard_graph_context(allowed_project_ids=None, username=None):
             selected_id = None
         if selected_id not in visible_ids:
             selected_project = "all"
-    records = get_accuracy_records(sorted(allowed_set) if allowed_set is not None else None)
+    records = get_accuracy_records(
+        sorted(allowed_set) if allowed_set is not None else None,
+        start_date="2026-01-01"
+    )
     if username:
         records = [r for r in records if normalize_text(r.get("username")).casefold() == normalize_text(username).casefold()]
     if selected_project != "all":
@@ -6775,7 +6778,7 @@ def calculate_weighted_accuracy(audited, errors):
 # GET ACCURACY RECORDS
 # =========================================================
 
-def get_accuracy_records(project_ids=None):
+def get_accuracy_records(project_ids=None, start_date=None):
 
     with db() as con:
 
@@ -6827,6 +6830,12 @@ def get_accuracy_records(project_ids=None):
 
             params = tuple(project_ids)
 
+        # record_date is normalized to ISO YYYY-MM-DD during import.
+        # Apply optional dashboard cutoffs in SQL to avoid loading old history.
+        if start_date:
+            base_query += " AND record_date >= ?"
+            params = (*params, start_date)
+
         base_query += " ORDER BY record_date"
 
         rows = con.execute(
@@ -6857,7 +6866,8 @@ def build_accuracy_context(
     selected_batch="all",
     history_batch="all",
     below_batch="all",
-    include_history=True
+    include_history=True,
+    min_record_date=None
 ):
     if period_type not in ("daily", "weekly", "monthly"):
         period_type = "monthly"
@@ -6900,7 +6910,8 @@ def build_accuracy_context(
         allowed_set = {int(value) for value in allowed_project_ids}
 
     records = get_accuracy_records(
-        sorted(allowed_set) if allowed_set is not None else None
+        sorted(allowed_set) if allowed_set is not None else None,
+        start_date=min_record_date
     )
 
     with db() as con:
@@ -6954,7 +6965,10 @@ def build_accuracy_context(
         "TRIM(billed_date) != ''"
     ]
 
-    error_params = []
+    error_params = [min_record_date] if min_record_date else []
+    if min_record_date:
+        # billed_date is normalized to ISO YYYY-MM-DD during import.
+        error_conditions.append("billed_date >= ?")
 
     if allowed_set is not None:
 
@@ -8466,7 +8480,8 @@ def supervisor_dashboard():
             ).fetchone()
 
         accuracy_context = build_accuracy_context(
-            allowed_project_ids=scoped_ids
+            allowed_project_ids=scoped_ids,
+            min_record_date="2026-01-01"
         )
 
         total_audited = sum(
