@@ -6,7 +6,7 @@
 <div class="page-header">
     <div>
         <h1>Workbook Import</h1>
-        <p>Upload CSV, XLS, XLSX, or ODS files for your assigned active projects only.</p>
+        <p>Upload separate ODS files for your assigned active projects only.</p>
     </div>
     <span class="section-tag">QC WORKSPACE</span>
 </div>
@@ -14,8 +14,8 @@
 <section class="content-card upload-section">
     <div class="section-heading">
         <div>
-            <h2>Workbook Import</h2>
-            <p>Imports are restricted to projects assigned to your QC account.</p>
+            <h2>Separate ODS Uploads</h2>
+            <p>Choose one or more files. Every imported row is checked against your assigned projects.</p>
         </div>
         <span class="section-tag">QC ACCESS</span>
     </div>
@@ -27,10 +27,21 @@
         <input type="hidden" name="csrf_token" value="{{ session.get('csrf_token', '') }}">
 
         <div class="form-group">
-            <label for="qc_source_file">Select Workbook</label>
-            <input type="file" name="source_file" id="qc_source_file"
-                   accept=".csv,.xls,.xlsx,.ods" required>
-            <small>Supported formats: CSV, XLS, XLSX, ODS</small>
+            <label for="error_file">1. ERROR.ods — Error Records</label>
+            <input type="file" name="error_file" id="error_file" accept=".ods">
+            <small>ODS file containing the Error Records sheet.</small>
+        </div>
+
+        <div class="form-group">
+            <label for="internal_file">2. INTERNAL.ods — Internal Accuracy</label>
+            <input type="file" name="internal_file" id="internal_file" accept=".ods">
+            <small>ODS file containing Internal Accuracy data.</small>
+        </div>
+
+        <div class="form-group">
+            <label for="external_file">3. EXTERNAL.ods — External Accuracy</label>
+            <input type="file" name="external_file" id="external_file" accept=".ods">
+            <small>ODS file containing External Accuracy (WC and WOC) data.</small>
         </div>
 
         <div class="form-group">
@@ -44,20 +55,11 @@
                     <option value="{{ project.id }}">{{ project.project_name }}</option>
                 {% endfor %}
             </select>
-            <small>When selecting All Assigned Projects, every imported row must identify its PROJECT.</small>
-        </div>
-
-        <div class="form-group">
-            <label for="qc_csv_sheet">Import Type</label>
-            <select name="csv_sheet" id="qc_csv_sheet" required>
-                <option value="ERROR">Error Records</option>
-                <option value="INTERNAL">Internal Accuracy</option>
-                <option value="EXTERNAL">External Accuracy</option>
-            </select>
+            <small>For All Assigned Projects, each row must identify its PROJECT.</small>
         </div>
 
         <button type="submit" class="btn btn-primary" {% if not projects %}disabled{% endif %}>
-            ⇧ Upload Workbook
+            ⇧ Upload Selected ODS Files
         </button>
     </form>
 
