@@ -5531,6 +5531,110 @@ def toggle_account_status():
 
     return redirect(url_for("admin_accounts"))
 
+
+# =========================================================
+# DELETE ACCOUNT
+# PRESERVE HISTORICAL RECORDS AND ACTIVITY LOGS
+# =========================================================
+
+@app.route(
+    "/admin/account/delete",
+    methods=["POST"]
+)
+@login_required
+@admin_required
+def delete_account():
+
+    validate_csrf()
+
+    user_id = request.form.get("user_id", "").strip()
+
+    if not user_id.isdigit():
+        flash("Invalid account selected.", "danger")
+        return redirect(url_for("admin_accounts"))
+
+    user_id = int(user_id)
+    current_user_id = session.get("user_id")
+
+    try:
+        with db() as con:
+
+            if is_postgres():
+                con.execute("SELECT pg_advisory_xact_lock(746281)")
+
+            target = con.execute(
+                """
+                SELECT id, username, role, active
+                FROM users
+                WHERE id = ?
+                """,
+                (user_id,)
+            ).fetchone()
+
+            if not target:
+                raise ValueError("The selected account does not exist.")
+
+            if str(current_user_id) == str(user_id):
+                raise ValueError("You cannot delete your own account.")
+
+            role = normalize_text(target["role"]).lower()
+
+            if role == "admin" and bool(target["active"]):
+                active_admins = con.execute(
+                    """
+                    SELECT COUNT(*) AS total
+                    FROM users
+                    WHERE LOWER(role) = 'admin'
+                      AND active = 1
+                    """
+                ).fetchone()
+
+                if int(active_admins["total"]) <= 1:
+                    raise ValueError("Cannot delete the last active Admin account.")
+
+            username = target["username"]
+
+            # Remove project membership explicitly; historical records
+            # and username-based audit/import history remain untouched.
+            con.execute(
+                "DELETE FROM user_projects WHERE user_id = ?",
+                (user_id,)
+            )
+
+            con.execute(
+                "DELETE FROM users WHERE id = ?",
+                (user_id,)
+            )
+
+            con.execute(
+                """
+                INSERT INTO activity_logs (
+                    username, action, details, created_at
+                )
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    session.get("username", ""),
+                    "DELETE ACCOUNT",
+                    f"Deleted account: {username} (Account ID: {user_id})",
+                    datetime.now().isoformat(timespec="seconds")
+                )
+            )
+
+        flash(
+            f"Account '{username}' deleted successfully. Historical records were preserved.",
+            "success"
+        )
+
+    except ValueError as exc:
+        flash(str(exc), "danger")
+
+    except Exception:
+        app.logger.exception("Account deletion failed")
+        flash("Unable to delete account. Please check related records and try again.", "danger")
+
+    return redirect(url_for("admin_accounts"))
+
 # =========================================================
 # UPDATE ACCOUNT PROJECT ASSIGNMENTS
 # =========================================================

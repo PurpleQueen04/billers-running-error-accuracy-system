@@ -2535,3 +2535,32 @@ input[type="radio"] {
     font-size: 9px;
     line-height: 1.2;
 }
+
+
+/* Compact, aligned action buttons on the Accounts table. */
+#accountsTable .action-buttons {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+#accountsTable .action-buttons form {
+    display: inline-flex;
+    margin: 0;
+}
+
+#accountsTable .edit-account-btn,
+#accountsTable .account-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-height: 30px;
+    padding: 5px 9px;
+    font-size: 11px;
+    line-height: 1;
+    white-space: nowrap;
+}
