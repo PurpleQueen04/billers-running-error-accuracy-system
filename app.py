@@ -1206,6 +1206,17 @@ def init_db():
             "project_id",
             "INTEGER"
         )
+
+        # -------------------------------------------------
+        # ACCURACY IMPORT LOOKUP INDEX
+        # Speeds up the existing-row lookup by sheet and
+        # workbook source-row range during large imports.
+        # Safe for existing data; does not modify records.
+        # -------------------------------------------------
+        con.execute("""
+            CREATE INDEX IF NOT EXISTS idx_accuracy_records_sheet_source_row_id
+            ON accuracy_records (sheet, source_row, id DESC)
+        """)
         
         # -------------------------------------------------
         # ONE-TIME SYNC OF EXISTING BILLER RESPONSES
