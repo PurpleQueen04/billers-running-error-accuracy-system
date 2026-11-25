@@ -2059,6 +2059,8 @@ class ODSWorkbookSource:
                                         except ValueError:
                                             pass
                                     element.clear()
+                                    if stack:
+                                        stack.pop()
                                     continue
 
                             row_values = self._row_values(element)
