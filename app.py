@@ -2092,6 +2092,10 @@ class ODSWorkbookSource:
 
                         elif element.tag == table_ns + "table":
                             if current_sheet:
+                                if self.forced_sheet == "ERROR" and headers is None:
+                                    raise ValueError(
+                                        "ERROR sheet could not find a header row containing USERNAME and PRO."
+                                    )
                                 if rows:
                                     frame = pd.DataFrame(rows, columns=headers or [], index=row_indexes, dtype=object)
                                     yield current_sheet, frame
