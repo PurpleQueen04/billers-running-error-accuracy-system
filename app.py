@@ -2967,6 +2967,65 @@ def import_workbook(
         total_imported = sum(sheet_import_counts.values())
         
     # -----------------------------------------------------
+    # EXACT MONTHLY REPLACEMENT FOR INTERNAL / EXTERNAL
+    # Keep the previous import history, but remove older active
+    # accuracy rows only for months/projects present in this
+    # successfully imported workbook. Other months, sheets,
+    # and projects remain untouched.
+    # -----------------------------------------------------
+
+    imported_scopes = con.execute(
+        """
+        SELECT DISTINCT
+            sheet,
+            month,
+            project_id
+        FROM accuracy_records
+        WHERE sheet IN ('INTERNAL', 'EXTERNAL')
+          AND imported_at = ?
+          AND month IS NOT NULL
+          AND TRIM(month) <> ''
+        """,
+        (workbook_imported_at,)
+    ).fetchall()
+
+    for scope in imported_scopes:
+        scope_sheet = normalize_text(scope["sheet"]).upper()
+        scope_month = normalize_text(scope["month"])
+        scope_project_id = scope["project_id"]
+
+        if scope_sheet not in ("INTERNAL", "EXTERNAL") or not scope_month:
+            continue
+
+        if scope_project_id is None:
+            con.execute(
+                """
+                DELETE FROM accuracy_records
+                WHERE sheet = ?
+                  AND month = ?
+                  AND project_id IS NULL
+                  AND COALESCE(imported_at, '') <> ?
+                """,
+                (scope_sheet, scope_month, workbook_imported_at)
+            )
+        else:
+            con.execute(
+                """
+                DELETE FROM accuracy_records
+                WHERE sheet = ?
+                  AND month = ?
+                  AND project_id = ?
+                  AND COALESCE(imported_at, '') <> ?
+                """,
+                (
+                    scope_sheet,
+                    scope_month,
+                    int(scope_project_id),
+                    workbook_imported_at
+                )
+            )
+
+    # -----------------------------------------------------
     # IMPORT HISTORY
     # Detect actual database columns to support both
     # older schemas and the expanded Supabase schema.
@@ -9259,4 +9318,3 @@ if __name__ == "__main__":
         ),
         debug=False
     )
-
