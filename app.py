@@ -2013,9 +2013,12 @@ class ODSWorkbookSource:
                             if element.tag == table_ns + "table":
                                 raw_name = element.get(table_ns + "name", "")
                                 normalized = normalize_text(raw_name).upper()
-                                if self.forced_sheet and not forced_sheet_used:
-                                    current_sheet = self.forced_sheet
-                                    forced_sheet_used = True
+                                if self.forced_sheet:
+                                    if not forced_sheet_used:
+                                        current_sheet = self.forced_sheet
+                                        forced_sheet_used = True
+                                    else:
+                                        current_sheet = None
                                 else:
                                     current_sheet = normalized if normalized in self.SUPPORTED_SHEETS else None
                                 headers = None
