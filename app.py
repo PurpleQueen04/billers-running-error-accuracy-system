@@ -1872,33 +1872,59 @@ class ODSWorkbookSource:
 
     @classmethod
     def _row_values(cls, row_element):
+        """Read only meaningful cells; defer blank repeats until a later value needs them."""
         table_ns = "{urn:oasis:names:tc:opendocument:xmlns:table:1.0}"
         cell_tags = {
             table_ns + "table-cell",
             table_ns + "covered-table-cell",
         }
+        max_columns = 16384
         values = []
-        for cell in list(row_element):
+        pending_blank_columns = 0
+
+        for cell in row_element:
             if cell.tag not in cell_tags:
                 continue
+
             repeat_text = cell.get(table_ns + "number-columns-repeated", "1")
             try:
-                repeat = max(1, min(int(repeat_text), 16384))
+                repeat = max(1, min(int(repeat_text), max_columns))
             except (TypeError, ValueError):
                 repeat = 1
+
             value = cls._cell_text(cell)
+
             span_text = cell.get(table_ns + "number-columns-spanned", "1")
             try:
-                span = max(1, min(int(span_text), 16384))
+                span = max(1, min(int(span_text), max_columns))
             except (TypeError, ValueError):
                 span = 1
-            values.extend([value] * repeat)
-            if span > 1:
-                values.extend([""] * (span - 1))
-        # Trailing empty cells are not useful to the import and can be
-        # repeated by spreadsheet formatting across thousands of columns.
-        while values and values[-1] == "":
-            values.pop()
+
+            # Preserve interior blank columns, but do not allocate trailing
+            # repeated blanks commonly added by spreadsheet formatting.
+            if value == "":
+                pending_blank_columns += repeat + span - 1
+                continue
+
+            remaining = max_columns - len(values)
+            if remaining <= 0:
+                break
+
+            blanks_to_add = min(pending_blank_columns, remaining)
+            if blanks_to_add:
+                values.extend([""] * blanks_to_add)
+                remaining -= blanks_to_add
+            pending_blank_columns = 0
+
+            repeated_values = min(repeat, remaining)
+            if repeated_values:
+                values.extend([value] * repeated_values)
+                remaining -= repeated_values
+
+            span_blanks = min(span - 1, remaining)
+            if span_blanks:
+                values.extend([""] * span_blanks)
+
         return values
 
     def iter_chunks(self):
