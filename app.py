@@ -4021,6 +4021,10 @@ def build_dashboard_graph_context(allowed_project_ids=None, username=None):
     for row in records:
         key = accuracy_period_key(row.get("record_date"), graph_period, row.get("month"))
         kind = normalize_accuracy_type(row.get("accuracy_type"))
+        # Keep the dashboard trend focused on January 2026 onward.
+        # Historical records remain stored and available in the other views.
+        if graph_period == "monthly" and key and key < "2026-01":
+            continue
         if not key or kind not in ("INTERNAL", "EXTERNAL_WC", "EXTERNAL_WOC"):
             continue
         totals = period_totals.setdefault(key, {k: {"audited": 0.0, "errors": 0.0} for k in ("INTERNAL", "EXTERNAL_WC", "EXTERNAL_WOC")})
