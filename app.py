@@ -1052,7 +1052,10 @@ def init_db():
                     uploaded_by TEXT,
                     imported_by TEXT,
                     records_imported INTEGER DEFAULT 0,
-                    imported_at TEXT
+                    imported_at TEXT,
+                    sheet_name TEXT,
+                    months_covered TEXT,
+                    replacement_note TEXT
                 )
             """)
         else:
@@ -1063,7 +1066,10 @@ def init_db():
                     uploaded_by TEXT,
                     imported_by TEXT,
                     records_imported INTEGER DEFAULT 0,
-                    imported_at TEXT
+                    imported_at TEXT,
+                    sheet_name TEXT,
+                    months_covered TEXT,
+                    replacement_note TEXT
                 )
             """)
 
@@ -1166,7 +1172,10 @@ def init_db():
                 "uploaded_by": "TEXT",
                 "imported_by": "TEXT",
                 "records_imported": "INTEGER DEFAULT 0",
-                "imported_at": "TEXT"
+                "imported_at": "TEXT",
+                "sheet_name": "TEXT",
+                "months_covered": "TEXT",
+                "replacement_note": "TEXT"
             },
 
             "activity_logs": {
@@ -2873,7 +2882,9 @@ def import_workbook(
     filename,
     uploaded_by,
     default_project_id=None,
-    allowed_project_ids=None
+    allowed_project_ids=None,
+    source_sheet=None,
+    import_metadata=None
 ):
     # Run the schema check once per workbook, not once per ODS chunk.
     ensure_accuracy_batch_column(con)
@@ -3033,6 +3044,43 @@ def import_workbook(
 
     imported_at = datetime.now().isoformat(timespec="seconds")
 
+    source_sheet = normalize_text(source_sheet).upper()
+    months_covered = []
+    if source_sheet in ("INTERNAL", "EXTERNAL"):
+        month_rows = con.execute(
+            """
+            SELECT DISTINCT month
+            FROM accuracy_records
+            WHERE sheet = ?
+              AND imported_at = ?
+              AND month IS NOT NULL
+              AND TRIM(month) <> ''
+            ORDER BY month
+            """,
+            (source_sheet, workbook_imported_at)
+        ).fetchall()
+        months_covered = [
+            normalize_text(row["month"])
+            for row in month_rows
+            if normalize_text(row["month"])
+        ]
+
+    replacement_note = ""
+    if source_sheet in ("INTERNAL", "EXTERNAL"):
+        replacement_note = (
+            "Exact-month replacement applied only to the listed month/project scopes; other months and sheets were kept."
+            if months_covered
+            else "No month scope detected; no monthly replacement was applied."
+        )
+
+    if import_metadata is not None:
+        import_metadata.update({
+            "sheet_name": source_sheet,
+            "months_covered": months_covered,
+            "replacement_note": replacement_note,
+            "records_imported": total_imported
+        })
+
     if is_postgres():
         history_columns = {
             row["column_name"]
@@ -3059,6 +3107,9 @@ def import_workbook(
         "imported_by": normalize_text(uploaded_by),
         "records_imported": total_imported,
         "imported_at": imported_at,
+        "sheet_name": source_sheet,
+        "months_covered": ", ".join(months_covered),
+        "replacement_note": replacement_note,
         "status": "SUCCESS"
     }
 
@@ -4301,20 +4352,33 @@ def upload_workbook():
         # the selected group is rolled back rather than partially imported.
         with db() as con:
             for sheet_name, filename, sheets in upload_items:
+                metadata = {}
                 imported = import_workbook(
                     con,
                     sheets,
                     filename,
                     session.get("username", ""),
                     default_project_id=default_project_id,
-                    allowed_project_ids=None
+                    allowed_project_ids=None,
+                    source_sheet=sheet_name,
+                    import_metadata=metadata
                 )
                 total_imported += imported
-                import_results.append(f"{sheet_name}: {imported}")
+                months_label = ", ".join(metadata.get("months_covered", []))
+                import_results.append({
+                    "filename": filename,
+                    "sheet": metadata.get("sheet_name") or sheet_name,
+                    "months": months_label or "—",
+                    "count": imported
+                })
 
         flash(
-            f"Import completed. {total_imported} records imported or updated. "
-            + " | ".join(import_results),
+            "Import completed successfully. "
+            + f"Total: {total_imported} records imported or updated. "
+            + " | ".join(
+                f"{item['filename']} ({item['sheet']} / {item['months']}): {item['count']} records"
+                for item in import_results
+            ),
             "success"
         )
     except ValueError as exc:
@@ -4386,20 +4450,33 @@ def qc_upload_workbook():
         # All selected files share one transaction to avoid partial group imports.
         with db() as con:
             for sheet_name, filename, sheets in upload_items:
+                metadata = {}
                 imported = import_workbook(
                     con,
                     sheets,
                     filename,
                     session.get("username", ""),
                     default_project_id=default_project_id,
-                    allowed_project_ids=allowed_ids
+                    allowed_project_ids=allowed_ids,
+                    source_sheet=sheet_name,
+                    import_metadata=metadata
                 )
                 total_imported += imported
-                import_results.append(f"{sheet_name}: {imported}")
+                months_label = ", ".join(metadata.get("months_covered", []))
+                import_results.append({
+                    "filename": filename,
+                    "sheet": metadata.get("sheet_name") or sheet_name,
+                    "months": months_label or "—",
+                    "count": imported
+                })
 
         flash(
-            f"Import completed. {total_imported} records imported or updated. "
-            + " | ".join(import_results),
+            "Import completed successfully. "
+            + f"Total: {total_imported} records imported or updated. "
+            + " | ".join(
+                f"{item['filename']} ({item['sheet']} / {item['months']}): {item['count']} records"
+                for item in import_results
+            ),
             "success"
         )
     except ValueError as exc:
@@ -9131,7 +9208,8 @@ def export_responses():
 def admin_import_history():
     with db() as con:
         rows = con.execute(
-            """SELECT id, filename, uploaded_by, records_imported, imported_at
+            """SELECT id, filename, uploaded_by, records_imported, imported_at,
+                      sheet_name, months_covered, replacement_note
                FROM import_history ORDER BY id DESC LIMIT 500"""
         ).fetchall()
     return render_template("import_history.html", history=[dict(row) for row in rows], scope="All system imports")
@@ -9144,7 +9222,8 @@ def qc_import_history():
     username = normalize_text(session.get("username"))
     with db() as con:
         rows = con.execute(
-            """SELECT id, filename, uploaded_by, records_imported, imported_at
+            """SELECT id, filename, uploaded_by, records_imported, imported_at,
+                      sheet_name, months_covered, replacement_note
                FROM import_history
                WHERE LOWER(TRIM(COALESCE(uploaded_by, ''))) = LOWER(?)
                ORDER BY id DESC LIMIT 500""",

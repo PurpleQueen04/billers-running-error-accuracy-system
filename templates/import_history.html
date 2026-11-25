@@ -17,8 +17,11 @@
                     <tr>
                         <th>DATE / TIME</th>
                         <th>FILE NAME</th>
+                        <th>SHEET</th>
+                        <th>MONTH COVERED</th>
                         <th>UPLOADED BY</th>
                         <th>RECORDS IMPORTED / UPDATED</th>
+                        <th>IMPORT NOTE</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -26,8 +29,11 @@
                     <tr>
                         <td>{{ item.imported_at or '—' }}</td>
                         <td>{{ item.filename or '—' }}</td>
+                        <td>{{ item.sheet_name or '—' }}</td>
+                        <td>{{ item.months_covered or '—' }}</td>
                         <td>{{ item.uploaded_by or '—' }}</td>
                         <td>{{ item.records_imported or 0 }}</td>
+                        <td>{{ item.replacement_note or '—' }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
