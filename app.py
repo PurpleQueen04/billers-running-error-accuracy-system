@@ -2783,11 +2783,82 @@ def import_accuracy_sheet(
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
 
-    batch_size = 500
-    for offset in range(0, len(updates), batch_size):
-        con.executemany(update_sql, updates[offset:offset + batch_size])
-    for offset in range(0, len(inserts), batch_size):
-        con.executemany(insert_sql, inserts[offset:offset + batch_size])
+    if is_postgres():
+        # Psycopg executemany still executes one statement per record.
+        # A single multi-row statement per chunk reduces database round trips
+        # for large ODS imports while remaining inside the caller's transaction.
+        batch_size = 2000
+
+        update_columns = (
+            "biller_name, month, weekly, record_date, accuracy_value, "
+            "bills_processed, audited, errors, imported_at, batch_no, id"
+        )
+        update_assignments = """
+            biller_name = incoming.biller_name,
+            month = incoming.month,
+            weekly = incoming.weekly,
+            record_date = incoming.record_date,
+            accuracy_value = incoming.accuracy_value,
+            bills_processed = incoming.bills_processed,
+            audited = incoming.audited,
+            errors = incoming.errors,
+            imported_at = incoming.imported_at,
+            batch_no = incoming.batch_no
+        """
+
+        for offset in range(0, len(updates), batch_size):
+            batch = updates[offset:offset + batch_size]
+            row_placeholders = "(" + ", ".join(["?"] * 11) + ")"
+            values_sql = ", ".join(
+                [row_placeholders] * len(batch)
+            )
+            params = [
+                value
+                for record in batch
+                for value in record
+            ]
+            con.execute(
+                f"""
+                UPDATE accuracy_records AS target
+                SET {update_assignments}
+                FROM (VALUES {values_sql}) AS incoming ({update_columns})
+                WHERE target.id = incoming.id
+                """,
+                params
+            )
+
+        insert_columns = (
+            "sheet, username, biller_name, month, weekly, record_date, "
+            "accuracy_type, accuracy_value, bills_processed, audited, "
+            "errors, source_row, imported_at, project_id, batch_no"
+        )
+
+        for offset in range(0, len(inserts), batch_size):
+            batch = inserts[offset:offset + batch_size]
+            row_placeholders = "(" + ", ".join(["?"] * 15) + ")"
+            values_sql = ", ".join(
+                [row_placeholders] * len(batch)
+            )
+            params = [
+                value
+                for record in batch
+                for value in record
+            ]
+            con.execute(
+                f"""
+                INSERT INTO accuracy_records ({insert_columns})
+                VALUES {values_sql}
+                """,
+                params
+            )
+
+    else:
+        # Keep the existing SQLite-compatible path unchanged.
+        batch_size = 500
+        for offset in range(0, len(updates), batch_size):
+            con.executemany(update_sql, updates[offset:offset + batch_size])
+        for offset in range(0, len(inserts), batch_size):
+            con.executemany(insert_sql, inserts[offset:offset + batch_size])
 
     return imported
 
