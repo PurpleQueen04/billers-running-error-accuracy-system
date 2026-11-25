@@ -10,7 +10,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 
 from datetime import datetime, date, timedelta
-from functools import wraps
+from functools import wraps, lru_cache
 
 import pandas as pd
 
@@ -611,7 +611,7 @@ def normalize_accuracy(value):
 
 
 def parse_date(value):
-    """Parse common workbook date values without expensive pandas inference."""
+    """Parse common workbook date values efficiently without pandas inference."""
     if value is None:
         return None
 
@@ -651,21 +651,65 @@ def parse_date(value):
     except (TypeError, ValueError, OverflowError):
         pass
 
-    formats = (
-        "%m/%d/%Y", "%m/%d/%y", "%d/%m/%Y", "%d/%m/%y",
-        "%Y/%m/%d", "%m-%d-%Y", "%m-%d-%y", "%d-%m-%Y",
-        "%d-%m-%y", "%d-%b-%Y", "%d-%B-%Y", "%b %d, %Y",
-        "%B %d, %Y", "%b %d %Y", "%B %d %Y", "%b-%d-%Y",
-        "%B-%d-%Y", "%d %b %Y", "%d %B %Y"
-    )
-    for fmt in formats:
+    # Handle numeric dates directly. This avoids repeatedly calling
+    # strptime() against many formats for every row in a large workbook.
+    for separator in ("/", "-"):
+        parts = [part.strip() for part in text_value.split(separator)]
+        if len(parts) != 3 or not all(part.isdigit() for part in parts):
+            continue
+
+        try:
+            first, second, third = (int(part) for part in parts)
+
+            if len(parts[0]) == 4:
+                return date(first, second, third)
+
+            # Match datetime.strptime("%y")'s 1969-2068 year window.
+            if len(parts[2]) == 2:
+                third += 2000 if third <= 68 else 1900
+
+            # Preserve the existing format priority: month/day before day/month.
+            try:
+                return date(third, first, second)
+            except ValueError:
+                return date(third, second, first)
+        except (TypeError, ValueError, OverflowError):
+            return None
+
+    # Named-month dates: select the matching format shape instead of trying
+    # every possible format for each value.
+    candidates = ()
+    if "," in text_value:
+        month_token = text_value.split()[0]
+        month_fmt = "%b" if len(month_token) == 3 else "%B"
+        candidates = (f"{month_fmt} %d, %Y",)
+    elif "-" in text_value:
+        parts = text_value.split("-")
+        if len(parts) == 3 and parts[0].strip().isalpha():
+            month_fmt = "%b" if len(parts[0].strip()) == 3 else "%B"
+            candidates = (f"{month_fmt}-%d-%Y",)
+        elif len(parts) == 3 and parts[1].strip().isalpha():
+            month_fmt = "%b" if len(parts[1].strip()) == 3 else "%B"
+            candidates = (f"%d-{month_fmt}-%Y",)
+    elif " " in text_value:
+        parts = text_value.split()
+        if len(parts) == 3 and parts[0].isalpha():
+            month_fmt = "%b" if len(parts[0]) == 3 else "%B"
+            candidates = (f"{month_fmt} %d %Y",)
+        elif len(parts) == 3 and parts[1].isalpha():
+            month_fmt = "%b" if len(parts[1]) == 3 else "%B"
+            candidates = (f"%d {month_fmt} %Y",)
+
+    for fmt in candidates:
         try:
             parsed = datetime.strptime(text_value, fmt).date()
             if 1900 <= parsed.year <= 9999:
                 return parsed
         except (TypeError, ValueError, OverflowError):
             continue
+
     return None
+
 
 
 def month_from_date(value):
@@ -6145,77 +6189,81 @@ def normalize_accuracy_type(value):
 
     return None
 
+@lru_cache(maxsize=24)
+def _cached_month_number(month_name):
+    """Convert a repeated abbreviated or full month name only once."""
+    fmt = "%b" if len(month_name) == 3 else "%B"
+    return datetime.strptime(month_name, fmt).month
+
+
+@lru_cache(maxsize=128)
+def _cached_accuracy_year_month(raw_month):
+    """Resolve repeated workbook month labels once per distinct label."""
+    raw = normalize_text(raw_month)
+    if not raw:
+        return None
+
+    # Also support YYYY-MM labels.
+    if len(raw) == 7 and raw[4] == "-":
+        try:
+            year, month = (int(part) for part in raw.split("-"))
+            if 1 <= month <= 12 and 1 <= year <= 9999:
+                return year, month
+        except (TypeError, ValueError, OverflowError):
+            return None
+
+    parts = raw.replace("-", " ").split()
+    if len(parts) < 2:
+        return None
+
+    month_name = parts[0].strip()
+    year_text = parts[-1].strip()
+    if not year_text.isdigit():
+        return None
+
+    try:
+        year = int(year_text)
+        if len(year_text) == 2:
+            year += 2000 if year <= 68 else 1900
+        month = _cached_month_number(month_name)
+        if 1 <= year <= 9999:
+            return year, month
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+    return None
+
+
 def parse_accuracy_date(value, month_value=None):
     """Parse full dates and short dates using the row's month and year."""
-
     parsed = parse_date(value)
-
     if parsed is not None:
         return parsed
 
     raw_date = normalize_text(value)
     raw_month = normalize_text(month_value)
-
     if not raw_date or not raw_month:
         return None
 
-    # Support both 2-digit and 4-digit years.
-    year_formats = (
-        "%b - %y",
-        "%B - %y",
-        "%b %y",
-        "%B %y",
-        "%b - %Y",
-        "%B - %Y",
-        "%b-%Y",
-        "%B-%Y",
-        "%b %Y",
-        "%B %Y",
-        "%Y-%m"
-    )
-
-    year = None
-
-    for fmt in year_formats:
-        try:
-            year = datetime.strptime(
-                raw_month,
-                fmt
-            ).year
-            break
-        except (TypeError, ValueError):
-            continue
-
-    if year is None:
+    year_month = _cached_accuracy_year_month(raw_month)
+    if year_month is None:
         return None
 
-    # Support short date values such as Nov - 02.
-    date_formats = (
-        "%b - %d",
-        "%B - %d",
-        "%b-%d",
-        "%B-%d",
-        "%b %d",
-        "%B %d"
-    )
+    year, _source_month = year_month
 
-    for fmt in date_formats:
-        try:
-            month_day = datetime.strptime(
-                raw_date,
-                fmt
-            )
+    # Short date values are month-name plus day, with the separator optional.
+    parts = raw_date.replace("-", " ").split()
+    if len(parts) != 2 or not parts[1].isdigit():
+        return None
 
-            return date(
-                year,
-                month_day.month,
-                month_day.day
-            )
+    try:
+        month = _cached_month_number(parts[0])
+        day = int(parts[1])
+        return date(year, month, day)
+    except (TypeError, ValueError, OverflowError):
+        return None
 
-        except (TypeError, ValueError):
-            continue
 
-    return None
 
 def accuracy_period_key(value, period_type, month_value=None):
     """Return a stable period key, resolving short dates using the row month."""
