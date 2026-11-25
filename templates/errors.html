@@ -149,7 +149,7 @@
                         <th>QC EXPLANATION</th>
                         <th>QC NAME</th>
                         <th>LAST UPDATED</th>
-                        {% if page_mode|default('pending') != 'completed' %}<th>ACTION</th>{% endif %}
+                        <th>ACTION</th>
                     </tr>
                 </thead>
 
@@ -224,7 +224,64 @@
                                 {{ error.updated_at or '—' }}
                             </td>
 
-                            {% if page_mode|default('pending') != 'completed' %}
+                            {% if page_mode|default('pending') == 'completed' %}
+                            <td>
+                                <button type="button"
+                                        class="btn btn-primary"
+                                        onclick="document.getElementById('qc-edit-{{ loop.index }}').showModal()">
+                                    Edit
+                                </button>
+
+                                <dialog id="qc-edit-{{ loop.index }}"
+                                        class="biller-response-modal"
+                                        style="width:min(760px, calc(100% - 32px)); max-width:760px; border:0; border-radius:14px; padding:0; box-shadow:0 20px 60px rgba(0,0,0,.35);">
+                                    <div style="padding:22px;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px;">
+                                            <div>
+                                                <h2 style="margin:0;">Edit QC Explanation</h2>
+                                                <p style="margin:5px 0 0; opacity:.75;">Only your QC Explanation can be changed.</p>
+                                            </div>
+                                            <button type="button"
+                                                    class="btn btn-secondary"
+                                                    aria-label="Close"
+                                                    onclick="document.getElementById('qc-edit-{{ loop.index }}').close()">
+                                                ✕
+                                            </button>
+                                        </div>
+
+                                        <form method="POST"
+                                              action="{{ url_for('save_response', record_key=error.record_key) }}"
+                                              class="response-form">
+                                            <input type="hidden" name="csrf_token"
+                                                   value="{{ session.get('csrf_token', '') }}">
+                                            <input type="hidden" name="qc_edit_mode" value="1">
+                                            <input type="hidden" name="return_date" value="{{ selected_date }}">
+
+                                            <div class="form-group">
+                                                <label>QC EXPLANATION</label>
+                                                <textarea name="qc_explanation"
+                                                          rows="5"
+                                                          required
+                                                          placeholder="Enter your QC explanation...">{{ error.qc_explanation or '' }}</textarea>
+                                            </div>
+
+                                            <p class="form-hint">Verified Error, Biller Comment, and original Error Details cannot be changed here.</p>
+
+                                            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px;">
+                                                <button type="button"
+                                                        class="btn btn-secondary"
+                                                        onclick="document.getElementById('qc-edit-{{ loop.index }}').close()">
+                                                    Cancel
+                                                </button>
+                                                <button type="submit" class="btn btn-primary">
+                                                    Update QC Explanation
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </dialog>
+                            </td>
+                            {% else %}
                             <td>
                                 <button type="button"
                                         class="btn btn-primary"
