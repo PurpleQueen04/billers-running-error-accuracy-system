@@ -3065,11 +3065,13 @@ def import_workbook(
             if normalize_text(row["month"])
         ]
 
-    replacement_note = (
-        "Previous active records for the same month/project scope replaced by this upload."
-        if source_sheet in ("INTERNAL", "EXTERNAL")
-        else ""
-    )
+    replacement_note = ""
+    if source_sheet in ("INTERNAL", "EXTERNAL"):
+        replacement_note = (
+            "Exact-month replacement applied only to the listed month/project scopes; other months and sheets were kept."
+            if months_covered
+            else "No month scope detected; no monthly replacement was applied."
+        )
 
     if import_metadata is not None:
         import_metadata.update({
