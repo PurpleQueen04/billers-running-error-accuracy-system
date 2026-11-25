@@ -1903,8 +1903,9 @@ class ODSWorkbookSource:
     CHUNK_SIZE = 500
     SUPPORTED_SHEETS = {"ERROR", "INTERNAL", "EXTERNAL"}
 
-    def __init__(self, stream):
+    def __init__(self, stream, forced_sheet=None):
         self.stream = stream
+        self.forced_sheet = normalize_text(forced_sheet).upper() if forced_sheet else None
 
     @staticmethod
     def _cell_text(cell):
@@ -2002,6 +2003,7 @@ class ODSWorkbookSource:
                 rows = []
                 row_indexes = []
                 yielded_for_sheet = False
+                forced_sheet_used = False
 
                 try:
                     iterator = ET.iterparse(xml_stream, events=("start", "end"))
@@ -2011,7 +2013,11 @@ class ODSWorkbookSource:
                             if element.tag == table_ns + "table":
                                 raw_name = element.get(table_ns + "name", "")
                                 normalized = normalize_text(raw_name).upper()
-                                current_sheet = normalized if normalized in self.SUPPORTED_SHEETS else None
+                                if self.forced_sheet and not forced_sheet_used:
+                                    current_sheet = self.forced_sheet
+                                    forced_sheet_used = True
+                                else:
+                                    current_sheet = normalized if normalized in self.SUPPORTED_SHEETS else None
                                 headers = None
                                 physical_row = 0
                                 rows = []
@@ -2081,7 +2087,7 @@ class ODSWorkbookSource:
                     raise ValueError("The ODS workbook contains invalid XML and could not be read.") from exc
 
 
-def read_source(file_storage, csv_sheet="ERROR"):
+def read_source(file_storage, csv_sheet="ERROR", single_sheet=False):
 
     filename = secure_filename(
         file_storage.filename or "source"
@@ -2100,7 +2106,10 @@ def read_source(file_storage, csv_sheet="ERROR"):
         if not zipfile.is_zipfile(stream):
             raise ValueError("The uploaded ODS file is invalid or corrupted.")
         stream.seek(0)
-        return ODSWorkbookSource(stream)
+        return ODSWorkbookSource(
+            stream,
+            forced_sheet=csv_sheet if single_sheet else None
+        )
 
     file_bytes = file_storage.read()
     if not file_bytes:
@@ -4032,20 +4041,6 @@ def admin_accuracy_improvement():
 @admin_required
 def upload_workbook():
     validate_csrf()
-    uploaded_file = request.files.get("source_file")
-    if not uploaded_file or not uploaded_file.filename:
-        flash("Please select a workbook or CSV file.", "warning")
-        return redirect(url_for("admin_workbook_import"))
-
-    filename = secure_filename(uploaded_file.filename)
-    if not allowed_file(filename):
-        flash("Unsupported file type. Allowed: ODS, XLSX, XLS, and CSV.", "danger")
-        return redirect(url_for("admin_workbook_import"))
-
-    csv_sheet = normalize_text(request.form.get("csv_sheet", "ERROR")).upper()
-    if csv_sheet not in ("ERROR", "INTERNAL", "EXTERNAL"):
-        flash("Invalid CSV sheet selection.", "danger")
-        return redirect(url_for("admin_workbook_import"))
 
     selected_project = normalize_text(request.form.get("project_id")) or "all"
     default_project_id = None
@@ -4064,22 +4059,62 @@ def upload_workbook():
             flash("Selected project does not exist or is inactive.", "danger")
             return redirect(url_for("admin_workbook_import"))
 
+    upload_specs = (
+        ("error_file", "ERROR"),
+        ("internal_file", "INTERNAL"),
+        ("external_file", "EXTERNAL")
+    )
+
     try:
-        sheets = read_source(uploaded_file, csv_sheet=csv_sheet)
-        if not sheets:
-            raise ValueError("No supported data was found in the file.")
-        with db() as con:
-            imported = import_workbook(
-                con, sheets, filename, session.get("username", ""),
-                default_project_id=default_project_id,
-                allowed_project_ids=None
+        upload_items = []
+        for field_name, sheet_name in upload_specs:
+            uploaded_file = request.files.get(field_name)
+            if not uploaded_file or not uploaded_file.filename:
+                continue
+
+            filename = secure_filename(uploaded_file.filename)
+            if os.path.splitext(filename)[1].lower() != ".ods":
+                raise ValueError(f"{sheet_name} upload must be an ODS file.")
+
+            sheets = read_source(
+                uploaded_file,
+                csv_sheet=sheet_name,
+                single_sheet=True
             )
-        flash(f"Import completed. {imported} records imported or updated.", "success")
+            upload_items.append((sheet_name, filename, sheets))
+
+        if not upload_items:
+            raise ValueError("Please select at least one ODS file.")
+
+        total_imported = 0
+        import_results = []
+
+        # One transaction for the selected files: if one fails validation,
+        # the selected group is rolled back rather than partially imported.
+        with db() as con:
+            for sheet_name, filename, sheets in upload_items:
+                imported = import_workbook(
+                    con,
+                    sheets,
+                    filename,
+                    session.get("username", ""),
+                    default_project_id=default_project_id,
+                    allowed_project_ids=None
+                )
+                total_imported += imported
+                import_results.append(f"{sheet_name}: {imported}")
+
+        flash(
+            f"Import completed. {total_imported} records imported or updated. "
+            + " | ".join(import_results),
+            "success"
+        )
     except ValueError as exc:
         flash(f"Import failed: {str(exc)}", "danger")
     except Exception:
         app.logger.exception("Admin workbook import failed")
         flash("Workbook import failed. No successful import was confirmed. Please check the workbook format and server logs.", "danger")
+
     return redirect(url_for("admin_workbook_import"))
 
 
@@ -4091,21 +4126,6 @@ def qc_upload_workbook():
     allowed_ids = get_user_project_ids(session.get("user_id"))
     if not allowed_ids:
         flash("Your QC account has no assigned active project.", "warning")
-        return redirect(url_for("qc_workbook_import"))
-
-    uploaded_file = request.files.get("source_file")
-    if not uploaded_file or not uploaded_file.filename:
-        flash("Please select a workbook or CSV file.", "warning")
-        return redirect(url_for("qc_workbook_import"))
-
-    filename = secure_filename(uploaded_file.filename)
-    if not allowed_file(filename):
-        flash("Unsupported file type. Allowed: ODS, XLSX, XLS, and CSV.", "danger")
-        return redirect(url_for("qc_workbook_import"))
-
-    csv_sheet = normalize_text(request.form.get("csv_sheet", "ERROR")).upper()
-    if csv_sheet not in ("ERROR", "INTERNAL", "EXTERNAL"):
-        flash("Invalid import type.", "danger")
         return redirect(url_for("qc_workbook_import"))
 
     selected_project = normalize_text(request.form.get("project_id")) or ""
@@ -4124,23 +4144,64 @@ def qc_upload_workbook():
         flash("Please select an assigned project, or choose All Assigned Projects and include a PROJECT column.", "warning")
         return redirect(url_for("qc_workbook_import"))
 
+    upload_specs = (
+        ("error_file", "ERROR"),
+        ("internal_file", "INTERNAL"),
+        ("external_file", "EXTERNAL")
+    )
+
     try:
-        sheets = read_source(uploaded_file, csv_sheet=csv_sheet)
-        if not sheets:
-            raise ValueError("No supported data was found in the file.")
-        with db() as con:
-            imported = import_workbook(
-                con, sheets, filename, session.get("username", ""),
-                default_project_id=default_project_id,
-                allowed_project_ids=allowed_ids
+        upload_items = []
+        for field_name, sheet_name in upload_specs:
+            uploaded_file = request.files.get(field_name)
+            if not uploaded_file or not uploaded_file.filename:
+                continue
+
+            filename = secure_filename(uploaded_file.filename)
+            if os.path.splitext(filename)[1].lower() != ".ods":
+                raise ValueError(f"{sheet_name} upload must be an ODS file.")
+
+            sheets = read_source(
+                uploaded_file,
+                csv_sheet=sheet_name,
+                single_sheet=True
             )
-        flash(f"Import completed. {imported} records imported or updated.", "success")
+            upload_items.append((sheet_name, filename, sheets))
+
+        if not upload_items:
+            raise ValueError("Please select at least one ODS file.")
+
+        total_imported = 0
+        import_results = []
+
+        # Validate every imported row against this QC account's assigned projects.
+        # All selected files share one transaction to avoid partial group imports.
+        with db() as con:
+            for sheet_name, filename, sheets in upload_items:
+                imported = import_workbook(
+                    con,
+                    sheets,
+                    filename,
+                    session.get("username", ""),
+                    default_project_id=default_project_id,
+                    allowed_project_ids=allowed_ids
+                )
+                total_imported += imported
+                import_results.append(f"{sheet_name}: {imported}")
+
+        flash(
+            f"Import completed. {total_imported} records imported or updated. "
+            + " | ".join(import_results),
+            "success"
+        )
     except ValueError as exc:
         flash(f"Import failed: {str(exc)}", "danger")
     except Exception:
         app.logger.exception("QC workbook import failed")
         flash("Workbook import failed. No successful import was confirmed. Please check the workbook format and server logs.", "danger")
+
     return redirect(url_for("qc_workbook_import"))
+
 
 # =========================================================
 # ADMIN ACCOUNT MANAGEMENT
