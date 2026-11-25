@@ -4021,9 +4021,11 @@ def build_dashboard_graph_context(allowed_project_ids=None, username=None):
     for row in records:
         key = accuracy_period_key(row.get("record_date"), graph_period, row.get("month"))
         kind = normalize_accuracy_type(row.get("accuracy_type"))
-        # Keep the dashboard trend focused on January 2026 onward.
+        # Keep every dashboard trend view focused on January 2026 onward.
+        # Daily and weekly keys are ISO dates; monthly keys are YYYY-MM.
         # Historical records remain stored and available in the other views.
-        if graph_period == "monthly" and key and key < "2026-01":
+        cutoff = "2026-01" if graph_period == "monthly" else "2026-01-01"
+        if key and key < cutoff:
             continue
         if not key or kind not in ("INTERNAL", "EXTERNAL_WC", "EXTERNAL_WOC"):
             continue
