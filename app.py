@@ -9040,146 +9040,206 @@ def save_response(record_key):
 
             elif role == "qc":
 
-                allowed_ids = get_user_project_ids(
-                    user_id
-                )
+                allowed_ids = get_user_project_ids(user_id)
 
                 if project_id not in allowed_ids:
                     abort(403)
 
-                if normalize_text(
-                    record["verified_error"]
-                ).upper() != "N":
+                qc_name = normalize_text(
+                    session.get("display_name")
+                ) or username
 
-                    abort(403)
-
-                verified_error = normalize_text(
-                    request.form.get("verified_error")
-                ).upper()
+                qc_edit_mode = normalize_text(
+                    request.form.get("qc_edit_mode")
+                ) == "1"
 
                 qc_explanation = (
                     request.form.get("qc_explanation")
                     or ""
                 ).strip()
 
-                if verified_error not in ("Y", "N"):
-                    flash(
-                        "Please select Y or N for Verified Error.",
-                        "warning"
-                    )
+                if not qc_explanation:
+                    flash("QC Explanation is required.", "warning")
+                    if qc_edit_mode:
+                        return redirect(url_for(
+                            "qc_error_details",
+                            date=normalize_text(request.form.get("return_date"))
+                        ))
                     return redirect(url_for("qc_errors"))
 
-                if not qc_explanation:
+                if qc_edit_mode:
+                    # Completed Error Details: only the QC explanation
+                    # and QC audit metadata may be changed. The original
+                    # Verified Error and Biller Comment remain untouched.
+                    if not normalize_text(record["qc_explanation"]):
+                        abort(403)
 
-                    flash(
-                        "QC Explanation is required.",
-                        "warning"
-                    )
-
-                    return redirect(
-                        url_for(
-                            "qc_errors"
+                    cursor = con.execute(
+                        """
+                        UPDATE error_records
+                        SET
+                            qc_explanation = ?,
+                            qc_name = ?,
+                            updated_at = ?,
+                            updated_by = ?
+                        WHERE record_key = ?
+                          AND project_id = ?
+                          AND NULLIF(TRIM(COALESCE(qc_explanation, '')), '') IS NOT NULL
+                        """,
+                        (
+                            qc_explanation,
+                            qc_name,
+                            response_updated_at,
+                            response_updated_by,
+                            record_key,
+                            project_id
                         )
                     )
 
-                # QC name is always taken from the
-                # authenticated account, never from POST.
-                qc_name = normalize_text(
-                    session.get("display_name")
-                ) or username
+                    if cursor.rowcount != 1:
+                        flash(
+                            "Unable to update this completed record. Please refresh the page.",
+                            "warning"
+                        )
+                        return redirect(url_for(
+                            "qc_error_details",
+                            date=normalize_text(request.form.get("return_date"))
+                        ))
 
-                cursor = con.execute(
-                    """
-                    UPDATE error_records
-                    SET
-                        verified_error = ?,
-                        qc_explanation = ?,
-                        qc_name = ?,
-                        updated_at = ?,
-                        updated_by = ?
-                    WHERE record_key = ?
-                    AND project_id = ?
-                    AND UPPER(TRIM(COALESCE(verified_error, '')))
-                        = 'N'
-                    """,
-                    (
-                        verified_error,
-                        qc_explanation,
-                        qc_name,
-                        response_updated_at,
-                        response_updated_by,
-                        record_key,
-                        project_id
+                    latest_record = con.execute(
+                        """
+                        SELECT verified_error, biller_comment
+                        FROM error_records
+                        WHERE record_key = ? AND project_id = ?
+                        """,
+                        (record_key, project_id)
+                    ).fetchone()
+
+                    if not latest_record:
+                        abort(404)
+
+                    con.execute(
+                        """
+                        INSERT INTO biller_responses (
+                            record_key, verified_error, biller_comment,
+                            qc_explanation, qc_name, updated_by, updated_at
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT (record_key)
+                        DO UPDATE SET
+                            qc_explanation = excluded.qc_explanation,
+                            qc_name = excluded.qc_name,
+                            updated_by = excluded.updated_by,
+                            updated_at = excluded.updated_at
+                        """,
+                        (
+                            record_key,
+                            latest_record["verified_error"],
+                            latest_record["biller_comment"] or "",
+                            qc_explanation,
+                            qc_name,
+                            response_updated_by,
+                            response_updated_at
+                        )
                     )
-                )
 
-                if cursor.rowcount != 1:
-
-                    flash(
-                        "This record has already been updated. Please refresh the page.",
-                        "warning"
+                    action = "QC RESPONSE EDIT"
+                    details = (
+                        f"{qc_name} edited QC explanation "
+                        f"for completed record {record_key}"
                     )
 
-                    return redirect(
-                        url_for("qc_errors")
+                else:
+                    # Initial QC response remains restricted to records
+                    # awaiting QC review (Verified Error = N).
+                    if normalize_text(record["verified_error"]).upper() != "N":
+                        abort(403)
+
+                    verified_error = normalize_text(
+                        request.form.get("verified_error")
+                    ).upper()
+
+                    if verified_error not in ("Y", "N"):
+                        flash(
+                            "Please select Y or N for Verified Error.",
+                            "warning"
+                        )
+                        return redirect(url_for("qc_errors"))
+
+                    cursor = con.execute(
+                        """
+                        UPDATE error_records
+                        SET
+                            verified_error = ?,
+                            qc_explanation = ?,
+                            qc_name = ?,
+                            updated_at = ?,
+                            updated_by = ?
+                        WHERE record_key = ?
+                          AND project_id = ?
+                          AND UPPER(TRIM(COALESCE(verified_error, ''))) = 'N'
+                        """,
+                        (
+                            verified_error,
+                            qc_explanation,
+                            qc_name,
+                            response_updated_at,
+                            response_updated_by,
+                            record_key,
+                            project_id
+                        )
                     )
 
-                latest_record = con.execute(
-                    """
-                    SELECT
-                        verified_error,
-                        biller_comment
-                    FROM error_records
-                    WHERE record_key = ?
-                    AND project_id = ?
-                    """,
-                    (
-                        record_key,
-                        project_id
+                    if cursor.rowcount != 1:
+                        flash(
+                            "This record has already been updated. Please refresh the page.",
+                            "warning"
+                        )
+                        return redirect(url_for("qc_errors"))
+
+                    latest_record = con.execute(
+                        """
+                        SELECT verified_error, biller_comment
+                        FROM error_records
+                        WHERE record_key = ? AND project_id = ?
+                        """,
+                        (record_key, project_id)
+                    ).fetchone()
+
+                    if not latest_record:
+                        abort(404)
+
+                    con.execute(
+                        """
+                        INSERT INTO biller_responses (
+                            record_key, verified_error, biller_comment,
+                            qc_explanation, qc_name, updated_by, updated_at
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT (record_key)
+                        DO UPDATE SET
+                            verified_error = excluded.verified_error,
+                            qc_explanation = excluded.qc_explanation,
+                            qc_name = excluded.qc_name,
+                            updated_by = excluded.updated_by,
+                            updated_at = excluded.updated_at
+                        """,
+                        (
+                            record_key,
+                            latest_record["verified_error"],
+                            latest_record["biller_comment"] or "",
+                            qc_explanation,
+                            qc_name,
+                            response_updated_by,
+                            response_updated_at
+                        )
                     )
-                ).fetchone()
 
-                if not latest_record:
-                    abort(404)
-
-
-                con.execute(
-                    """
-                    INSERT INTO biller_responses (
-                        record_key,
-                        verified_error,
-                        biller_comment,
-                        qc_explanation,
-                        qc_name,
-                        updated_by,
-                        updated_at
+                    action = "QC RESPONSE"
+                    details = (
+                        f"{qc_name} submitted QC explanation "
+                        f"for record {record_key}"
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT (record_key)
-                    DO UPDATE SET
-                        verified_error = excluded.verified_error,
-                        qc_explanation = excluded.qc_explanation,
-                        qc_name = excluded.qc_name,
-                        updated_by = excluded.updated_by,
-                        updated_at = excluded.updated_at
-                    """,
-                    (
-                        record_key,
-                        latest_record["verified_error"],
-                        latest_record["biller_comment"] or "",
-                        qc_explanation or "",
-                        qc_name,
-                        response_updated_by,
-                        response_updated_at
-                    )
-                )
-                
-                action = "QC RESPONSE"
-
-                details = (
-                    f"{qc_name} submitted QC explanation "
-                    f"for record {record_key}"
-                )
 
             # -------------------------------------------------
             # ACTIVITY LOG
@@ -9225,6 +9285,14 @@ def save_response(record_key):
         )
 
     if role == "qc":
+
+        if normalize_text(request.form.get("qc_edit_mode")) == "1":
+            return redirect(
+                url_for(
+                    "qc_error_details",
+                    date=normalize_text(request.form.get("return_date"))
+                )
+            )
 
         return redirect(
             url_for("qc_errors")
