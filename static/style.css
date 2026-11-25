@@ -2552,6 +2552,7 @@ input[type="radio"] {
     margin: 0;
 }
 
+#accountsTable .edit-account-btn,
 #accountsTable .account-action-btn {
     display: inline-flex;
     align-items: center;
