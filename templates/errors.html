@@ -238,8 +238,8 @@
                                     <div style="padding:22px;">
                                         <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px;">
                                             <div>
-                                                <h2 style="margin:0;">Edit QC Explanation</h2>
-                                                <p style="margin:5px 0 0; opacity:.75;">Only your QC Explanation can be changed.</p>
+                                                <h2 style="margin:0;">Edit Error Details</h2>
+                                                <p style="margin:5px 0 0; opacity:.75;">You may update Verified Error and your QC Explanation only.</p>
                                             </div>
                                             <button type="button"
                                                     class="btn btn-secondary"
@@ -258,6 +258,15 @@
                                             <input type="hidden" name="return_date" value="{{ selected_date }}">
 
                                             <div class="form-group">
+                                                <label>VERIFIED ERROR</label>
+                                                <select name="verified_error" required>
+                                                    <option value="">Select Y or N</option>
+                                                    <option value="Y" {% if error.verified_error == 'Y' %}selected{% endif %}>Y — Yes</option>
+                                                    <option value="N" {% if error.verified_error == 'N' %}selected{% endif %}>N — No</option>
+                                                </select>
+                                            </div>
+
+                                            <div class="form-group">
                                                 <label>QC EXPLANATION</label>
                                                 <textarea name="qc_explanation"
                                                           rows="5"
@@ -265,7 +274,7 @@
                                                           placeholder="Enter your QC explanation...">{{ error.qc_explanation or '' }}</textarea>
                                             </div>
 
-                                            <p class="form-hint">Verified Error, Biller Comment, and original Error Details cannot be changed here.</p>
+                                            <p class="form-hint">Biller Comment and original Error Details cannot be changed here.</p>
 
                                             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px;">
                                                 <button type="button"
@@ -274,7 +283,7 @@
                                                     Cancel
                                                 </button>
                                                 <button type="submit" class="btn btn-primary">
-                                                    Update QC Explanation
+                                                    Update Error Details
                                                 </button>
                                             </div>
                                         </form>
