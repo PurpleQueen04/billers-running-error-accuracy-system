@@ -7021,18 +7021,20 @@ def build_accuracy_context(
             row.get("month")
         )
 
-        if key:
+        # Accuracy Monitoring period options start at January 2026.
+        # Older records remain stored but are excluded from this period selector.
+        if key and key >= "2026-01":
             row_periods[id(row)] = key
             period_keys.add(key)
 
-    # Include all historical ERROR records as well.
+    # Include ERROR records from January 2026 onward as well.
     for row in error_rows:
         key = accuracy_period_key(
             row["billed_date"],
             period_type
         )
 
-        if key:
+        if key and key >= "2026-01":
             period_keys.add(key)
 
     periods = sorted(period_keys)
@@ -7721,7 +7723,8 @@ def get_biller_accuracy_summary(
             period_type,
             row.get("month")
         )
-        if period_key:
+        # Keep Biller Accuracy Monitoring period options at January 2026 onward.
+        if period_key and period_key >= "2026-01":
             periods.add(period_key)
             row_periods[index] = period_key
 
