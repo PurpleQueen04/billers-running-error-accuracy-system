@@ -550,6 +550,29 @@
 
 document.addEventListener("DOMContentLoaded", function () {
 
+    // Preserve the Accounts page scroll position after saving an edited account.
+    const accountEditScrollKey = "accountsEditScrollY";
+    const savedAccountScrollY = sessionStorage.getItem(accountEditScrollKey);
+
+    if (savedAccountScrollY !== null) {
+        sessionStorage.removeItem(accountEditScrollKey);
+        requestAnimationFrame(function () {
+            window.scrollTo(0, Number(savedAccountScrollY) || 0);
+        });
+    }
+
+    const accountEditForm = document.querySelector("#editAccountModal form");
+
+    if (accountEditForm) {
+        accountEditForm.addEventListener("submit", function () {
+            sessionStorage.setItem(
+                accountEditScrollKey,
+                String(window.scrollY)
+            );
+        });
+    }
+
+
     // =================================================
     // ACCOUNT FILTERS
     // =================================================
