@@ -4351,7 +4351,6 @@ def upload_workbook():
         with db() as con:
             for sheet_name, filename, sheets in upload_items:
                 metadata = {}
-                metadata = {}
                 imported = import_workbook(
                     con,
                     sheets,
@@ -4449,6 +4448,7 @@ def qc_upload_workbook():
         # All selected files share one transaction to avoid partial group imports.
         with db() as con:
             for sheet_name, filename, sheets in upload_items:
+                metadata = {}
                 imported = import_workbook(
                     con,
                     sheets,
