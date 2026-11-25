@@ -2053,12 +2053,15 @@ class ODSWorkbookSource:
                                 )
                                 if not row_has_value:
                                     physical_row += row_repeat
-                                    if len(stack) >= 2:
-                                        try:
-                                            stack[-2].remove(element)
-                                        except ValueError:
-                                            pass
+                                    # Avoid parent.remove(element): lxml searches the
+                                    # parent's children for every row, which becomes
+                                    # quadratic on very large worksheets. Clear this row
+                                    # and discard preceding siblings in amortized O(n).
+                                    parent = element.getparent()
                                     element.clear()
+                                    if parent is not None:
+                                        while element.getprevious() is not None:
+                                            del parent[0]
                                     if stack:
                                         stack.pop()
                                     continue
@@ -2110,12 +2113,14 @@ class ODSWorkbookSource:
                                             rows = []
                                             row_indexes = []
 
-                            if len(stack) >= 2:
-                                try:
-                                    stack[-2].remove(element)
-                                except ValueError:
-                                    pass
+                            # Keep the current (cleared) row as the cursor;
+                            # discard preceding siblings once instead of searching
+                            # the parent's child list for this row on every iteration.
+                            parent = element.getparent()
                             element.clear()
+                            if parent is not None:
+                                while element.getprevious() is not None:
+                                    del parent[0]
 
                         elif element.tag == table_ns + "table":
                             finished_target_sheet = bool(current_sheet)
