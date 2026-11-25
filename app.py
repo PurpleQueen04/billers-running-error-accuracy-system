@@ -4015,19 +4015,10 @@ def build_dashboard_graph_context(allowed_project_ids=None, username=None):
             if normalize_text(r.get("batch_no")) == graph_selected_batch
         ]
 
-    latest_imports = {}
-    for row in records:
-        pid = int(row["project_id"]) if row.get("project_id") is not None else None
-        sheet = normalize_text(row.get("sheet")).upper()
-        imported_at = normalize_text(row.get("imported_at"))
-        if imported_at and imported_at > latest_imports.get((pid, sheet), ""):
-            latest_imports[(pid, sheet)] = imported_at
+    # Build trend data from all retained historical records,
+    # not only records belonging to the latest upload.
     period_totals = {}
     for row in records:
-        pid = int(row["project_id"]) if row.get("project_id") is not None else None
-        sheet = normalize_text(row.get("sheet")).upper()
-        if normalize_text(row.get("imported_at")) != latest_imports.get((pid, sheet)):
-            continue
         key = accuracy_period_key(row.get("record_date"), graph_period, row.get("month"))
         kind = normalize_accuracy_type(row.get("accuracy_type"))
         if not key or kind not in ("INTERNAL", "EXTERNAL_WC", "EXTERNAL_WOC"):
@@ -6873,14 +6864,14 @@ def build_accuracy_context(
 
     # -----------------------------------------------------
     # BUILD AVAILABLE PERIODS
-    # Show periods from the latest import per project/sheet.
-    # Keep all historical records for period comparisons.
+    # Include every period present in the retained historical
+    # records, regardless of when the records were imported.
     # -----------------------------------------------------
 
     period_keys = set()
     row_periods = {}
 
-    # Map period keys for ALL historical accuracy records.
+    # Include all historical accuracy records.
     for row in records:
         key = accuracy_period_key(
             row.get("record_date"),
@@ -6890,68 +6881,10 @@ def build_accuracy_context(
 
         if key:
             row_periods[id(row)] = key
-
-    # Find latest accuracy import per project and sheet.
-    latest_accuracy_imports = {}
-
-    for row in records:
-        imported_at = normalize_text(row.get("imported_at"))
-        if not imported_at:
-            continue
-
-        import_key = (
-            row.get("project_id"),
-            normalize_text(row.get("sheet")).upper()
-        )
-
-        if imported_at > latest_accuracy_imports.get(import_key, ""):
-            latest_accuracy_imports[import_key] = imported_at
-
-    # Add periods only from the latest accuracy imports.
-    for row in records:
-        import_key = (
-            row.get("project_id"),
-            normalize_text(row.get("sheet")).upper()
-        )
-
-        if (
-            normalize_text(row.get("imported_at"))
-            != latest_accuracy_imports.get(import_key)
-        ):
-            continue
-
-        key = accuracy_period_key(
-            row.get("record_date"),
-            period_type,
-            row.get("month")
-        )
-
-        if key:
             period_keys.add(key)
 
-    # Find latest ERROR import per project.
-    latest_error_imports = {}
-
+    # Include all historical ERROR records as well.
     for row in error_rows:
-        imported_at = normalize_text(row["imported_at"])
-        if not imported_at:
-            continue
-
-        project_id = row["project_id"]
-
-        if imported_at > latest_error_imports.get(project_id, ""):
-            latest_error_imports[project_id] = imported_at
-
-    # Add periods only from the latest ERROR imports.
-    for row in error_rows:
-        project_id = row["project_id"]
-
-        if (
-            normalize_text(row["imported_at"])
-            != latest_error_imports.get(project_id)
-        ):
-            continue
-
         key = accuracy_period_key(
             row["billed_date"],
             period_type
