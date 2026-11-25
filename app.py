@@ -2003,7 +2003,6 @@ class ODSWorkbookSource:
                 rows = []
                 row_indexes = []
                 yielded_for_sheet = False
-                forced_sheet_used = False
 
                 try:
                     iterator = ET.iterparse(xml_stream, events=("start", "end"))
@@ -2040,8 +2039,29 @@ class ODSWorkbookSource:
                                 row_repeat = 1
 
                             if headers is None:
+                                if self.forced_sheet == "ERROR":
+                                    normalized_values = {
+                                        norm_header(value)
+                                        for value in row_values
+                                        if normalize_text(value)
+                                    }
+                                    has_username = bool(
+                                        normalized_values
+                                        & {"USERNAME", "USER", "USER NAME"}
+                                    )
+                                    has_pro = bool(
+                                        normalized_values
+                                        & {"PRO", "PRO NUMBER", "PRO#"}
+                                    )
+                                    physical_row += row_repeat
+                                    if not (has_username and has_pro):
+                                        # Ignore title/information rows until the
+                                        # actual ERROR column-header row is found.
+                                        continue
+                                else:
+                                    physical_row = row_repeat
+
                                 headers = row_values
-                                physical_row = row_repeat
                             else:
                                 has_data = any(value not in (None, "") for value in row_values)
                                 if not has_data:
@@ -2053,7 +2073,8 @@ class ODSWorkbookSource:
                                         if len(padded) < len(headers):
                                             padded.extend([""] * (len(headers) - len(padded)))
                                         rows.append(padded)
-                                        # Pandas importers use source row = index + 2.
+                                        # Preserve the actual source row number,
+                                        # including rows before the detected header.
                                         row_indexes.append(physical_row - 2)
                                         if len(rows) >= self.CHUNK_SIZE:
                                             frame = pd.DataFrame(rows, columns=headers, index=row_indexes, dtype=object)
