@@ -245,40 +245,30 @@
                                         Edit
                                     </button>
 
-                                    <!-- ACTIVATE / DEACTIVATE -->
+                                    <!-- DELETE ACCOUNT -->
                                     <form
                                         method="POST"
-                                        action="{{ url_for('toggle_account_status') }}"
-                                        onsubmit="return confirm(
-                                            'Are you sure you want to {{ 'deactivate' if account.active else 'activate' }} this account?'
-                                        );"
+                                        action="{{ url_for('delete_account') }}"
+                                        class="account-delete-form"
+                                        onsubmit="return confirm('Permanently delete the account for {{ account.display_name|e }}? Historical records and activity logs will be preserved.');"
                                     >
-
                                         <input
                                             type="hidden"
                                             name="csrf_token"
                                             value="{{ csrf_token }}"
                                         >
-
                                         <input
                                             type="hidden"
                                             name="user_id"
                                             value="{{ account.id }}"
                                         >
-
                                         <button
                                             type="submit"
-                                            class="btn {{ 'btn-danger' if account.active else 'btn-success' }}"
+                                            class="btn btn-danger account-action-btn"
                                         >
-                                            {% if account.active %}
-                                                <i class="fa-solid fa-user-slash"></i>
-                                                Deactivate
-                                            {% else %}
-                                                <i class="fa-solid fa-user-check"></i>
-                                                Activate
-                                            {% endif %}
+                                            <i class="fa-solid fa-trash"></i>
+                                            Delete
                                         </button>
-
                                     </form>
 
                                 </div>
