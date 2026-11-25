@@ -2031,12 +2031,37 @@ class ODSWorkbookSource:
                             continue
 
                         if element.tag == table_ns + "table-row" and current_sheet:
-                            row_values = self._row_values(element)
                             repeat_text = element.get(table_ns + "number-rows-repeated", "1")
                             try:
                                 row_repeat = max(1, min(int(repeat_text), 1000000))
                             except (TypeError, ValueError):
                                 row_repeat = 1
+
+                            # ODS files can encode over a million trailing blank
+                            # rows as one repeated table-row element. Detect that
+                            # compactly before building a row DataFrame or expanding
+                            # any repeated cells.
+                            if headers is not None and row_repeat > 1:
+                                cell_tags = {
+                                    table_ns + "table-cell",
+                                    table_ns + "covered-table-cell",
+                                }
+                                row_has_value = any(
+                                    self._cell_text(cell) != ""
+                                    for cell in element
+                                    if cell.tag in cell_tags
+                                )
+                                if not row_has_value:
+                                    physical_row += row_repeat
+                                    if len(stack) >= 2:
+                                        try:
+                                            stack[-2].remove(element)
+                                        except ValueError:
+                                            pass
+                                    element.clear()
+                                    continue
+
+                            row_values = self._row_values(element)
 
                             if headers is None:
                                 if self.forced_sheet == "ERROR":
@@ -2091,6 +2116,7 @@ class ODSWorkbookSource:
                             element.clear()
 
                         elif element.tag == table_ns + "table":
+                            finished_target_sheet = bool(current_sheet)
                             if current_sheet:
                                 if self.forced_sheet == "ERROR" and headers is None:
                                     raise ValueError(
@@ -2113,6 +2139,12 @@ class ODSWorkbookSource:
                                 except ValueError:
                                     pass
                             element.clear()
+
+                            # A section-specific upload needs no XML from later
+                            # worksheets or workbook content once its target tab
+                            # has been completely processed.
+                            if finished_target_sheet and self.forced_sheet:
+                                break
 
                         elif element.tag == table_ns + "table-row" and not current_sheet:
                             # Discard rows from unrelated tabs without retaining their XML.
