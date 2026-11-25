@@ -9068,16 +9068,34 @@ def save_response(record_key):
                     return redirect(url_for("qc_errors"))
 
                 if qc_edit_mode:
-                    # Completed Error Details: only the QC explanation
-                    # and QC audit metadata may be changed. The original
-                    # Verified Error and Biller Comment remain untouched.
+                    # Completed Error Details: QC may update only the
+                    # Verified Error decision and QC Explanation.
                     if not normalize_text(record["qc_explanation"]):
                         abort(403)
+
+                    verified_error = normalize_text(
+                        request.form.get("verified_error")
+                    ).upper()
+
+                    if verified_error not in ("Y", "N"):
+                        flash(
+                            "Please select Y or N for Verified Error.",
+                            "warning"
+                        )
+                        return redirect(url_for(
+                            "qc_error_details",
+                            date=normalize_text(request.form.get("return_date"))
+                        ))
+
+                    previous_verified_error = normalize_text(
+                        record["verified_error"]
+                    ).upper()
 
                     cursor = con.execute(
                         """
                         UPDATE error_records
                         SET
+                            verified_error = ?,
                             qc_explanation = ?,
                             qc_name = ?,
                             updated_at = ?,
@@ -9087,6 +9105,7 @@ def save_response(record_key):
                           AND NULLIF(TRIM(COALESCE(qc_explanation, '')), '') IS NOT NULL
                         """,
                         (
+                            verified_error,
                             qc_explanation,
                             qc_name,
                             response_updated_at,
@@ -9127,6 +9146,7 @@ def save_response(record_key):
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                         ON CONFLICT (record_key)
                         DO UPDATE SET
+                            verified_error = excluded.verified_error,
                             qc_explanation = excluded.qc_explanation,
                             qc_name = excluded.qc_name,
                             updated_by = excluded.updated_by,
@@ -9145,8 +9165,9 @@ def save_response(record_key):
 
                     action = "QC RESPONSE EDIT"
                     details = (
-                        f"{qc_name} edited QC explanation "
-                        f"for completed record {record_key}"
+                        f"{qc_name} edited completed record {record_key}; "
+                        f"Verified Error: {previous_verified_error or '—'} "
+                        f"→ {verified_error}; QC Explanation updated"
                     )
 
                 else:
