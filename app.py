@@ -7,7 +7,7 @@ import hashlib
 import sqlite3
 import secrets
 import zipfile
-import xml.etree.ElementTree as ET
+from lxml import etree as ET
 
 from datetime import datetime, date, timedelta
 from functools import wraps, lru_cache
