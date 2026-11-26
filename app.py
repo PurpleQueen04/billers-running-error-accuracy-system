@@ -3061,7 +3061,63 @@ def import_workbook(
             )
 
         total_imported = sum(sheet_import_counts.values())
-        
+
+    # -----------------------------------------------------
+    # EXACT MONTH REPLACEMENT
+    # For each accuracy sheet, identify the month/project
+    # combinations written by this workbook import. Once the
+    # complete workbook has been processed, remove older rows
+    # for those exact combinations only. This also handles ODS
+    # files processed in multiple chunks.
+    # -----------------------------------------------------
+    for accuracy_sheet in ("INTERNAL", "EXTERNAL"):
+        if not sheet_import_counts[accuracy_sheet]:
+            continue
+
+        imported_periods = con.execute(
+            """
+            SELECT DISTINCT month, project_id
+            FROM accuracy_records
+            WHERE sheet = ? AND imported_at = ?
+            """,
+            (accuracy_sheet, workbook_imported_at)
+        ).fetchall()
+
+        for period in imported_periods:
+            imported_month = normalize_text(period["month"])
+            imported_project_id = period["project_id"]
+
+            if not imported_month:
+                continue
+
+            if imported_project_id is None:
+                con.execute(
+                    """
+                    DELETE FROM accuracy_records
+                    WHERE sheet = ?
+                      AND month = ?
+                      AND project_id IS NULL
+                      AND imported_at <> ?
+                    """,
+                    (accuracy_sheet, imported_month, workbook_imported_at)
+                )
+            else:
+                con.execute(
+                    """
+                    DELETE FROM accuracy_records
+                    WHERE sheet = ?
+                      AND month = ?
+                      AND project_id = ?
+                      AND imported_at <> ?
+                    """,
+                    (
+                        accuracy_sheet,
+                        imported_month,
+                        imported_project_id,
+                        workbook_imported_at
+                    )
+                )
+
     # -----------------------------------------------------
     # EXACT MONTHLY REPLACEMENT FOR INTERNAL / EXTERNAL
     # Keep the previous import history, but remove older active
