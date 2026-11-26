@@ -102,7 +102,7 @@
                         <th>SOURCE</th>
                         <th>AUDITOR</th>
                         <th>AUDIT TYPE</th>
-                        <th>PROJECT ID</th>
+                        <th>PROJECT</th>
                     </tr>
                 </thead>
 
@@ -147,7 +147,7 @@
 
                             <td>
                                 {% if record.project_id %}
-                                    {{ record.project_id }}
+                                    {{ record.project_name or 'Unknown Project' }}
                                 {% else %}
                                     <span class="status-badge status-warning">
                                         Unassigned
