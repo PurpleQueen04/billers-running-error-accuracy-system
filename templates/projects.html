@@ -151,7 +151,7 @@
                                 </strong>
                             </td>
 
-                            <td>{{ project.sites or '—' }}</td>
+                            <td>{{ project.site or '—' }}</td>
 
                             <td>
                                 {% if project.active %}
@@ -175,6 +175,7 @@
                                     class="btn btn-primary btn-small edit-project-btn"
                                     data-project-id="{{ project.id }}"
                                     data-project-name="{{ project.project_name|e }}"
+                                    data-project-site="{{ project.site|e }}"
                                 >
                                     <i class="fa-solid fa-pen"></i> Edit
                                 </button>
@@ -224,7 +225,7 @@
         <div class="modal-header">
             <div>
                 <h2 class="modal-title" id="editProjectTitle">Edit Project</h2>
-                <p class="form-help">Update the project name. Sites are detected automatically from imported files.</p>
+                <p class="form-help">Update the project name and its primary Site.</p>
             </div>
             <button type="button" class="btn btn-secondary btn-small" onclick="closeEditProject()">Close</button>
         </div>
@@ -233,6 +234,14 @@
             <div class="form-group">
                 <label for="edit_project_name">Project Name</label>
                 <input type="text" id="edit_project_name" name="project_name" maxlength="120" required>
+            </div>
+            <div class="form-group">
+                <label for="edit_project_site">Site</label>
+                <select id="edit_project_site" name="site" required>
+                    <option value="">Select Site</option>
+                    <option value="Manila">Manila</option>
+                    <option value="Leyte">Leyte</option>
+                </select>
             </div>
             <div class="action-buttons">
                 <button type="button" class="btn btn-secondary" onclick="closeEditProject()">Cancel</button>
@@ -259,6 +268,14 @@
             <div class="form-group">
                 <label for="new_project_name">Project Name</label>
                 <input type="text" id="new_project_name" name="project_name" maxlength="120" placeholder="e.g. SAIA" required>
+            </div>
+            <div class="form-group">
+                <label for="new_project_site">Site</label>
+                <select id="new_project_site" name="site" required>
+                    <option value="">Select Site</option>
+                    <option value="Manila">Manila</option>
+                    <option value="Leyte">Leyte</option>
+                </select>
             </div>
 
 
@@ -344,13 +361,15 @@ function closeCreateProject() {
     if (modal) modal.style.display = "none";
 }
 
-function openEditProject(projectId, projectName) {
+function openEditProject(projectId, projectName, projectSite) {
     const modal = document.getElementById("editProjectModal");
     const form = document.getElementById("editProjectForm");
     const nameInput = document.getElementById("edit_project_name");
-    if (!modal || !form || !nameInput) return;
+    const siteInput = document.getElementById("edit_project_site");
+    if (!modal || !form || !nameInput || !siteInput) return;
     form.action = "/admin/project/" + encodeURIComponent(projectId) + "/edit";
     nameInput.value = projectName || "";
+    siteInput.value = projectSite || "";
     modal.style.display = "flex";
     nameInput.focus();
 }
@@ -362,7 +381,7 @@ function closeEditProject() {
 
 document.querySelectorAll(".edit-project-btn").forEach(function(button) {
     button.addEventListener("click", function() {
-        openEditProject(this.dataset.projectId, this.dataset.projectName);
+        openEditProject(this.dataset.projectId, this.dataset.projectName, this.dataset.projectSite);
     });
 });
 
