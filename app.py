@@ -4814,8 +4814,12 @@ def admin_accounts():
         ]
         assigned_sites = sorted({
             site
-            for item in assigned
-            for site in project_site_map.get(item["id"], [])
+            for project_id in (
+                project_site_map.keys()
+                if user_role == "admin"
+                else [item["id"] for item in assigned]
+            )
+            for site in project_site_map.get(project_id, [])
         }, key=str.casefold)
 
         accounts.append({
