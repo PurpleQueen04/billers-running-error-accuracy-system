@@ -154,7 +154,8 @@ ERROR_ALIASES = {
     "project": [
         "PROJECT",
         "PROJECT NAME"
-    ]
+    ],
+    "site": ["SITE", "LOCATION"]
 }
 
 
@@ -574,6 +575,34 @@ def normalize_text(value):
 def norm_header(value):
 
     return normalize_text(value).upper()
+
+
+def normalize_site_name(value):
+    """Normalize workbook Site labels to their canonical site names."""
+    raw = normalize_text(value)
+    if not raw:
+        return ""
+    folded = raw.casefold()
+    if "leyte" in folded:
+        return "Leyte"
+    if "manila" in folded:
+        return "Manila"
+    return raw
+
+
+def record_project_site(con, project_id, site):
+    """Remember a normalized Site as one of a project's available sites."""
+    site = normalize_site_name(site)
+    if not site:
+        return
+    con.execute(
+        """
+        INSERT INTO project_sites (project_id, site)
+        VALUES (?, ?)
+        ON CONFLICT (project_id, site) DO NOTHING
+        """,
+        (int(project_id), site)
+    )
 
 
 def number_value(value):
@@ -1215,6 +1244,17 @@ def init_db():
             "project_id",
             "INTEGER"
         )
+
+        add_column_if_missing(con, "error_records", "site", "TEXT")
+        add_column_if_missing(con, "accuracy_records", "site", "TEXT")
+
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS project_sites (
+                project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                site TEXT NOT NULL,
+                PRIMARY KEY (project_id, site)
+            )
+        """)
 
         # -------------------------------------------------
         # ACCURACY IMPORT LOOKUP INDEX
@@ -2408,10 +2448,13 @@ def get_accuracy_columns(dataframe):
             ["PROJECT", "PROJECT NAME"]
         ),
 
+        "site": find_col(columns, ["SITE", "LOCATION"]),
+
         "batch_no": find_col(
             columns,
             ["BATCH #", "BATCH NO", "BATCH NUMBER"]
-        )
+        ),
+        "site": find_col(columns, ["SITE", "LOCATION"])
     }
 
 
@@ -2447,9 +2490,9 @@ def import_error_sheet(
         INSERT INTO error_records (
             record_key, billed_date, week, source, audit_type, biller_name,
             username, id_number, auditor, pro, zb_field, error_details,
-            project_id, verified_error, imported_at
+            project_id, site, verified_error, imported_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?)
         ON CONFLICT (record_key) DO UPDATE SET
             billed_date = EXCLUDED.billed_date,
             week = EXCLUDED.week,
@@ -2463,6 +2506,7 @@ def import_error_sheet(
             zb_field = EXCLUDED.zb_field,
             error_details = EXCLUDED.error_details,
             project_id = COALESCE(error_records.project_id, EXCLUDED.project_id),
+            site = EXCLUDED.site,
             imported_at = EXCLUDED.imported_at
     """
 
@@ -2489,6 +2533,8 @@ def import_error_sheet(
         auditor = dataframe_value(row, columns["auditor"])
         zb_field = dataframe_value(row, columns["zb_field"])
         error_details = dataframe_value(row, columns["error_details"])
+        site = normalize_site_name(dataframe_value(row, columns["site"]))
+        record_project_site(con, project_id, site)
         week = week_for_billed_date(billed_date_text)
 
         fingerprint_parts = [
@@ -2503,7 +2549,7 @@ def import_error_sheet(
         batch.append((
             record_key, billed_date_text, week, source, audit_type,
             biller_name, username, id_number, auditor, pro, zb_field,
-            error_details, project_id,
+            error_details, project_id, site,
             imported_at
         ))
         imported += 1
@@ -2722,6 +2768,8 @@ def import_accuracy_sheet(
         month = record_date.strftime("%Y-%m") if record_date else source_month
         weekly = week_for_billed_date(record_date) if record_date else dataframe_value(row, columns["weekly"])
         batch_no = dataframe_value(row, columns["batch_no"])
+        site = normalize_site_name(dataframe_value(row, columns["site"]))
+        record_project_site(con, project_id, site)
         audited = number_value(val(row, columns["audited"])) or 0
         bills_processed = number_value(val(row, columns["bills_processed"]))
 
@@ -2758,6 +2806,7 @@ def import_accuracy_sheet(
                 audited,
                 errors,
                 imported_at,
+                site,
                 batch_no
             )
 
@@ -2795,6 +2844,7 @@ def import_accuracy_sheet(
                     source_row,
                     imported_at,
                     project_id,
+                    site,
                     batch_no
                 ))
 
@@ -2815,6 +2865,7 @@ def import_accuracy_sheet(
             audited = ?,
             errors = ?,
             imported_at = ?,
+            site = ?,
             batch_no = ?
         WHERE id = ?
     """
@@ -2822,8 +2873,8 @@ def import_accuracy_sheet(
         INSERT INTO accuracy_records (
             sheet, username, biller_name, month, weekly, record_date,
             accuracy_type, accuracy_value, bills_processed, audited,
-            errors, source_row, imported_at, project_id, batch_no
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            errors, source_row, imported_at, project_id, site, batch_no
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
 
     if is_postgres():
@@ -2834,7 +2885,7 @@ def import_accuracy_sheet(
 
         update_columns = (
             "biller_name, month, weekly, record_date, accuracy_value, "
-            "bills_processed, audited, errors, imported_at, batch_no, id"
+            "bills_processed, audited, errors, imported_at, site, batch_no, id"
         )
         update_assignments = """
             biller_name = incoming.biller_name,
@@ -2846,12 +2897,13 @@ def import_accuracy_sheet(
             audited = incoming.audited,
             errors = incoming.errors,
             imported_at = incoming.imported_at,
+            site = incoming.site,
             batch_no = incoming.batch_no
         """
 
         for offset in range(0, len(updates), batch_size):
             batch = updates[offset:offset + batch_size]
-            row_placeholders = "(" + ", ".join(["?"] * 11) + ")"
+            row_placeholders = "(" + ", ".join(["?"] * 12) + ")"
             values_sql = ", ".join(
                 [row_placeholders] * len(batch)
             )
@@ -2873,12 +2925,12 @@ def import_accuracy_sheet(
         insert_columns = (
             "sheet, username, biller_name, month, weekly, record_date, "
             "accuracy_type, accuracy_value, bills_processed, audited, "
-            "errors, source_row, imported_at, project_id, batch_no"
+            "errors, source_row, imported_at, project_id, site, batch_no"
         )
 
         for offset in range(0, len(inserts), batch_size):
             batch = inserts[offset:offset + batch_size]
-            row_placeholders = "(" + ", ".join(["?"] * 15) + ")"
+            row_placeholders = "(" + ", ".join(["?"] * 16) + ")"
             values_sql = ", ".join(
                 [row_placeholders] * len(batch)
             )
