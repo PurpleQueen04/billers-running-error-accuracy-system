@@ -2395,12 +2395,12 @@ def get_accuracy_columns(dataframe):
 
         "external_wc_accuracy": find_col(
             columns,
-            ["PER AUDITED ACCURACY - WOC"]
+            ["PER AUDITED ACCURACY"]
         ),
 
         "external_woc_accuracy": find_col(
             columns,
-            ["PER AUDITED PROJECTED ACCURACY - WOC"]
+            ["PER AUDITED ACCURACY - WOC"]
         ),
 
         "project": find_col(
@@ -2522,8 +2522,8 @@ def import_error_sheet(
 #   ACCURACY
 #
 # EXTERNAL:
-#   PER AUDITED ACCURACY - WOC           = EXTERNAL WC
-#   PER AUDITED PROJECTED ACCURACY - WOC = EXTERNAL_WOC
+#   PER AUDITED ACCURACY       = WC
+#   PER AUDITED ACCURACY - WOC = WOC
 # =========================================================
 
 def import_accuracy_sheet(
@@ -4207,10 +4207,6 @@ def build_dashboard_graph_context(allowed_project_ids=None, username=None):
             "CAST(COALESCE(NULLIF(REPLACE(TRIM(COALESCE(errors, '0')), ',', ''), ''), '0') "
             "AS DOUBLE PRECISION)"
         )
-        accuracy_value_expression = (
-            "CAST(COALESCE(NULLIF(REPLACE(TRIM(COALESCE(accuracy_value, '')), ',', ''), ''), '0') "
-            "AS DOUBLE PRECISION)"
-        )
 
         aggregate_rows = con.execute(
             f"""
@@ -4218,14 +4214,7 @@ def build_dashboard_graph_context(allowed_project_ids=None, username=None):
                 {period_expression} AS period_key,
                 {accuracy_type_expression} AS accuracy_kind,
                 SUM({audited_expression}) AS audited_total,
-                SUM({errors_expression}) AS errors_total,
-                SUM({accuracy_value_expression} * {audited_expression}) AS accuracy_weighted_sum,
-                SUM(CASE WHEN TRIM(COALESCE(accuracy_value, '')) != ''
-                         THEN {audited_expression} ELSE 0 END) AS accuracy_weight,
-                SUM(CASE WHEN TRIM(COALESCE(accuracy_value, '')) != ''
-                         THEN {accuracy_value_expression} ELSE 0 END) AS accuracy_fallback_sum,
-                SUM(CASE WHEN TRIM(COALESCE(accuracy_value, '')) != ''
-                         THEN 1 ELSE 0 END) AS accuracy_fallback_count
+                SUM({errors_expression}) AS errors_total
             FROM accuracy_records
             WHERE {aggregate_where}
             GROUP BY {period_expression}, {accuracy_type_expression}
@@ -4245,31 +4234,18 @@ def build_dashboard_graph_context(allowed_project_ids=None, username=None):
             continue
         totals = period_totals.setdefault(
             key,
-            {
-                name: {
-                    "audited": 0.0, "errors": 0.0,
-                    "accuracy_weighted_sum": 0.0, "accuracy_weight": 0.0,
-                    "accuracy_fallback_sum": 0.0, "accuracy_fallback_count": 0
-                }
-                for name in ("INTERNAL", "EXTERNAL_WC", "EXTERNAL_WOC")
-            }
+            {name: {"audited": 0.0, "errors": 0.0} for name in ("INTERNAL", "EXTERNAL_WC", "EXTERNAL_WOC")}
         )
         totals[kind]["audited"] += number_value(row["audited_total"]) or 0
         totals[kind]["errors"] += number_value(row["errors_total"]) or 0
-        totals[kind]["accuracy_weighted_sum"] += number_value(row["accuracy_weighted_sum"]) or 0
-        totals[kind]["accuracy_weight"] += number_value(row["accuracy_weight"]) or 0
-        totals[kind]["accuracy_fallback_sum"] += number_value(row["accuracy_fallback_sum"]) or 0
-        totals[kind]["accuracy_fallback_count"] += int(number_value(row["accuracy_fallback_count"]) or 0)
 
     labels = sorted(period_totals)
 
     def series(kind):
         return [
-            calculate_imported_accuracy(
-                period_totals[key][kind]["accuracy_weighted_sum"],
-                period_totals[key][kind]["accuracy_weight"],
-                period_totals[key][kind]["accuracy_fallback_sum"],
-                period_totals[key][kind]["accuracy_fallback_count"]
+            calculate_weighted_accuracy(
+                period_totals[key][kind]["audited"],
+                period_totals[key][kind]["errors"]
             )
             for key in labels
         ]
@@ -7004,15 +6980,6 @@ def calculate_weighted_accuracy(audited, errors):
     ) * 100
 
 
-def calculate_imported_accuracy(weighted_sum, weight, fallback_sum=0, fallback_count=0):
-    """Aggregate the uploaded accuracy values without recalculating from errors."""
-    if weight > 0:
-        return weighted_sum / weight
-    if fallback_count > 0:
-        return fallback_sum / fallback_count
-    return None
-
-
 # =========================================================
 # GET ACCURACY RECORDS
 # =========================================================
@@ -7294,14 +7261,7 @@ def build_accuracy_context(
 
     # Full period history, aggregated with the same weighted-accuracy formula.
     period_history_map = {
-        key: {
-            kind: {
-                "audited": 0.0, "errors": 0.0,
-                "accuracy_weighted_sum": 0.0, "accuracy_weight": 0.0,
-                "accuracy_fallback_sum": 0.0, "accuracy_fallback_count": 0
-            }
-            for kind in ACCURACY_TYPES
-        }
+        key: {kind: {"audited": 0.0, "errors": 0.0} for kind in ACCURACY_TYPES}
         for key in periods
     }
     for row in records:
@@ -7309,26 +7269,15 @@ def build_accuracy_context(
         kind = normalize_accuracy_type(row.get("accuracy_type"))
         if key not in period_history_map or kind not in ACCURACY_TYPES:
             continue
-        audited_value = number_value(row.get("audited")) or 0
-        accuracy_value = number_value(row.get("accuracy_value"))
-        period_history_map[key][kind]["audited"] += audited_value
+        period_history_map[key][kind]["audited"] += number_value(row.get("audited")) or 0
         period_history_map[key][kind]["errors"] += number_value(row.get("errors")) or 0
-        if accuracy_value is not None and 0 <= accuracy_value <= 100:
-            if audited_value > 0:
-                period_history_map[key][kind]["accuracy_weighted_sum"] += accuracy_value * audited_value
-                period_history_map[key][kind]["accuracy_weight"] += audited_value
-            period_history_map[key][kind]["accuracy_fallback_sum"] += accuracy_value
-            period_history_map[key][kind]["accuracy_fallback_count"] += 1
 
     period_history = []
     for key in sorted(period_history_map, reverse=True):
         item = {"period": key}
         for kind in ACCURACY_TYPES:
             totals = period_history_map[key][kind]
-            item[kind] = calculate_imported_accuracy(
-                totals["accuracy_weighted_sum"], totals["accuracy_weight"],
-                totals["accuracy_fallback_sum"], totals["accuracy_fallback_count"]
-            )
+            item[kind] = calculate_weighted_accuracy(totals["audited"], totals["errors"])
         period_history.append(item)
 
     if selected_period not in period_keys:
@@ -7352,23 +7301,11 @@ def build_accuracy_context(
             "accuracy_type": accuracy_type,
             "audited": 0.0,
             "errors": 0.0,
-            "bills_processed": 0.0,
-            "accuracy_weighted_sum": 0.0,
-            "accuracy_weight": 0.0,
-            "accuracy_fallback_sum": 0.0,
-            "accuracy_fallback_count": 0
+            "bills_processed": 0.0
         })
-        audited_value = number_value(row.get("audited")) or 0
-        accuracy_value = number_value(row.get("accuracy_value"))
-        item["audited"] += audited_value
+        item["audited"] += number_value(row.get("audited")) or 0
         item["errors"] += number_value(row.get("errors")) or 0
         item["bills_processed"] += number_value(row.get("bills_processed")) or 0
-        if accuracy_value is not None and 0 <= accuracy_value <= 100:
-            if audited_value > 0:
-                item["accuracy_weighted_sum"] += accuracy_value * audited_value
-                item["accuracy_weight"] += audited_value
-            item["accuracy_fallback_sum"] += accuracy_value
-            item["accuracy_fallback_count"] += 1
 
     current_aggregates = {}
     previous_aggregates = {}
@@ -7401,28 +7338,17 @@ def build_accuracy_context(
             "audited": audited,
             "errors": errors,
             "bills_processed": bills,
-            "accuracy": calculate_imported_accuracy(
-                sum(item["accuracy_weighted_sum"] for item in matching),
-                sum(item["accuracy_weight"] for item in matching),
-                sum(item["accuracy_fallback_sum"] for item in matching),
-                sum(item["accuracy_fallback_count"] for item in matching)
-            )
+            "accuracy": calculate_weighted_accuracy(audited, errors)
         }
 
     improvements = []
     for key, current in current_aggregates.items():
-        current_accuracy = calculate_imported_accuracy(
-            current["accuracy_weighted_sum"], current["accuracy_weight"],
-            current["accuracy_fallback_sum"], current["accuracy_fallback_count"]
-        )
+        current_accuracy = calculate_weighted_accuracy(current["audited"], current["errors"])
         current["accuracy"] = current_accuracy
 
         previous = previous_aggregates.get(key)
         previous_accuracy = (
-            calculate_imported_accuracy(
-                previous["accuracy_weighted_sum"], previous["accuracy_weight"],
-                previous["accuracy_fallback_sum"], previous["accuracy_fallback_count"]
-            )
+            calculate_weighted_accuracy(previous["audited"], previous["errors"])
             if previous else None
         )
         if previous_accuracy is None:
@@ -7963,7 +7889,6 @@ def get_biller_accuracy_summary(
                 accuracy_type,
                 audited,
                 errors,
-                accuracy_value,
                 project_id,
                 batch_no
             FROM accuracy_records
@@ -8026,14 +7951,8 @@ def get_biller_accuracy_summary(
     periods = sorted(periods)
 
     history_map = {
-        key: {
-            kind: {
-                "audited": 0.0, "errors": 0.0,
-                "accuracy_weighted_sum": 0.0, "accuracy_weight": 0.0,
-                "accuracy_fallback_sum": 0.0, "accuracy_fallback_count": 0
-            }
-            for kind in ("INTERNAL", "EXTERNAL_WC", "EXTERNAL_WOC")
-        }
+        key: {kind: {"audited": 0.0, "errors": 0.0}
+              for kind in ("INTERNAL", "EXTERNAL_WC", "EXTERNAL_WOC")}
         for key in periods
     }
     for index, row in enumerate(current_rows):
@@ -8041,38 +7960,24 @@ def get_biller_accuracy_summary(
         kind = normalize_accuracy_type(row.get("accuracy_type"))
         if key not in history_map or kind not in history_map[key]:
             continue
-        audited_value = number_value(row.get("audited")) or 0
-        accuracy_value = number_value(row.get("accuracy_value"))
-        history_map[key][kind]["audited"] += audited_value
+        history_map[key][kind]["audited"] += number_value(row.get("audited")) or 0
         history_map[key][kind]["errors"] += number_value(row.get("errors")) or 0
-        if accuracy_value is not None and 0 <= accuracy_value <= 100:
-            if audited_value > 0:
-                history_map[key][kind]["accuracy_weighted_sum"] += accuracy_value * audited_value
-                history_map[key][kind]["accuracy_weight"] += audited_value
-            history_map[key][kind]["accuracy_fallback_sum"] += accuracy_value
-            history_map[key][kind]["accuracy_fallback_count"] += 1
 
     period_history = []
     for key in sorted(history_map, reverse=True):
         item = {"period": key}
         for kind in ("INTERNAL", "EXTERNAL_WC", "EXTERNAL_WOC"):
             totals = history_map[key][kind]
-            item[kind] = calculate_imported_accuracy(
-                totals["accuracy_weighted_sum"], totals["accuracy_weight"],
-                totals["accuracy_fallback_sum"], totals["accuracy_fallback_count"]
-            )
+            item[kind] = calculate_weighted_accuracy(totals["audited"], totals["errors"])
         period_history.append(item)
 
     if selected_period not in periods:
         selected_period = periods[-1] if periods else ""
 
     totals = {
-        kind: {
-            "audited": 0.0, "errors": 0.0,
-            "accuracy_weighted_sum": 0.0, "accuracy_weight": 0.0,
-            "accuracy_fallback_sum": 0.0, "accuracy_fallback_count": 0
-        }
-        for kind in ("INTERNAL", "EXTERNAL_WC", "EXTERNAL_WOC")
+        "INTERNAL": {"audited": 0.0, "errors": 0.0},
+        "EXTERNAL_WC": {"audited": 0.0, "errors": 0.0},
+        "EXTERNAL_WOC": {"audited": 0.0, "errors": 0.0}
     }
 
     for index, row in enumerate(current_rows):
@@ -8083,25 +7988,17 @@ def get_biller_accuracy_summary(
         if accuracy_type not in totals:
             continue
 
-        audited_value = number_value(row.get("audited")) or 0
-        accuracy_value = number_value(row.get("accuracy_value"))
-        totals[accuracy_type]["audited"] += audited_value
+        totals[accuracy_type]["audited"] += number_value(row.get("audited")) or 0
         totals[accuracy_type]["errors"] += number_value(row.get("errors")) or 0
-        if accuracy_value is not None and 0 <= accuracy_value <= 100:
-            if audited_value > 0:
-                totals[accuracy_type]["accuracy_weighted_sum"] += accuracy_value * audited_value
-                totals[accuracy_type]["accuracy_weight"] += audited_value
-            totals[accuracy_type]["accuracy_fallback_sum"] += accuracy_value
-            totals[accuracy_type]["accuracy_fallback_count"] += 1
 
     summaries = {}
     for accuracy_type, values in totals.items():
         summaries[accuracy_type] = {
             "audited": values["audited"],
             "errors": values["errors"],
-            "accuracy": calculate_imported_accuracy(
-                values["accuracy_weighted_sum"], values["accuracy_weight"],
-                values["accuracy_fallback_sum"], values["accuracy_fallback_count"]
+            "accuracy": calculate_weighted_accuracy(
+                values["audited"],
+                values["errors"]
             )
         }
 
@@ -8802,17 +8699,11 @@ def supervisor_dashboard():
             for item in accuracy_context["summary"].values()
         )
 
-        imported_accuracy_rows = [
-            item for item in accuracy_context["summary"].values()
-            if item.get("accuracy") is not None
-        ]
         counts = {
             "errors": int(error_row["total"] or 0),
-            "accuracy": calculate_imported_accuracy(
-                sum(item["accuracy"] * item["audited"] for item in imported_accuracy_rows if item["audited"] > 0),
-                sum(item["audited"] for item in imported_accuracy_rows if item["audited"] > 0),
-                sum(item["accuracy"] for item in imported_accuracy_rows if item["audited"] <= 0),
-                sum(1 for item in imported_accuracy_rows if item["audited"] <= 0)
+            "accuracy": calculate_weighted_accuracy(
+                total_audited,
+                total_accuracy_errors
             ),
             "billers": int(biller_row["total"] or 0),
             "qcs": int(qc_row["total"] or 0)
