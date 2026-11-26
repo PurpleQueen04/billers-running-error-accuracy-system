@@ -6609,6 +6609,9 @@ def admin_errors():
             query,
             params
         ).fetchall()
+        sites = [row["site"] for row in con.execute(
+            "SELECT DISTINCT site FROM project_sites ORDER BY site"
+        ).fetchall()]
 
     return render_template(
         "admin_errors.html",
@@ -6616,7 +6619,7 @@ def admin_errors():
         projects=projects,
         selected_project_id=selected_project_id,
         selected_site=selected_site,
-        sites=[row["site"] for row in con.execute("SELECT DISTINCT site FROM project_sites ORDER BY site").fetchall()]
+        sites=sites
     )
 
 # =========================================================
