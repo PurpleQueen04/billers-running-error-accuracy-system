@@ -8645,6 +8645,8 @@ def biller_errors():
     username = session.get("username", "")
 
     project_ids = get_biller_project_ids()
+    selected_site = normalize_site_name(request.args.get("site")) or "all"
+    sites = []
 
     if not project_ids:
 
@@ -8672,6 +8674,11 @@ def biller_errors():
                 """,
                 (username, *project_ids)
             ).fetchall()
+
+            sites = [row["site"] for row in con.execute(
+                "SELECT DISTINCT site FROM project_sites WHERE project_id IN (" + placeholders + ") ORDER BY site",
+                tuple(project_ids)
+            ).fetchall()]
 
             dates = [
                 row["billed_date"]
@@ -8711,7 +8718,8 @@ def biller_errors():
                         e.biller_comment,
                         e.qc_explanation,
                         e.qc_name,
-                        e.updated_at
+                        e.updated_at,
+                        e.site
                     FROM error_records e
                     LEFT JOIN projects p
                         ON p.id = e.project_id
@@ -8734,13 +8742,16 @@ def biller_errors():
         errors = [
             dict(row)
             for row in rows
+            if selected_site == "all" or normalize_site_name(row["site"]).casefold() == selected_site.casefold()
         ]
 
     return render_template(
     "biller_errors.html",
     errors=errors,
     dates=dates,
-    selected_date=selected_date
+    selected_date=selected_date,
+    selected_site=selected_site,
+    sites=sites
     )
 
 # =========================================================
