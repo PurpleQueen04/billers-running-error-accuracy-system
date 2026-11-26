@@ -8136,7 +8136,14 @@ def get_biller_accuracy_summary(
         sheet_key = normalize_text(row["sheet"]).upper()
         if normalize_text(row["imported_at"]) != latest_imports.get((project_key, sheet_key)):
             continue
-        if normalize_text(row["username"]).casefold() != normalize_text(username).casefold():
+        row_username = normalize_text(row["username"])
+        is_own_record = row_username.casefold() == normalize_text(username).casefold()
+        is_act_shared_external = (
+            sheet_key == "EXTERNAL"
+            and normalize_text(project_names.get(project_key, "")).upper() == "ACT"
+            and row_username == "__ACT_PROJECT_WIDE__"
+        )
+        if not (is_own_record or is_act_shared_external):
             continue
         current_rows.append(dict(row))
 
