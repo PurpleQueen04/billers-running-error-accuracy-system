@@ -8797,6 +8797,8 @@ def qc_dashboard():
 def qc_errors():
 
     project_ids = get_user_project_ids()
+    selected_site = normalize_site_name(request.args.get("site")) or "all"
+    sites = []
 
     if not project_ids:
 
@@ -8810,7 +8812,9 @@ def qc_errors():
             errors=[],
             dates=[],
             selected_date="",
-            projects=[]
+            projects=[],
+            selected_site=selected_site,
+            sites=[]
         )
 
     placeholders = ", ".join(
@@ -8818,6 +8822,11 @@ def qc_errors():
     )
 
     with db() as con:
+
+        sites = [row["site"] for row in con.execute(
+            "SELECT DISTINCT site FROM project_sites WHERE project_id IN (" + placeholders + ") ORDER BY site",
+            tuple(project_ids)
+        ).fetchall()]
 
         date_rows = con.execute(
             f"""
@@ -8871,7 +8880,8 @@ def qc_errors():
                 e.biller_comment,
                 e.qc_explanation,
                 e.qc_name,
-                e.updated_at
+                e.updated_at,
+                e.site
             FROM error_records e
             LEFT JOIN projects p
                 ON p.id = e.project_id
@@ -8915,10 +8925,8 @@ def qc_errors():
 
     projects = [dict(row) for row in project_rows]
 
-    errors = [
-        dict(row)
-        for row in rows
-    ]
+    errors = [dict(row) for row in rows
+              if selected_site == "all" or normalize_site_name(row["site"]).casefold() == selected_site.casefold()]
 
     return render_template(
         "errors.html",
@@ -8926,7 +8934,9 @@ def qc_errors():
         dates=dates,
         selected_date=selected_date,
         projects=projects,
-        page_mode="pending"
+        page_mode="pending",
+        selected_site=selected_site,
+        sites=sites
     )
 
 
