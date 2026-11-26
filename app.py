@@ -8169,7 +8169,8 @@ def get_biller_accuracy_summary(
     history_period_type="monthly",
     selected_batch="all",
     history_batch="all",
-    include_history=True
+    include_history=True,
+    selected_site="all"
 ):
     if period_type not in ("daily", "weekly", "monthly"):
         period_type = "monthly"
@@ -8205,6 +8206,8 @@ def get_biller_accuracy_summary(
             "history_period_type": history_period_type,
             "projects": [],
             "selected_project": "all",
+            "selected_site": selected_site,
+            "sites": [],
             "selected_period": "",
             "period_type": period_type,
             "internal_summary": dict(empty_summary),
@@ -8221,6 +8224,15 @@ def get_biller_accuracy_summary(
     project_names = {
         int(row["id"]): row["project_name"] for row in project_rows
     }
+    with db() as con:
+        site_rows = con.execute(
+            "SELECT project_id, site FROM project_sites WHERE project_id IN (" +
+            ", ".join(["?"] * len(all_project_ids)) + ") ORDER BY site",
+            tuple(all_project_ids)
+        ).fetchall()
+    project_site_map = {}
+    for site_row in site_rows:
+        project_site_map.setdefault(int(site_row["project_id"]), []).append(site_row["site"])
 
     placeholders = ", ".join(["?"] * len(project_ids))
 
@@ -8240,7 +8252,8 @@ def get_biller_accuracy_summary(
                 audited,
                 errors,
                 project_id,
-                batch_no
+                batch_no,
+                site
             FROM accuracy_records
             WHERE project_id IN ({placeholders})
             ORDER BY record_date
@@ -8278,6 +8291,12 @@ def get_biller_accuracy_summary(
         if not (is_own_record or is_act_shared_external):
             continue
         current_rows.append(dict(row))
+
+    selected_site = normalize_site_name(selected_site) or "all"
+    if selected_site != "all":
+        current_rows = [row for row in current_rows
+                        if normalize_site_name(row.get("site")).casefold() == selected_site.casefold()]
+    site_options = sorted({site for values in project_site_map.values() for site in values}, key=str.casefold)
 
     batch_options = sorted({
         normalize_text(row.get("batch_no"))
@@ -8388,12 +8407,15 @@ def get_biller_accuracy_summary(
         "history_batches": history_batches if include_history else batch_options,
         "history_batch": str(history_batch),
         "projects": [
-            {"id": project_id, "project_name": project_name}
+            {"id": project_id, "project_name": project_name,
+             "sites": ", ".join(project_site_map.get(project_id, []))}
             for project_id, project_name in project_names.items()
             if project_id in all_project_ids
         ],
         "selected_project": str(project_ids[0]) if len(project_ids) == 1 and selected_project != "all" else "all",
         "selected_period": selected_period,
+        "selected_site": selected_site,
+        "sites": site_options,
         "period_type": period_type,
         "internal_summary": summaries["INTERNAL"],
         "external_wc_summary": summaries["EXTERNAL_WC"],
@@ -8429,7 +8451,8 @@ def biller_accuracy_monitoring():
             session.get("username", ""), allowed_ids or [], period_type,
             selected_period, selected_project, history_project=history_project,
             history_period_type=history_period_type, selected_batch=selected_batch,
-            history_batch=history_batch
+            history_batch=history_batch,
+            selected_site=normalize_site_name(request.args.get("site")) or "all"
         )
     else:
         context = build_accuracy_context(
