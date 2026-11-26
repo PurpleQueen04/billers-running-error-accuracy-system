@@ -84,6 +84,13 @@
             </select>
         </div>
         <div class="filter-group">
+            <label for="site">Site</label>
+            <select name="site" id="site">
+                <option value="all" {% if selected_site == 'all' %}selected{% endif %}>All Sites</option>
+                {% for site in sites %}<option value="{{ site }}" {% if selected_site == site %}selected{% endif %}>{{ site }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="filter-group">
             <label for="source">Source</label>
             <select name="source" id="source">
                 <option value="all" {% if selected_source == 'all' %}selected{% endif %}>All Sources</option>
@@ -113,7 +120,7 @@
             </colgroup>
             <thead>
                 <tr>
-                    <th>BILLED DATE</th><th>PROJECT</th><th>BILLER NAME</th><th>USERNAME</th>
+                    <th>BILLED DATE</th><th>PROJECT</th><th>SITE</th><th>BILLER NAME</th><th>USERNAME</th>
                     <th>PRO</th><th>SOURCE</th><th>AUDITOR</th><th>AUDIT TYPE</th>
                     <th>VERIFIED ERROR</th><th>BILLER COMMENT</th><th>QC EXPLANATION</th><th>QC NAME</th>
                 </tr>
@@ -123,6 +130,7 @@
                 <tr>
                     <td>{{ record.billed_date or '—' }}</td>
                     <td>{{ record.project_name or '—' }}</td>
+                    <td>{{ record.site or '—' }}</td>
                     <td>{{ record.biller_name or '—' }}</td>
                     <td>{{ record.username or '—' }}</td>
                     <td>{{ record.pro or '—' }}</td>
