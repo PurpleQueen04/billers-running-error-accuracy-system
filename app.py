@@ -6445,9 +6445,12 @@ def admin_errors():
                 pro,
                 source,
                 auditor,
-                audit_type,
-                project_id
-            FROM error_records
+                e.audit_type,
+                e.project_id,
+                p.project_name
+            FROM error_records e
+            LEFT JOIN projects p
+                ON p.id = e.project_id
         """
         params = []
 
