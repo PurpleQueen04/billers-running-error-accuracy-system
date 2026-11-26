@@ -2453,8 +2453,7 @@ def get_accuracy_columns(dataframe):
         "batch_no": find_col(
             columns,
             ["BATCH #", "BATCH NO", "BATCH NUMBER"]
-        ),
-        "site": find_col(columns, ["SITE", "LOCATION"])
+        )
     }
 
 
@@ -7207,7 +7206,8 @@ def get_accuracy_records(project_ids=None, start_date=None):
                 source_row,
                 project_id,
                 imported_at,
-                batch_no
+                batch_no,
+                site
             FROM accuracy_records
             WHERE record_date IS NOT NULL
               AND TRIM(record_date) != ''
@@ -7272,7 +7272,8 @@ def build_accuracy_context(
     history_batch="all",
     below_batch="all",
     include_history=True,
-    min_record_date=None
+    min_record_date=None,
+    selected_site="all"
 ):
     if period_type not in ("daily", "weekly", "monthly"):
         period_type = "monthly"
@@ -7318,6 +7319,13 @@ def build_accuracy_context(
         sorted(allowed_set) if allowed_set is not None else None,
         start_date=min_record_date
     )
+
+    selected_site = normalize_site_name(selected_site) or "all"
+    if selected_site.casefold() == "all":
+        selected_site = "all"
+    else:
+        records = [row for row in records
+                   if normalize_site_name(row.get("site")).casefold() == selected_site.casefold()]
 
     with db() as con:
         project_rows = con.execute(
@@ -7399,7 +7407,7 @@ def build_accuracy_context(
 
                 error_rows = con.execute(
                     f"""
-                    SELECT billed_date, project_id, imported_at
+                    SELECT billed_date, project_id, imported_at, site
                     FROM error_records
                     WHERE {" AND ".join(error_conditions)}
                     """,
@@ -7416,12 +7424,16 @@ def build_accuracy_context(
 
             error_rows = con.execute(
                 f"""
-                SELECT billed_date, project_id, imported_at
+                SELECT billed_date, project_id, imported_at, site
                 FROM error_records
                 WHERE {" AND ".join(error_conditions)}
                 """,
                 tuple(error_params)
             ).fetchall()
+
+    if selected_site != "all":
+        error_rows = [row for row in error_rows
+                      if normalize_site_name(row["site"]).casefold() == selected_site.casefold()]
 
     # -----------------------------------------------------
     # BUILD AVAILABLE PERIODS
@@ -7799,18 +7811,40 @@ def build_accuracy_context(
             selected_batch="all",
             history_batch="all",
             below_batch=below_batch,
-            include_history=False
+            include_history=False,
+            selected_site=selected_site
         )
         improvements = unfiltered_context["improvements"]
 
+    with db() as con:
+        site_rows = con.execute("SELECT project_id, site FROM project_sites ORDER BY site").fetchall()
+    site_map = {}
+    for site_row in site_rows:
+        project_id = int(site_row["project_id"])
+        if allowed_set is None or project_id in allowed_set:
+            site_map.setdefault(project_id, []).append(site_row["site"])
+
+    site_project_id = None
+    if selected_project != "all":
+        try:
+            site_project_id = int(selected_project)
+        except (TypeError, ValueError):
+            pass
+    visible_site_values = sorted({
+        site for project_id, project_sites in site_map.items()
+        if site_project_id is None or project_id == site_project_id
+        for site in project_sites
+    }, key=str.casefold)
     if allowed_set is None:
         visible_projects = [
-            {"id": int(row["id"]), "project_name": row["project_name"]}
+            {"id": int(row["id"]), "project_name": row["project_name"],
+             "sites": ", ".join(site_map.get(int(row["id"]), []))}
             for row in project_rows if bool(con_value(row, "active", 1))
         ]
     else:
         visible_projects = [
-            {"id": int(row["id"]), "project_name": row["project_name"]}
+            {"id": int(row["id"]), "project_name": row["project_name"],
+             "sites": ", ".join(site_map.get(int(row["id"]), []))}
             for row in project_rows
             if int(row["id"]) in allowed_set and bool(con_value(row, "active", 1))
         ]
@@ -7828,7 +7862,8 @@ def build_accuracy_context(
             below_to_date=below_to_date,
             below_category=below_category,
             selected_batch=history_batch,
-            include_history=False
+            include_history=False,
+            selected_site=selected_site
         )
         period_history = history_context["period_history"]
         history_project = history_context["selected_project"]
@@ -7862,6 +7897,8 @@ def build_accuracy_context(
         "projects": visible_projects,
         "selected_period": selected_period,
         "selected_project": str(selected_project),
+        "selected_site": selected_site,
+        "sites": visible_site_values,
         "summary": summary
     }
 
@@ -8319,7 +8356,8 @@ def get_biller_accuracy_summary(
             selected_period=None,
             selected_project=history_project,
             selected_batch=history_batch,
-            include_history=False
+            include_history=False,
+            selected_site=selected_site
         )
         period_history = history_context["period_history"]
         history_project = history_context["selected_project"]
