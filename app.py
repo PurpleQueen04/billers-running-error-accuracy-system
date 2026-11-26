@@ -7270,7 +7270,14 @@ def build_accuracy_context(
 
     # Full period history, aggregated with the same weighted-accuracy formula.
     period_history_map = {
-        key: {kind: {"audited": 0.0, "errors": 0.0} for kind in ACCURACY_TYPES}
+        key: {
+            kind: {
+                "audited": 0.0, "errors": 0.0,
+                "accuracy_weighted_sum": 0.0, "accuracy_weight": 0.0,
+                "accuracy_fallback_sum": 0.0, "accuracy_fallback_count": 0
+            }
+            for kind in ACCURACY_TYPES
+        }
         for key in periods
     }
     for row in records:
@@ -7278,8 +7285,16 @@ def build_accuracy_context(
         kind = normalize_accuracy_type(row.get("accuracy_type"))
         if key not in period_history_map or kind not in ACCURACY_TYPES:
             continue
-        period_history_map[key][kind]["audited"] += number_value(row.get("audited")) or 0
+        audited_value = number_value(row.get("audited")) or 0
+        accuracy_value = number_value(row.get("accuracy_value"))
+        period_history_map[key][kind]["audited"] += audited_value
         period_history_map[key][kind]["errors"] += number_value(row.get("errors")) or 0
+        if accuracy_value is not None and 0 <= accuracy_value <= 100:
+            if audited_value > 0:
+                period_history_map[key][kind]["accuracy_weighted_sum"] += accuracy_value * audited_value
+                period_history_map[key][kind]["accuracy_weight"] += audited_value
+            period_history_map[key][kind]["accuracy_fallback_sum"] += accuracy_value
+            period_history_map[key][kind]["accuracy_fallback_count"] += 1
 
     period_history = []
     for key in sorted(period_history_map, reverse=True):
