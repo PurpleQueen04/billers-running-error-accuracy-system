@@ -4176,6 +4176,13 @@ def build_dashboard_graph_context(allowed_project_ids=None, username=None):
             "SELECT id, project_name, active FROM projects ORDER BY project_name"
         ).fetchall()
 
+        site_rows = con.execute(
+            "SELECT project_id, site FROM project_sites ORDER BY site"
+        ).fetchall()
+        project_site_map = {}
+        for site_row in site_rows:
+            project_site_map.setdefault(int(site_row["project_id"]), []).append(site_row["site"])
+
         projects = []
         for row in project_rows:
             pid = int(row["id"])
@@ -4183,7 +4190,11 @@ def build_dashboard_graph_context(allowed_project_ids=None, username=None):
                 continue
             if allowed_set is not None and pid not in allowed_set:
                 continue
-            projects.append({"id": pid, "project_name": row["project_name"]})
+            projects.append({
+                "id": pid,
+                "project_name": row["project_name"],
+                "sites": ", ".join(project_site_map.get(pid, []))
+            })
 
         selected_project = normalize_text(request.args.get("graph_project_id")) or "all"
         visible_ids = {p["id"] for p in projects}
