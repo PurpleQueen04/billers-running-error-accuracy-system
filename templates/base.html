@@ -125,6 +125,12 @@
                     <span>Dashboard</span>
                 </a>
 
+                <a href="/admin/accounts"
+                   class="nav-link {% if request.path.startswith('/admin/accounts') %}active{% endif %}">
+                    <span class="nav-icon">♙</span>
+                    <span>Accounts</span>
+                </a>
+
                 <a href="/qc/workbook-import"
                    class="nav-link {% if request.path.startswith('/qc/workbook-import') %}active{% endif %}">
                     <span class="nav-icon">⇧</span>
