@@ -593,7 +593,7 @@ def normalize_site_name(value):
 def record_project_site(con, project_id, site):
     """Remember a normalized Site as one of a project's available sites."""
     site = normalize_site_name(site)
-    if not site:
+    if not site or project_id is None:
         return
     con.execute(
         """
