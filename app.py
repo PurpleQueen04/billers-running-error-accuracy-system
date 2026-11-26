@@ -7972,6 +7972,8 @@ def get_act_external_accuracy_summary(project_ids):
             )
             SELECT
                 er.period,
+                er.month,
+                er.record_date,
                 er.accuracy_type,
                 AVG(CAST(er.accuracy_value AS DOUBLE PRECISION)) AS accuracy
             FROM external_rows er
@@ -7980,12 +7982,7 @@ def get_act_external_accuracy_summary(project_ids):
                AND li.period = er.period
                AND li.latest_imported_at = er.imported_at
             WHERE er.accuracy_type IN (?, ?)
-              AND (
-                  (TRIM(COALESCE(er.month, '')) <> ''
-                   AND TRIM(er.month) >= '2026-01')
-                  OR er.record_date >= '2026-01-01'
-              )
-            GROUP BY er.period, er.accuracy_type
+            GROUP BY er.period, er.month, er.record_date, er.accuracy_type
             ORDER BY er.period DESC
             """,
             (*clean_ids, EXTERNAL_ACCURACY[0], EXTERNAL_ACCURACY[1])
@@ -7993,10 +7990,28 @@ def get_act_external_accuracy_summary(project_ids):
 
     summaries = {}
     for row in rows:
-        period = normalize_text(row["period"])
-        accuracy_type = normalize_text(row["accuracy_type"])
-        if not period:
+        raw_period = normalize_text(row["period"])
+        raw_month = normalize_text(row["month"]) or raw_period
+        raw_date = normalize_text(row["record_date"])
+
+        parsed_date = parse_date(raw_date)
+        if parsed_date is not None:
+            period = parsed_date.strftime("%Y-%m")
+        else:
+            year_month = _cached_accuracy_year_month(raw_month)
+            if year_month is not None:
+                period = f"{year_month[0]:04d}-{year_month[1]:02d}"
+            elif len(raw_period) == 7 and raw_period[4] == "-":
+                period = raw_period
+            else:
+                continue
+
+        # Keep the January 2026 cutoff while accepting month labels such as
+        # "November 2026" as well as the canonical "2026-11" format.
+        if period < "2026-01":
             continue
+
+        accuracy_type = normalize_text(row["accuracy_type"])
         item = summaries.setdefault(
             period,
             {"period": period, "external_wc": None, "external_woc": None}
