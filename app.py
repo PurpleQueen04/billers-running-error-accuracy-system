@@ -8946,6 +8946,8 @@ def qc_errors():
 def qc_error_details():
 
     project_ids = get_user_project_ids()
+    selected_site = normalize_site_name(request.args.get("site")) or "all"
+    sites = []
 
     if not project_ids:
         return render_template(
@@ -8954,12 +8956,18 @@ def qc_error_details():
             dates=[],
             selected_date="",
             projects=[],
-            page_mode="completed"
+            page_mode="completed",
+            selected_site=selected_site,
+            sites=[]
         )
 
     placeholders = ", ".join(["?"] * len(project_ids))
 
     with db() as con:
+        sites = [row["site"] for row in con.execute(
+            "SELECT DISTINCT site FROM project_sites WHERE project_id IN (" + placeholders + ") ORDER BY site",
+            tuple(project_ids)
+        ).fetchall()]
         date_rows = con.execute(
             f"""
             SELECT DISTINCT billed_date
@@ -8990,7 +8998,7 @@ def qc_error_details():
                     p.project_name, e.week, e.source, e.username,
                     e.auditor, e.audit_type, e.biller_name, e.zb_field,
                     e.error_details, e.verified_error, e.biller_comment,
-                    e.qc_explanation, e.qc_name, e.updated_at
+                    e.qc_explanation, e.qc_name, e.updated_at, e.site
                 FROM error_records e
                 LEFT JOIN projects p ON p.id = e.project_id
                 WHERE e.project_id IN ({placeholders})
@@ -9003,11 +9011,13 @@ def qc_error_details():
 
     return render_template(
         "errors.html",
-        errors=[dict(row) for row in rows],
+        errors=[dict(row) for row in rows if selected_site == "all" or normalize_site_name(row["site"]).casefold() == selected_site.casefold()],
         dates=dates,
         selected_date=selected_date,
         projects=[],
-        page_mode="completed"
+        page_mode="completed",
+        selected_site=selected_site,
+        sites=sites
     )
 
 
