@@ -70,6 +70,11 @@
                     </option>
                 {% endfor %}
             </select>
+            <label for="siteFilter">Site</label>
+            <select id="siteFilter" name="site" onchange="this.form.submit()">
+                <option value="all" {% if selected_site == 'all' %}selected{% endif %}>All Sites</option>
+                {% for site in sites %}<option value="{{ site }}" {% if selected_site == site %}selected{% endif %}>{{ site }}</option>{% endfor %}
+            </select>
         </form>
 
         <div class="filter-group search-group">
@@ -103,6 +108,7 @@
                         <th>AUDITOR</th>
                         <th>AUDIT TYPE</th>
                         <th>PROJECT</th>
+                        <th>SITE</th>
                     </tr>
                 </thead>
 
@@ -154,6 +160,7 @@
                                     </span>
                                 {% endif %}
                             </td>
+                            <td>{{ record.site or '—' }}</td>
 
                         </tr>
 
