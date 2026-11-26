@@ -161,6 +161,7 @@
                         <th>USERNAME</th>
                         <th>ROLE</th>
                         <th>ASSIGNED PROJECTS</th>
+                        <th>SITES</th>
                         <th>STATUS</th>
                         <th>DATE CREATED</th>
                         {% if current_role == "admin" %}
@@ -214,6 +215,10 @@
 
                             <td class="comment-cell">
                                 {{ account.projects }}
+                            </td>
+
+                            <td class="comment-cell">
+                                {{ account.sites or '—' }}
                             </td>
 
                             <td>
