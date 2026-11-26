@@ -7843,6 +7843,19 @@ def get_act_external_accuracy_summary(project_ids):
                   FROM accuracy_records latest
                   WHERE latest.project_id = ar.project_id
                     AND UPPER(TRIM(COALESCE(latest.sheet, ''))) = 'EXTERNAL'
+                    AND (
+                        CASE
+                            WHEN TRIM(COALESCE(latest.month, '')) <> ''
+                            THEN TRIM(latest.month)
+                            ELSE SUBSTR(latest.record_date, 1, 7)
+                        END
+                    ) = (
+                        CASE
+                            WHEN TRIM(COALESCE(ar.month, '')) <> ''
+                            THEN TRIM(ar.month)
+                            ELSE SUBSTR(ar.record_date, 1, 7)
+                        END
+                    )
               )
               AND ar.accuracy_type IN (?, ?)
               AND (
