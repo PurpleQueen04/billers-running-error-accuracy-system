@@ -22,6 +22,21 @@
         </div>
     </div>
 
+    <form method="GET" action="{{ url_for('admin_accuracy_improvement') }}" class="filter-bar">
+        <div class="form-group">
+            <label for="project_id">Project</label>
+            <select id="project_id" name="project_id">
+                <option value="all" {% if selected_project == 'all' %}selected{% endif %}>All Projects</option>
+                {% for project in projects %}
+                    <option value="{{ project.id }}" {% if selected_project|string == project.id|string %}selected{% endif %}>{{ project.project_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <input type="hidden" name="period" value="{{ period_type }}">
+        <input type="hidden" name="date" value="{{ selected_period }}">
+        <button type="submit" class="btn btn-primary">Apply Filter</button>
+    </form>
+
     <div class="table-container">
 
         <table class="data-table">
