@@ -6413,10 +6413,29 @@ def toggle_project(project_id):
 @admin_required
 def admin_errors():
 
+    selected_project_id = normalize_text(
+        request.args.get("project_id")
+    )
+
     with db() as con:
 
-        records = con.execute(
+        projects = con.execute(
             """
+            SELECT id, project_name
+            FROM projects
+            ORDER BY project_name
+            """
+        ).fetchall()
+
+        valid_project_ids = {
+            str(row["id"])
+            for row in projects
+        }
+
+        if selected_project_id and selected_project_id not in valid_project_ids:
+            selected_project_id = ""
+
+        query = """
             SELECT
                 record_key,
                 billed_date,
@@ -6429,6 +6448,14 @@ def admin_errors():
                 audit_type,
                 project_id
             FROM error_records
+        """
+        params = []
+
+        if selected_project_id:
+            query += " WHERE project_id = ?"
+            params.append(int(selected_project_id))
+
+        query += """
             ORDER BY
                 CASE
                     WHEN billed_date IS NULL
@@ -6439,12 +6466,18 @@ def admin_errors():
                 billed_date DESC,
                 record_key DESC
             LIMIT 250
-            """
+        """
+
+        records = con.execute(
+            query,
+            params
         ).fetchall()
 
     return render_template(
         "admin_errors.html",
-        records=records
+        records=records,
+        projects=projects,
+        selected_project_id=selected_project_id
     )
 
 # =========================================================
