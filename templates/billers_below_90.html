@@ -29,9 +29,15 @@
           class="filter-bar">
 
         <!-- PRESERVE MAIN ACCURACY FILTERS -->
-        <input type="hidden"
-               name="project_id"
-               value="{{ selected_project }}">
+        <div class="form-group">
+            <label for="project_id">Project</label>
+            <select id="project_id" name="project_id">
+                <option value="all" {% if selected_project == 'all' %}selected{% endif %}>All Projects</option>
+                {% for project in projects %}
+                    <option value="{{ project.id }}" {% if selected_project|string == project.id|string %}selected{% endif %}>{{ project.project_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
 
         <input type="hidden"
                name="period"
