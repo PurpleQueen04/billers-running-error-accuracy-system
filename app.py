@@ -7280,6 +7280,9 @@ def build_accuracy_context(
     if history_period_type not in ("daily", "weekly", "monthly"):
         history_period_type = "monthly"
 
+    if selected_site == "all":
+        selected_site = normalize_site_name(request.args.get("site")) or "all"
+
     
     # -----------------------------------------------------
     # INDEPENDENT BELOW 90% DATE RANGE
