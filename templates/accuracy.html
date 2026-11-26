@@ -33,6 +33,7 @@
 
     <input type="hidden" name="history_project_id" value="{{ history_project|default('all') }}">
     <input type="hidden" name="history_period" value="{{ history_period_type|default('monthly') }}">
+    <input type="hidden" name="site" value="{{ selected_site|default('all') }}">
 
     <!-- PRESERVE BELOW 90% DATE FILTER -->
     <input type="hidden"
@@ -59,9 +60,17 @@
                 {% for project in projects %}
                     <option value="{{ project.id }}"
                         {% if selected_project|string == project.id|string %}selected{% endif %}>
-                        {{ project.project_name }}
+                        {{ project.project_name }}{% if project.sites %} — {{ project.sites }}{% endif %}
                     </option>
                 {% endfor %}
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="site">Site</label>
+            <select name="site" id="site" onchange="this.form.submit()">
+                <option value="all" {% if selected_site == 'all' %}selected{% endif %}>All Sites</option>
+                {% for site in sites %}<option value="{{ site }}" {% if selected_site == site %}selected{% endif %}>{{ site }}</option>{% endfor %}
             </select>
         </div>
 
@@ -188,6 +197,7 @@
         <input type="hidden" name="below_from" value="{{ below_from_date }}">
         <input type="hidden" name="below_to" value="{{ below_to_date }}">
         <input type="hidden" name="below_category" value="{{ below_category }}">
+        <input type="hidden" name="site" value="{{ selected_site|default('all') }}">
         <div class="filter-group">
             <label for="history_project_id">History Project</label>
             <select name="history_project_id" id="history_project_id" onchange="this.form.submit()">
@@ -262,9 +272,17 @@
                 {% for project in projects %}
                     <option value="{{ project.id }}"
                         {% if selected_project|string == project.id|string %}selected{% endif %}>
-                        {{ project.project_name }}
+                        {{ project.project_name }}{% if project.sites %} — {{ project.sites }}{% endif %}
                     </option>
                 {% endfor %}
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="below_site">Site</label>
+            <select id="below_site" name="site">
+                <option value="all" {% if selected_site == 'all' %}selected{% endif %}>All Sites</option>
+                {% for site in sites %}<option value="{{ site }}" {% if selected_site == site %}selected{% endif %}>{{ site }}</option>{% endfor %}
             </select>
         </div>
 
