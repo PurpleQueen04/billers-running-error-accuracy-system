@@ -6541,9 +6541,8 @@ def toggle_project(project_id):
 @admin_required
 def admin_errors():
 
-    selected_project_id = normalize_text(
-        request.args.get("project_id")
-    )
+    selected_project_id = normalize_text(request.args.get("project_id"))
+    selected_site = normalize_site_name(request.args.get("site")) or "all"
 
     with db() as con:
 
@@ -6575,16 +6574,23 @@ def admin_errors():
                 auditor,
                 e.audit_type,
                 e.project_id,
-                p.project_name
+                p.project_name,
+                e.site
             FROM error_records e
             LEFT JOIN projects p
                 ON p.id = e.project_id
         """
         params = []
+        conditions = []
 
         if selected_project_id:
-            query += " WHERE project_id = ?"
+            conditions.append("e.project_id = ?")
             params.append(int(selected_project_id))
+        if selected_site != "all":
+            conditions.append("LOWER(TRIM(COALESCE(e.site, ''))) = LOWER(?)")
+            params.append(selected_site)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
 
         query += """
             ORDER BY
@@ -6608,7 +6614,9 @@ def admin_errors():
         "admin_errors.html",
         records=records,
         projects=projects,
-        selected_project_id=selected_project_id
+        selected_project_id=selected_project_id,
+        selected_site=selected_site,
+        sites=[row["site"] for row in con.execute("SELECT DISTINCT site FROM project_sites ORDER BY site").fetchall()]
     )
 
 # =========================================================
@@ -9085,6 +9093,7 @@ def supervisor_errors():
 
     selected_period = normalize_text(request.args.get("date"))
     selected_source = normalize_text(request.args.get("source")) or "all"
+    selected_site = normalize_site_name(request.args.get("site")) or "all"
     periods = []
     sources = []
 
@@ -9108,7 +9117,8 @@ def supervisor_errors():
                     e.biller_comment,
                     e.qc_explanation,
                     e.qc_name,
-                    p.project_name
+                    p.project_name,
+                    e.site
                 FROM error_records e
                 INNER JOIN projects p
                     ON p.id = e.project_id
@@ -9125,6 +9135,9 @@ def supervisor_errors():
             ).fetchall()
 
         all_records = [dict(row) for row in rows]
+        site_options = sorted({normalize_site_name(row.get("site")) for row in all_records if normalize_site_name(row.get("site"))}, key=str.casefold)
+        if selected_site != "all":
+            all_records = [row for row in all_records if normalize_site_name(row.get("site")).casefold() == selected_site.casefold()]
         period_by_key = {}
 
         for index, record in enumerate(all_records):
@@ -9163,7 +9176,9 @@ def supervisor_errors():
         period_type=period_type,
         selected_period=selected_period,
         sources=sources,
-        selected_source=selected_source
+        selected_source=selected_source,
+        selected_site=selected_site,
+        sites=site_options if project_ids else []
     )
 
 
