@@ -2542,10 +2542,9 @@ def import_accuracy_sheet(
         raise ValueError("Invalid accuracy sheet.")
 
     columns = get_accuracy_columns(dataframe)
-    # USER is required for individual accuracy records. ACT EXTERNAL
-    # accuracy is project-wide, so it may be imported without a Biller USER.
-    if not columns["biller_name"]:
-        raise ValueError(f"{sheet_name} sheet must contain NAME.")
+    # ACT EXTERNAL project-wide rows do not belong to an individual
+    # Biller, so USER and NAME may both be absent for those rows.
+    # Individual accuracy imports still require both fields.
     if not columns["audited"]:
         raise ValueError(f"{sheet_name} sheet must contain AUDITED.")
 
@@ -2688,17 +2687,26 @@ def import_accuracy_sheet(
             dataframe_value(row, columns["username"])
             if columns["username"] else ""
         )
-        if not username:
-            if sheet_name == "EXTERNAL" and is_act_project:
-                # Stable project-wide key; this is not a Biller username.
-                username = "__ACT_PROJECT_WIDE__"
-            else:
-                raise ValueError(
-                    f"{sheet_name} sheet must contain USER "
-                    "for projects other than ACT EXTERNAL."
-                )
+        is_project_wide_act_external = (
+            sheet_name == "EXTERNAL"
+            and is_act_project
+            and not username
+        )
+        if is_project_wide_act_external:
+            # Stable project-wide key; this is not a Biller username.
+            username = "__ACT_PROJECT_WIDE__"
+        elif not username:
+            raise ValueError(
+                f"{sheet_name} sheet must contain USER "
+                "for projects other than ACT EXTERNAL."
+            )
 
         biller_name = dataframe_value(row, columns["biller_name"])
+        if not biller_name and not is_project_wide_act_external:
+            raise ValueError(
+                f"{sheet_name} sheet must contain NAME "
+                "for individual accuracy records."
+            )
 
         source_month = dataframe_value(row, columns["month"])
         record_date = parse_accuracy_date(
