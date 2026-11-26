@@ -137,6 +137,38 @@ document.addEventListener("DOMContentLoaded",function(){
     </aside>
 </div>
 
+{% if act_external_accuracy %}
+<section class="content-card">
+    <div class="section-heading">
+        <div>
+            <h2>ACT – External Accuracy</h2>
+            <p>Shared project-wide results for all Billers assigned to ACT. These are not individual Biller accuracy scores.</p>
+        </div>
+        <span class="section-tag">PROJECT-WIDE</span>
+    </div>
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>MONTH</th>
+                    <th>EXTERNAL WC</th>
+                    <th>EXTERNAL WOC</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in act_external_accuracy %}
+                <tr>
+                    <td>{{ item.period }}</td>
+                    <td>{{ format_accuracy(item.external_wc) if item.external_wc is not none else '—' }}</td>
+                    <td>{{ format_accuracy(item.external_woc) if item.external_woc is not none else '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+
     <span class="section-tag">
         Biller Dashboard
     </span>
