@@ -7842,9 +7842,9 @@ def get_biller_project_ids():
 def get_act_external_accuracy_summary(project_ids):
     """
     Return project-wide ACT External accuracy for authorized project IDs.
-    Use the imported accuracy_value values directly; when multiple rows
-    exist for a month/type, average those imported values rather than
-    recalculating accuracy from audited and errors.
+    Use imported accuracy_value values directly; when multiple rows exist
+    for a month/type, average those imported values rather than recalculating.
+    Only rows from the latest EXTERNAL import for each project/month are used.
     """
     clean_ids = sorted({
         int(value) for value in (project_ids or [])
@@ -7858,53 +7858,51 @@ def get_act_external_accuracy_summary(project_ids):
     with db() as con:
         rows = con.execute(
             f"""
+            WITH external_rows AS (
+                SELECT
+                    ar.project_id,
+                    CASE
+                        WHEN TRIM(COALESCE(ar.month, '')) <> ''
+                        THEN TRIM(ar.month)
+                        ELSE SUBSTR(ar.record_date, 1, 7)
+                    END AS period,
+                    ar.imported_at,
+                    ar.accuracy_type,
+                    ar.accuracy_value,
+                    ar.month,
+                    ar.record_date
+                FROM accuracy_records ar
+                INNER JOIN projects p
+                    ON p.id = ar.project_id
+                WHERE ar.project_id IN ({placeholders})
+                  AND UPPER(TRIM(COALESCE(p.project_name, ''))) = 'ACT'
+                  AND UPPER(TRIM(COALESCE(ar.sheet, ''))) = 'EXTERNAL'
+            ),
+            latest_imports AS (
+                SELECT
+                    project_id,
+                    period,
+                    MAX(imported_at) AS latest_imported_at
+                FROM external_rows
+                GROUP BY project_id, period
+            )
             SELECT
-                CASE
-                    WHEN TRIM(COALESCE(ar.month, '')) <> ''
-                    THEN TRIM(ar.month)
-                    ELSE SUBSTR(ar.record_date, 1, 7)
-                END AS period,
-                ar.accuracy_type,
-                AVG(CAST(ar.accuracy_value AS DOUBLE PRECISION)) AS accuracy
-            FROM accuracy_records ar
-            INNER JOIN projects p
-                ON p.id = ar.project_id
-            WHERE ar.project_id IN ({placeholders})
-              AND UPPER(TRIM(COALESCE(p.project_name, ''))) = 'ACT'
-              AND UPPER(TRIM(COALESCE(ar.sheet, ''))) = 'EXTERNAL'
-              AND ar.imported_at = (
-                  SELECT MAX(latest.imported_at)
-                  FROM accuracy_records latest
-                  WHERE latest.project_id = ar.project_id
-                    AND UPPER(TRIM(COALESCE(latest.sheet, ''))) = 'EXTERNAL'
-                    AND (
-                        CASE
-                            WHEN TRIM(COALESCE(latest.month, '')) <> ''
-                            THEN TRIM(latest.month)
-                            ELSE SUBSTR(latest.record_date, 1, 7)
-                        END
-                    ) = (
-                        CASE
-                            WHEN TRIM(COALESCE(ar.month, '')) <> ''
-                            THEN TRIM(ar.month)
-                            ELSE SUBSTR(ar.record_date, 1, 7)
-                        END
-                    )
-              )
-              AND ar.accuracy_type IN (?, ?)
+                er.period,
+                er.accuracy_type,
+                AVG(CAST(er.accuracy_value AS DOUBLE PRECISION)) AS accuracy
+            FROM external_rows er
+            INNER JOIN latest_imports li
+                ON li.project_id = er.project_id
+               AND li.period = er.period
+               AND li.latest_imported_at = er.imported_at
+            WHERE er.accuracy_type IN (?, ?)
               AND (
-                  (TRIM(COALESCE(ar.month, '')) <> ''
-                   AND TRIM(ar.month) >= '2026-01')
-                  OR ar.record_date >= '2026-01-01'
+                  (TRIM(COALESCE(er.month, '')) <> ''
+                   AND TRIM(er.month) >= '2026-01')
+                  OR er.record_date >= '2026-01-01'
               )
-            GROUP BY
-                CASE
-                    WHEN TRIM(COALESCE(ar.month, '')) <> ''
-                    THEN TRIM(ar.month)
-                    ELSE SUBSTR(ar.record_date, 1, 7)
-                END,
-                ar.accuracy_type
-            ORDER BY period DESC
+            GROUP BY er.period, er.accuracy_type
+            ORDER BY er.period DESC
             """,
             (*clean_ids, EXTERNAL_ACCURACY[0], EXTERNAL_ACCURACY[1])
         ).fetchall()
@@ -7925,7 +7923,6 @@ def get_act_external_accuracy_summary(project_ids):
             item["external_woc"] = number_value(row["accuracy"])
 
     return [summaries[key] for key in sorted(summaries, reverse=True)]
-
 
 # =========================================================
 # BILLER: ACCURACY SUMMARY FOR SELECTED MONTH
