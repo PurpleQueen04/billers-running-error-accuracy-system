@@ -117,6 +117,13 @@
 
             </select>
         </div>
+        <div class="filter-group">
+            <label for="site">Site</label>
+            <select name="site" id="site" onchange="this.form.submit()">
+                <option value="all" {% if selected_site == 'all' %}selected{% endif %}>All Sites</option>
+                {% for site in sites %}<option value="{{ site }}" {% if selected_site == site %}selected{% endif %}>{{ site }}</option>{% endfor %}
+            </select>
+        </div>
 
         <noscript>
             <button type="submit" class="btn btn-primary">
@@ -160,6 +167,7 @@
                     <tr>
                         <th>PRO</th>
                         <th>PROJECT</th>
+                        <th>SITE</th>
                         <th>BILLED DATE</th>
                         <th>WEEK</th>
                         <th>SOURCE</th>
@@ -195,6 +203,7 @@
                             <td>
                                 {{ error.project_name or '—' }}
                             </td>
+                            <td>{{ error.site or '—' }}</td>
 
                             <td>
                                 {{ error.billed_date or '—' }}

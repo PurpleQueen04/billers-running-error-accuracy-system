@@ -154,7 +154,8 @@ ERROR_ALIASES = {
     "project": [
         "PROJECT",
         "PROJECT NAME"
-    ]
+    ],
+    "site": ["SITE", "LOCATION"]
 }
 
 
@@ -574,6 +575,34 @@ def normalize_text(value):
 def norm_header(value):
 
     return normalize_text(value).upper()
+
+
+def normalize_site_name(value):
+    """Normalize workbook Site labels to their canonical site names."""
+    raw = normalize_text(value)
+    if not raw:
+        return ""
+    folded = raw.casefold()
+    if "leyte" in folded:
+        return "Leyte"
+    if "manila" in folded:
+        return "Manila"
+    return raw
+
+
+def record_project_site(con, project_id, site):
+    """Remember a normalized Site as one of a project's available sites."""
+    site = normalize_site_name(site)
+    if not site:
+        return
+    con.execute(
+        """
+        INSERT INTO project_sites (project_id, site)
+        VALUES (?, ?)
+        ON CONFLICT (project_id, site) DO NOTHING
+        """,
+        (int(project_id), site)
+    )
 
 
 def number_value(value):
@@ -1215,6 +1244,17 @@ def init_db():
             "project_id",
             "INTEGER"
         )
+
+        add_column_if_missing(con, "error_records", "site", "TEXT")
+        add_column_if_missing(con, "accuracy_records", "site", "TEXT")
+
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS project_sites (
+                project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                site TEXT NOT NULL,
+                PRIMARY KEY (project_id, site)
+            )
+        """)
 
         # -------------------------------------------------
         # ACCURACY IMPORT LOOKUP INDEX
@@ -2408,6 +2448,8 @@ def get_accuracy_columns(dataframe):
             ["PROJECT", "PROJECT NAME"]
         ),
 
+        "site": find_col(columns, ["SITE", "LOCATION"]),
+
         "batch_no": find_col(
             columns,
             ["BATCH #", "BATCH NO", "BATCH NUMBER"]
@@ -2447,9 +2489,9 @@ def import_error_sheet(
         INSERT INTO error_records (
             record_key, billed_date, week, source, audit_type, biller_name,
             username, id_number, auditor, pro, zb_field, error_details,
-            project_id, verified_error, imported_at
+            project_id, site, verified_error, imported_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?)
         ON CONFLICT (record_key) DO UPDATE SET
             billed_date = EXCLUDED.billed_date,
             week = EXCLUDED.week,
@@ -2463,6 +2505,7 @@ def import_error_sheet(
             zb_field = EXCLUDED.zb_field,
             error_details = EXCLUDED.error_details,
             project_id = COALESCE(error_records.project_id, EXCLUDED.project_id),
+            site = EXCLUDED.site,
             imported_at = EXCLUDED.imported_at
     """
 
@@ -2489,6 +2532,8 @@ def import_error_sheet(
         auditor = dataframe_value(row, columns["auditor"])
         zb_field = dataframe_value(row, columns["zb_field"])
         error_details = dataframe_value(row, columns["error_details"])
+        site = normalize_site_name(dataframe_value(row, columns["site"]))
+        record_project_site(con, project_id, site)
         week = week_for_billed_date(billed_date_text)
 
         fingerprint_parts = [
@@ -2503,7 +2548,7 @@ def import_error_sheet(
         batch.append((
             record_key, billed_date_text, week, source, audit_type,
             biller_name, username, id_number, auditor, pro, zb_field,
-            error_details, project_id,
+            error_details, project_id, site,
             imported_at
         ))
         imported += 1
@@ -2722,6 +2767,8 @@ def import_accuracy_sheet(
         month = record_date.strftime("%Y-%m") if record_date else source_month
         weekly = week_for_billed_date(record_date) if record_date else dataframe_value(row, columns["weekly"])
         batch_no = dataframe_value(row, columns["batch_no"])
+        site = normalize_site_name(dataframe_value(row, columns["site"]))
+        record_project_site(con, project_id, site)
         audited = number_value(val(row, columns["audited"])) or 0
         bills_processed = number_value(val(row, columns["bills_processed"]))
 
@@ -2758,6 +2805,7 @@ def import_accuracy_sheet(
                 audited,
                 errors,
                 imported_at,
+                site,
                 batch_no
             )
 
@@ -2795,6 +2843,7 @@ def import_accuracy_sheet(
                     source_row,
                     imported_at,
                     project_id,
+                    site,
                     batch_no
                 ))
 
@@ -2815,6 +2864,7 @@ def import_accuracy_sheet(
             audited = ?,
             errors = ?,
             imported_at = ?,
+            site = ?,
             batch_no = ?
         WHERE id = ?
     """
@@ -2822,8 +2872,8 @@ def import_accuracy_sheet(
         INSERT INTO accuracy_records (
             sheet, username, biller_name, month, weekly, record_date,
             accuracy_type, accuracy_value, bills_processed, audited,
-            errors, source_row, imported_at, project_id, batch_no
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            errors, source_row, imported_at, project_id, site, batch_no
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
 
     if is_postgres():
@@ -2834,7 +2884,7 @@ def import_accuracy_sheet(
 
         update_columns = (
             "biller_name, month, weekly, record_date, accuracy_value, "
-            "bills_processed, audited, errors, imported_at, batch_no, id"
+            "bills_processed, audited, errors, imported_at, site, batch_no, id"
         )
         update_assignments = """
             biller_name = incoming.biller_name,
@@ -2846,12 +2896,13 @@ def import_accuracy_sheet(
             audited = incoming.audited,
             errors = incoming.errors,
             imported_at = incoming.imported_at,
+            site = incoming.site,
             batch_no = incoming.batch_no
         """
 
         for offset in range(0, len(updates), batch_size):
             batch = updates[offset:offset + batch_size]
-            row_placeholders = "(" + ", ".join(["?"] * 11) + ")"
+            row_placeholders = "(" + ", ".join(["?"] * 12) + ")"
             values_sql = ", ".join(
                 [row_placeholders] * len(batch)
             )
@@ -2873,12 +2924,12 @@ def import_accuracy_sheet(
         insert_columns = (
             "sheet, username, biller_name, month, weekly, record_date, "
             "accuracy_type, accuracy_value, bills_processed, audited, "
-            "errors, source_row, imported_at, project_id, batch_no"
+            "errors, source_row, imported_at, project_id, site, batch_no"
         )
 
         for offset in range(0, len(inserts), batch_size):
             batch = inserts[offset:offset + batch_size]
-            row_placeholders = "(" + ", ".join(["?"] * 15) + ")"
+            row_placeholders = "(" + ", ".join(["?"] * 16) + ")"
             values_sql = ", ".join(
                 [row_placeholders] * len(batch)
             )
@@ -4125,6 +4176,13 @@ def build_dashboard_graph_context(allowed_project_ids=None, username=None):
             "SELECT id, project_name, active FROM projects ORDER BY project_name"
         ).fetchall()
 
+        site_rows = con.execute(
+            "SELECT project_id, site FROM project_sites ORDER BY site"
+        ).fetchall()
+        project_site_map = {}
+        for site_row in site_rows:
+            project_site_map.setdefault(int(site_row["project_id"]), []).append(site_row["site"])
+
         projects = []
         for row in project_rows:
             pid = int(row["id"])
@@ -4132,7 +4190,11 @@ def build_dashboard_graph_context(allowed_project_ids=None, username=None):
                 continue
             if allowed_set is not None and pid not in allowed_set:
                 continue
-            projects.append({"id": pid, "project_name": row["project_name"]})
+            projects.append({
+                "id": pid,
+                "project_name": row["project_name"],
+                "sites": ", ".join(project_site_map.get(pid, []))
+            })
 
         selected_project = normalize_text(request.args.get("graph_project_id")) or "all"
         visible_ids = {p["id"] for p in projects}
@@ -4700,6 +4762,17 @@ def admin_accounts():
                 """
             ).fetchall()
 
+        site_rows = con.execute(
+            """
+            SELECT project_id, site
+            FROM project_sites
+            ORDER BY site
+            """
+        ).fetchall()
+        project_site_map = {}
+        for site_row in site_rows:
+            project_site_map.setdefault(int(site_row["project_id"]), []).append(site_row["site"])
+
         # Load all project assignments at once.
         assignments = con.execute(
             """
@@ -4749,6 +4822,15 @@ def admin_accounts():
             item["name"]
             for item in assigned
         ]
+        assigned_sites = sorted({
+            site
+            for project_id in (
+                project_site_map.keys()
+                if user_role == "admin"
+                else [item["id"] for item in assigned]
+            )
+            for site in project_site_map.get(project_id, [])
+        }, key=str.casefold)
 
         accounts.append({
             "id": user_id,
@@ -4771,7 +4853,8 @@ def admin_accounts():
                     else "No project assigned"
                 )
             ),
-            "assigned_project_ids": assigned_ids
+            "assigned_project_ids": assigned_ids,
+            "sites": ", ".join(assigned_sites) if assigned_sites else "—"
         })
 
     return render_template(
@@ -6062,6 +6145,13 @@ def admin_projects():
             """
         ).fetchall()
 
+        site_rows = con.execute(
+            "SELECT project_id, site FROM project_sites ORDER BY site"
+        ).fetchall()
+        project_site_map = {}
+        for site_row in site_rows:
+            project_site_map.setdefault(int(site_row["project_id"]), []).append(site_row["site"])
+
     assignment_map = {}
 
     for assignment in assignments:
@@ -6119,6 +6209,7 @@ def admin_projects():
             ).upper(),
             "active": bool(project["active"]),
             "created_at": project["created_at"],
+            "sites": ", ".join(project_site_map.get(project_id, [])) or "—",
             "assigned_accounts": (
                 ", ".join(account_names)
                 if account_names
@@ -6461,9 +6552,8 @@ def toggle_project(project_id):
 @admin_required
 def admin_errors():
 
-    selected_project_id = normalize_text(
-        request.args.get("project_id")
-    )
+    selected_project_id = normalize_text(request.args.get("project_id"))
+    selected_site = normalize_site_name(request.args.get("site")) or "all"
 
     with db() as con:
 
@@ -6495,16 +6585,23 @@ def admin_errors():
                 auditor,
                 e.audit_type,
                 e.project_id,
-                p.project_name
+                p.project_name,
+                e.site
             FROM error_records e
             LEFT JOIN projects p
                 ON p.id = e.project_id
         """
         params = []
+        conditions = []
 
         if selected_project_id:
-            query += " WHERE project_id = ?"
+            conditions.append("e.project_id = ?")
             params.append(int(selected_project_id))
+        if selected_site != "all":
+            conditions.append("LOWER(TRIM(COALESCE(e.site, ''))) = LOWER(?)")
+            params.append(selected_site)
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
 
         query += """
             ORDER BY
@@ -6523,12 +6620,17 @@ def admin_errors():
             query,
             params
         ).fetchall()
+        sites = [row["site"] for row in con.execute(
+            "SELECT DISTINCT site FROM project_sites ORDER BY site"
+        ).fetchall()]
 
     return render_template(
         "admin_errors.html",
         records=records,
         projects=projects,
-        selected_project_id=selected_project_id
+        selected_project_id=selected_project_id,
+        selected_site=selected_site,
+        sites=sites
     )
 
 # =========================================================
@@ -7126,7 +7228,8 @@ def get_accuracy_records(project_ids=None, start_date=None):
                 source_row,
                 project_id,
                 imported_at,
-                batch_no
+                batch_no,
+                site
             FROM accuracy_records
             WHERE record_date IS NOT NULL
               AND TRIM(record_date) != ''
@@ -7191,12 +7294,16 @@ def build_accuracy_context(
     history_batch="all",
     below_batch="all",
     include_history=True,
-    min_record_date=None
+    min_record_date=None,
+    selected_site="all"
 ):
     if period_type not in ("daily", "weekly", "monthly"):
         period_type = "monthly"
     if history_period_type not in ("daily", "weekly", "monthly"):
         history_period_type = "monthly"
+
+    if selected_site == "all":
+        selected_site = normalize_site_name(request.args.get("site")) or "all"
 
     
     # -----------------------------------------------------
@@ -7237,6 +7344,13 @@ def build_accuracy_context(
         sorted(allowed_set) if allowed_set is not None else None,
         start_date=min_record_date
     )
+
+    selected_site = normalize_site_name(selected_site) or "all"
+    if selected_site.casefold() == "all":
+        selected_site = "all"
+    else:
+        records = [row for row in records
+                   if normalize_site_name(row.get("site")).casefold() == selected_site.casefold()]
 
     with db() as con:
         project_rows = con.execute(
@@ -7318,7 +7432,7 @@ def build_accuracy_context(
 
                 error_rows = con.execute(
                     f"""
-                    SELECT billed_date, project_id, imported_at
+                    SELECT billed_date, project_id, imported_at, site
                     FROM error_records
                     WHERE {" AND ".join(error_conditions)}
                     """,
@@ -7335,12 +7449,16 @@ def build_accuracy_context(
 
             error_rows = con.execute(
                 f"""
-                SELECT billed_date, project_id, imported_at
+                SELECT billed_date, project_id, imported_at, site
                 FROM error_records
                 WHERE {" AND ".join(error_conditions)}
                 """,
                 tuple(error_params)
             ).fetchall()
+
+    if selected_site != "all":
+        error_rows = [row for row in error_rows
+                      if normalize_site_name(row["site"]).casefold() == selected_site.casefold()]
 
     # -----------------------------------------------------
     # BUILD AVAILABLE PERIODS
@@ -7718,18 +7836,40 @@ def build_accuracy_context(
             selected_batch="all",
             history_batch="all",
             below_batch=below_batch,
-            include_history=False
+            include_history=False,
+            selected_site=selected_site
         )
         improvements = unfiltered_context["improvements"]
 
+    with db() as con:
+        site_rows = con.execute("SELECT project_id, site FROM project_sites ORDER BY site").fetchall()
+    site_map = {}
+    for site_row in site_rows:
+        project_id = int(site_row["project_id"])
+        if allowed_set is None or project_id in allowed_set:
+            site_map.setdefault(project_id, []).append(site_row["site"])
+
+    site_project_id = None
+    if selected_project != "all":
+        try:
+            site_project_id = int(selected_project)
+        except (TypeError, ValueError):
+            pass
+    visible_site_values = sorted({
+        site for project_id, project_sites in site_map.items()
+        if site_project_id is None or project_id == site_project_id
+        for site in project_sites
+    }, key=str.casefold)
     if allowed_set is None:
         visible_projects = [
-            {"id": int(row["id"]), "project_name": row["project_name"]}
+            {"id": int(row["id"]), "project_name": row["project_name"],
+             "sites": ", ".join(site_map.get(int(row["id"]), []))}
             for row in project_rows if bool(con_value(row, "active", 1))
         ]
     else:
         visible_projects = [
-            {"id": int(row["id"]), "project_name": row["project_name"]}
+            {"id": int(row["id"]), "project_name": row["project_name"],
+             "sites": ", ".join(site_map.get(int(row["id"]), []))}
             for row in project_rows
             if int(row["id"]) in allowed_set and bool(con_value(row, "active", 1))
         ]
@@ -7747,7 +7887,8 @@ def build_accuracy_context(
             below_to_date=below_to_date,
             below_category=below_category,
             selected_batch=history_batch,
-            include_history=False
+            include_history=False,
+            selected_site=selected_site
         )
         period_history = history_context["period_history"]
         history_project = history_context["selected_project"]
@@ -7781,6 +7922,8 @@ def build_accuracy_context(
         "projects": visible_projects,
         "selected_period": selected_period,
         "selected_project": str(selected_project),
+        "selected_site": selected_site,
+        "sites": visible_site_values,
         "summary": summary
     }
 
@@ -8037,7 +8180,8 @@ def get_biller_accuracy_summary(
     history_period_type="monthly",
     selected_batch="all",
     history_batch="all",
-    include_history=True
+    include_history=True,
+    selected_site="all"
 ):
     if period_type not in ("daily", "weekly", "monthly"):
         period_type = "monthly"
@@ -8073,6 +8217,8 @@ def get_biller_accuracy_summary(
             "history_period_type": history_period_type,
             "projects": [],
             "selected_project": "all",
+            "selected_site": selected_site,
+            "sites": [],
             "selected_period": "",
             "period_type": period_type,
             "internal_summary": dict(empty_summary),
@@ -8089,6 +8235,15 @@ def get_biller_accuracy_summary(
     project_names = {
         int(row["id"]): row["project_name"] for row in project_rows
     }
+    with db() as con:
+        site_rows = con.execute(
+            "SELECT project_id, site FROM project_sites WHERE project_id IN (" +
+            ", ".join(["?"] * len(all_project_ids)) + ") ORDER BY site",
+            tuple(all_project_ids)
+        ).fetchall()
+    project_site_map = {}
+    for site_row in site_rows:
+        project_site_map.setdefault(int(site_row["project_id"]), []).append(site_row["site"])
 
     placeholders = ", ".join(["?"] * len(project_ids))
 
@@ -8108,7 +8263,8 @@ def get_biller_accuracy_summary(
                 audited,
                 errors,
                 project_id,
-                batch_no
+                batch_no,
+                site
             FROM accuracy_records
             WHERE project_id IN ({placeholders})
             ORDER BY record_date
@@ -8146,6 +8302,12 @@ def get_biller_accuracy_summary(
         if not (is_own_record or is_act_shared_external):
             continue
         current_rows.append(dict(row))
+
+    selected_site = normalize_site_name(selected_site) or "all"
+    if selected_site != "all":
+        current_rows = [row for row in current_rows
+                        if normalize_site_name(row.get("site")).casefold() == selected_site.casefold()]
+    site_options = sorted({site for values in project_site_map.values() for site in values}, key=str.casefold)
 
     batch_options = sorted({
         normalize_text(row.get("batch_no"))
@@ -8238,7 +8400,8 @@ def get_biller_accuracy_summary(
             selected_period=None,
             selected_project=history_project,
             selected_batch=history_batch,
-            include_history=False
+            include_history=False,
+            selected_site=selected_site
         )
         period_history = history_context["period_history"]
         history_project = history_context["selected_project"]
@@ -8255,12 +8418,15 @@ def get_biller_accuracy_summary(
         "history_batches": history_batches if include_history else batch_options,
         "history_batch": str(history_batch),
         "projects": [
-            {"id": project_id, "project_name": project_name}
+            {"id": project_id, "project_name": project_name,
+             "sites": ", ".join(project_site_map.get(project_id, []))}
             for project_id, project_name in project_names.items()
             if project_id in all_project_ids
         ],
         "selected_project": str(project_ids[0]) if len(project_ids) == 1 and selected_project != "all" else "all",
         "selected_period": selected_period,
+        "selected_site": selected_site,
+        "sites": site_options,
         "period_type": period_type,
         "internal_summary": summaries["INTERNAL"],
         "external_wc_summary": summaries["EXTERNAL_WC"],
@@ -8296,7 +8462,8 @@ def biller_accuracy_monitoring():
             session.get("username", ""), allowed_ids or [], period_type,
             selected_period, selected_project, history_project=history_project,
             history_period_type=history_period_type, selected_batch=selected_batch,
-            history_batch=history_batch
+            history_batch=history_batch,
+            selected_site=normalize_site_name(request.args.get("site")) or "all"
         )
     else:
         context = build_accuracy_context(
@@ -8478,6 +8645,8 @@ def biller_errors():
     username = session.get("username", "")
 
     project_ids = get_biller_project_ids()
+    selected_site = normalize_site_name(request.args.get("site")) or "all"
+    sites = []
 
     if not project_ids:
 
@@ -8505,6 +8674,11 @@ def biller_errors():
                 """,
                 (username, *project_ids)
             ).fetchall()
+
+            sites = [row["site"] for row in con.execute(
+                "SELECT DISTINCT site FROM project_sites WHERE project_id IN (" + placeholders + ") ORDER BY site",
+                tuple(project_ids)
+            ).fetchall()]
 
             dates = [
                 row["billed_date"]
@@ -8544,7 +8718,8 @@ def biller_errors():
                         e.biller_comment,
                         e.qc_explanation,
                         e.qc_name,
-                        e.updated_at
+                        e.updated_at,
+                        e.site
                     FROM error_records e
                     LEFT JOIN projects p
                         ON p.id = e.project_id
@@ -8567,13 +8742,16 @@ def biller_errors():
         errors = [
             dict(row)
             for row in rows
+            if selected_site == "all" or normalize_site_name(row["site"]).casefold() == selected_site.casefold()
         ]
 
     return render_template(
     "biller_errors.html",
     errors=errors,
     dates=dates,
-    selected_date=selected_date
+    selected_date=selected_date,
+    selected_site=selected_site,
+    sites=sites
     )
 
 # =========================================================
@@ -8619,6 +8797,8 @@ def qc_dashboard():
 def qc_errors():
 
     project_ids = get_user_project_ids()
+    selected_site = normalize_site_name(request.args.get("site")) or "all"
+    sites = []
 
     if not project_ids:
 
@@ -8632,7 +8812,9 @@ def qc_errors():
             errors=[],
             dates=[],
             selected_date="",
-            projects=[]
+            projects=[],
+            selected_site=selected_site,
+            sites=[]
         )
 
     placeholders = ", ".join(
@@ -8640,6 +8822,11 @@ def qc_errors():
     )
 
     with db() as con:
+
+        sites = [row["site"] for row in con.execute(
+            "SELECT DISTINCT site FROM project_sites WHERE project_id IN (" + placeholders + ") ORDER BY site",
+            tuple(project_ids)
+        ).fetchall()]
 
         date_rows = con.execute(
             f"""
@@ -8693,7 +8880,8 @@ def qc_errors():
                 e.biller_comment,
                 e.qc_explanation,
                 e.qc_name,
-                e.updated_at
+                e.updated_at,
+                e.site
             FROM error_records e
             LEFT JOIN projects p
                 ON p.id = e.project_id
@@ -8737,10 +8925,8 @@ def qc_errors():
 
     projects = [dict(row) for row in project_rows]
 
-    errors = [
-        dict(row)
-        for row in rows
-    ]
+    errors = [dict(row) for row in rows
+              if selected_site == "all" or normalize_site_name(row["site"]).casefold() == selected_site.casefold()]
 
     return render_template(
         "errors.html",
@@ -8748,7 +8934,9 @@ def qc_errors():
         dates=dates,
         selected_date=selected_date,
         projects=projects,
-        page_mode="pending"
+        page_mode="pending",
+        selected_site=selected_site,
+        sites=sites
     )
 
 
@@ -8758,6 +8946,8 @@ def qc_errors():
 def qc_error_details():
 
     project_ids = get_user_project_ids()
+    selected_site = normalize_site_name(request.args.get("site")) or "all"
+    sites = []
 
     if not project_ids:
         return render_template(
@@ -8766,12 +8956,18 @@ def qc_error_details():
             dates=[],
             selected_date="",
             projects=[],
-            page_mode="completed"
+            page_mode="completed",
+            selected_site=selected_site,
+            sites=[]
         )
 
     placeholders = ", ".join(["?"] * len(project_ids))
 
     with db() as con:
+        sites = [row["site"] for row in con.execute(
+            "SELECT DISTINCT site FROM project_sites WHERE project_id IN (" + placeholders + ") ORDER BY site",
+            tuple(project_ids)
+        ).fetchall()]
         date_rows = con.execute(
             f"""
             SELECT DISTINCT billed_date
@@ -8802,7 +8998,7 @@ def qc_error_details():
                     p.project_name, e.week, e.source, e.username,
                     e.auditor, e.audit_type, e.biller_name, e.zb_field,
                     e.error_details, e.verified_error, e.biller_comment,
-                    e.qc_explanation, e.qc_name, e.updated_at
+                    e.qc_explanation, e.qc_name, e.updated_at, e.site
                 FROM error_records e
                 LEFT JOIN projects p ON p.id = e.project_id
                 WHERE e.project_id IN ({placeholders})
@@ -8815,11 +9011,13 @@ def qc_error_details():
 
     return render_template(
         "errors.html",
-        errors=[dict(row) for row in rows],
+        errors=[dict(row) for row in rows if selected_site == "all" or normalize_site_name(row["site"]).casefold() == selected_site.casefold()],
         dates=dates,
         selected_date=selected_date,
         projects=[],
-        page_mode="completed"
+        page_mode="completed",
+        selected_site=selected_site,
+        sites=sites
     )
 
 
@@ -8963,6 +9161,7 @@ def supervisor_errors():
 
     selected_period = normalize_text(request.args.get("date"))
     selected_source = normalize_text(request.args.get("source")) or "all"
+    selected_site = normalize_site_name(request.args.get("site")) or "all"
     periods = []
     sources = []
 
@@ -8986,7 +9185,8 @@ def supervisor_errors():
                     e.biller_comment,
                     e.qc_explanation,
                     e.qc_name,
-                    p.project_name
+                    p.project_name,
+                    e.site
                 FROM error_records e
                 INNER JOIN projects p
                     ON p.id = e.project_id
@@ -9003,6 +9203,9 @@ def supervisor_errors():
             ).fetchall()
 
         all_records = [dict(row) for row in rows]
+        site_options = sorted({normalize_site_name(row.get("site")) for row in all_records if normalize_site_name(row.get("site"))}, key=str.casefold)
+        if selected_site != "all":
+            all_records = [row for row in all_records if normalize_site_name(row.get("site")).casefold() == selected_site.casefold()]
         period_by_key = {}
 
         for index, record in enumerate(all_records):
@@ -9041,7 +9244,9 @@ def supervisor_errors():
         period_type=period_type,
         selected_period=selected_period,
         sources=sources,
-        selected_source=selected_source
+        selected_source=selected_source,
+        selected_site=selected_site,
+        sites=site_options if project_ids else []
     )
 
 
@@ -9672,6 +9877,7 @@ def export_responses():
 
     writer.writerow([
         "PROJECT",
+        "SITE",
         "BILLED DATE",
         "WEEK",
         "BILLER NAME",
@@ -9690,6 +9896,7 @@ def export_responses():
             """
             SELECT
                 p.project_name,
+                e.site,
                 e.billed_date,
                 e.week,
                 e.biller_name,
@@ -9713,6 +9920,7 @@ def export_responses():
 
         writer.writerow([
             row["project_name"] or "Unassigned",
+            row["site"] or "",
             row["billed_date"] or "",
             row["week"] or "",
             row["biller_name"] or "",
@@ -9849,6 +10057,26 @@ def internal_server_error(error):
 # Runs automatically when the web app starts on Render.
 # =========================================================
 
+def ensure_project_site_schema():
+    """Apply additive Site migrations safely on existing production databases."""
+    with db() as con:
+        if is_postgres():
+            con.execute("SELECT pg_advisory_xact_lock(746283)")
+            con.execute("ALTER TABLE error_records ADD COLUMN IF NOT EXISTS site TEXT")
+            con.execute("ALTER TABLE accuracy_records ADD COLUMN IF NOT EXISTS site TEXT")
+        else:
+            add_column_if_missing(con, "error_records", "site", "TEXT")
+            add_column_if_missing(con, "accuracy_records", "site", "TEXT")
+
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS project_sites (
+                project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                site TEXT NOT NULL,
+                PRIMARY KEY (project_id, site)
+            )
+        """)
+
+
 def ensure_supervisor_role_constraint():
 
     if not is_postgres():
@@ -9905,9 +10133,10 @@ def ensure_supervisor_role_constraint():
             )
 
 
-# Apply the small, idempotent migration automatically on Render.
-# This avoids requiring access to the Render Shell.
-if is_postgres():
+# Apply additive, idempotent migrations automatically on Render.
+# Existing imported records, responses, and assignments remain untouched.
+if DATABASE_URL:
+    ensure_project_site_schema()
     ensure_supervisor_role_constraint()
 
 
