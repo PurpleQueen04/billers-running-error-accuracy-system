@@ -8802,11 +8802,17 @@ def supervisor_dashboard():
             for item in accuracy_context["summary"].values()
         )
 
+        imported_accuracy_rows = [
+            item for item in accuracy_context["summary"].values()
+            if item.get("accuracy") is not None
+        ]
         counts = {
             "errors": int(error_row["total"] or 0),
-            "accuracy": calculate_weighted_accuracy(
-                total_audited,
-                total_accuracy_errors
+            "accuracy": calculate_imported_accuracy(
+                sum(item["accuracy"] * item["audited"] for item in imported_accuracy_rows if item["audited"] > 0),
+                sum(item["audited"] for item in imported_accuracy_rows if item["audited"] > 0),
+                sum(item["accuracy"] for item in imported_accuracy_rows if item["audited"] <= 0),
+                sum(1 for item in imported_accuracy_rows if item["audited"] <= 0)
             ),
             "billers": int(biller_row["total"] or 0),
             "qcs": int(qc_row["total"] or 0)
