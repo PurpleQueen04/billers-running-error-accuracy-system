@@ -4207,6 +4207,10 @@ def build_dashboard_graph_context(allowed_project_ids=None, username=None):
             "CAST(COALESCE(NULLIF(REPLACE(TRIM(COALESCE(errors, '0')), ',', ''), ''), '0') "
             "AS DOUBLE PRECISION)"
         )
+        accuracy_value_expression = (
+            "CAST(COALESCE(NULLIF(REPLACE(TRIM(COALESCE(accuracy_value, '')), ',', ''), ''), '0') "
+            "AS DOUBLE PRECISION)"
+        )
 
         aggregate_rows = con.execute(
             f"""
@@ -4214,7 +4218,14 @@ def build_dashboard_graph_context(allowed_project_ids=None, username=None):
                 {period_expression} AS period_key,
                 {accuracy_type_expression} AS accuracy_kind,
                 SUM({audited_expression}) AS audited_total,
-                SUM({errors_expression}) AS errors_total
+                SUM({errors_expression}) AS errors_total,
+                SUM({accuracy_value_expression} * {audited_expression}) AS accuracy_weighted_sum,
+                SUM(CASE WHEN TRIM(COALESCE(accuracy_value, '')) != ''
+                         THEN {audited_expression} ELSE 0 END) AS accuracy_weight,
+                SUM(CASE WHEN TRIM(COALESCE(accuracy_value, '')) != ''
+                         THEN {accuracy_value_expression} ELSE 0 END) AS accuracy_fallback_sum,
+                SUM(CASE WHEN TRIM(COALESCE(accuracy_value, '')) != ''
+                         THEN 1 ELSE 0 END) AS accuracy_fallback_count
             FROM accuracy_records
             WHERE {aggregate_where}
             GROUP BY {period_expression}, {accuracy_type_expression}
@@ -4234,18 +4245,31 @@ def build_dashboard_graph_context(allowed_project_ids=None, username=None):
             continue
         totals = period_totals.setdefault(
             key,
-            {name: {"audited": 0.0, "errors": 0.0} for name in ("INTERNAL", "EXTERNAL_WC", "EXTERNAL_WOC")}
+            {
+                name: {
+                    "audited": 0.0, "errors": 0.0,
+                    "accuracy_weighted_sum": 0.0, "accuracy_weight": 0.0,
+                    "accuracy_fallback_sum": 0.0, "accuracy_fallback_count": 0
+                }
+                for name in ("INTERNAL", "EXTERNAL_WC", "EXTERNAL_WOC")
+            }
         )
         totals[kind]["audited"] += number_value(row["audited_total"]) or 0
         totals[kind]["errors"] += number_value(row["errors_total"]) or 0
+        totals[kind]["accuracy_weighted_sum"] += number_value(row["accuracy_weighted_sum"]) or 0
+        totals[kind]["accuracy_weight"] += number_value(row["accuracy_weight"]) or 0
+        totals[kind]["accuracy_fallback_sum"] += number_value(row["accuracy_fallback_sum"]) or 0
+        totals[kind]["accuracy_fallback_count"] += int(number_value(row["accuracy_fallback_count"]) or 0)
 
     labels = sorted(period_totals)
 
     def series(kind):
         return [
-            calculate_weighted_accuracy(
-                period_totals[key][kind]["audited"],
-                period_totals[key][kind]["errors"]
+            calculate_imported_accuracy(
+                period_totals[key][kind]["accuracy_weighted_sum"],
+                period_totals[key][kind]["accuracy_weight"],
+                period_totals[key][kind]["accuracy_fallback_sum"],
+                period_totals[key][kind]["accuracy_fallback_count"]
             )
             for key in labels
         ]
