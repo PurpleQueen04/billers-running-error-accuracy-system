@@ -9877,6 +9877,7 @@ def export_responses():
 
     writer.writerow([
         "PROJECT",
+        "SITE",
         "BILLED DATE",
         "WEEK",
         "BILLER NAME",
@@ -9895,6 +9896,7 @@ def export_responses():
             """
             SELECT
                 p.project_name,
+                e.site,
                 e.billed_date,
                 e.week,
                 e.biller_name,
@@ -9918,6 +9920,7 @@ def export_responses():
 
         writer.writerow([
             row["project_name"] or "Unassigned",
+            row["site"] or "",
             row["billed_date"] or "",
             row["week"] or "",
             row["biller_name"] or "",
