@@ -4752,6 +4752,17 @@ def admin_accounts():
                 """
             ).fetchall()
 
+        site_rows = con.execute(
+            """
+            SELECT project_id, site
+            FROM project_sites
+            ORDER BY site
+            """
+        ).fetchall()
+        project_site_map = {}
+        for site_row in site_rows:
+            project_site_map.setdefault(int(site_row["project_id"]), []).append(site_row["site"])
+
         # Load all project assignments at once.
         assignments = con.execute(
             """
@@ -4801,6 +4812,11 @@ def admin_accounts():
             item["name"]
             for item in assigned
         ]
+        assigned_sites = sorted({
+            site
+            for item in assigned
+            for site in project_site_map.get(item["id"], [])
+        }, key=str.casefold)
 
         accounts.append({
             "id": user_id,
@@ -4823,7 +4839,8 @@ def admin_accounts():
                     else "No project assigned"
                 )
             ),
-            "assigned_project_ids": assigned_ids
+            "assigned_project_ids": assigned_ids,
+            "sites": ", ".join(assigned_sites) if assigned_sites else "—"
         })
 
     return render_template(
@@ -6114,6 +6131,13 @@ def admin_projects():
             """
         ).fetchall()
 
+        site_rows = con.execute(
+            "SELECT project_id, site FROM project_sites ORDER BY site"
+        ).fetchall()
+        project_site_map = {}
+        for site_row in site_rows:
+            project_site_map.setdefault(int(site_row["project_id"]), []).append(site_row["site"])
+
     assignment_map = {}
 
     for assignment in assignments:
@@ -6171,6 +6195,7 @@ def admin_projects():
             ).upper(),
             "active": bool(project["active"]),
             "created_at": project["created_at"],
+            "sites": ", ".join(project_site_map.get(project_id, [])) or "—",
             "assigned_accounts": (
                 ", ".join(account_names)
                 if account_names
@@ -9901,6 +9926,26 @@ def internal_server_error(error):
 # Runs automatically when the web app starts on Render.
 # =========================================================
 
+def ensure_project_site_schema():
+    """Apply additive Site migrations safely on existing production databases."""
+    with db() as con:
+        if is_postgres():
+            con.execute("SELECT pg_advisory_xact_lock(746283)")
+            con.execute("ALTER TABLE error_records ADD COLUMN IF NOT EXISTS site TEXT")
+            con.execute("ALTER TABLE accuracy_records ADD COLUMN IF NOT EXISTS site TEXT")
+        else:
+            add_column_if_missing(con, "error_records", "site", "TEXT")
+            add_column_if_missing(con, "accuracy_records", "site", "TEXT")
+
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS project_sites (
+                project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                site TEXT NOT NULL,
+                PRIMARY KEY (project_id, site)
+            )
+        """)
+
+
 def ensure_supervisor_role_constraint():
 
     if not is_postgres():
@@ -9957,9 +10002,10 @@ def ensure_supervisor_role_constraint():
             )
 
 
-# Apply the small, idempotent migration automatically on Render.
-# This avoids requiring access to the Render Shell.
-if is_postgres():
+# Apply additive, idempotent migrations automatically on Render.
+# Existing imported records, responses, and assignments remain untouched.
+if DATABASE_URL:
+    ensure_project_site_schema()
     ensure_supervisor_role_constraint()
 
 
