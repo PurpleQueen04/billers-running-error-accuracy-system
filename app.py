@@ -2657,6 +2657,10 @@ def import_accuracy_sheet(
 
     imported = 0
     project_cache = {}
+    # Cache the ACT/non-ACT lookup by project ID as well. Project
+    # resolution is already cached by workbook project name, but without
+    # this second cache the importer still queried projects once per row.
+    act_project_cache = {}
 
     if imported_at is None:
         imported_at = datetime.now().isoformat(timespec="microseconds")
@@ -2674,14 +2678,16 @@ def import_accuracy_sheet(
             )
         project_id = project_cache[cache_key]
 
-        project_row = con.execute(
-            "SELECT project_name FROM projects WHERE id = ?",
-            (project_id,)
-        ).fetchone()
-        is_act_project = bool(
-            project_row
-            and normalize_text(project_row["project_name"]).casefold() == "act"
-        )
+        if project_id not in act_project_cache:
+            project_row = con.execute(
+                "SELECT project_name FROM projects WHERE id = ?",
+                (project_id,)
+            ).fetchone()
+            act_project_cache[project_id] = bool(
+                project_row
+                and normalize_text(project_row["project_name"]).casefold() == "act"
+            )
+        is_act_project = act_project_cache[project_id]
 
         username = (
             dataframe_value(row, columns["username"])
