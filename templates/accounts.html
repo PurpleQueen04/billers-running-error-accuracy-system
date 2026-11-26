@@ -11,9 +11,11 @@
     </div>
 
     <div class="page-header-actions">
+        {% if current_role in ("admin", "qc") %}
         <button type="button" class="btn btn-primary" onclick="openCreateAccount()">
             <i class="fa-solid fa-user-plus"></i> Add User
         </button>
+        {% endif %}
         <span class="section-tag">
         {{ accounts|length }} Accounts
         </span>
@@ -161,7 +163,9 @@
                         <th>ASSIGNED PROJECTS</th>
                         <th>STATUS</th>
                         <th>DATE CREATED</th>
+                        {% if current_role == "admin" %}
                         <th>ACTION</th>
+                        {% endif %}
                     </tr>
                 </thead>
 
@@ -228,6 +232,7 @@
                                 {{ account.created_at or '—' }}
                             </td>
 
+                            {% if current_role == "admin" %}
                             <td>
                                 <div class="action-buttons">
 
@@ -273,6 +278,7 @@
 
                                 </div>
                             </td>
+                            {% endif %}
 
                         </tr>
 
@@ -317,7 +323,13 @@
         <div class="modal-header">
             <div>
                 <h2 class="modal-title" id="createAccountTitle">Add User</h2>
-                <p class="form-help">Create an Admin, QC, Biller, or Supervisor account.</p>
+                <p class="form-help">
+                    {% if current_role == "qc" %}
+                        Create a QC or Biller account for your assigned projects.
+                    {% else %}
+                        Create an Admin, QC, Biller, or Supervisor account.
+                    {% endif %}
+                </p>
             </div>
             <button type="button" class="btn btn-secondary btn-small" onclick="closeCreateAccount()">Close</button>
         </div>
@@ -340,8 +352,10 @@
                 <select id="new_role" name="role" required>
                     <option value="biller">Biller</option>
                     <option value="qc">QC</option>
+                    {% if current_role == "admin" %}
                     <option value="supervisor">Supervisor</option>
                     <option value="admin">Admin</option>
+                    {% endif %}
                 </select>
             </div>
 
@@ -363,7 +377,13 @@
                         {% endif %}
                     {% endfor %}
                 </div>
-                <small class="form-help">Select one or more active projects. The same project can be assigned to multiple Biller, QC, or Supervisor accounts. Admin accounts automatically have access to all active projects.</small>
+                <small class="form-help">
+                    {% if current_role == "qc" %}
+                        Select one or more active projects assigned to your QC account.
+                    {% else %}
+                        Select one or more active projects. The same project can be assigned to multiple Biller, QC, or Supervisor accounts. Admin accounts automatically have access to all active projects.
+                    {% endif %}
+                </small>
             </div>
 
             <div class="action-buttons">
@@ -375,6 +395,7 @@
 </div>
 
 
+{% if current_role == "admin" %}
 <!-- EDIT ACCOUNT MODAL -->
 <div id="editAccountModal" class="modal-backdrop" style="display: none;">
 
@@ -530,6 +551,7 @@
     </div>
 
 </div>
+{% endif %}
 
 {% endblock %}
 
