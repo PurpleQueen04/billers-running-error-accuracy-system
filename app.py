@@ -4633,12 +4633,26 @@ def qc_upload_workbook():
 
 @app.route("/admin/accounts")
 @login_required
-@admin_required
+@role_required("admin", "qc")
 def admin_accounts():
 
     accounts = []
+    current_user = get_active_session_user()
+    current_role = normalize_text(current_user["role"]).lower()
+    qc_project_ids = set()
 
     with db() as con:
+
+        if current_role == "qc":
+            own_projects = con.execute(
+                """
+                SELECT project_id
+                FROM user_projects
+                WHERE user_id = ?
+                """,
+                (int(current_user["id"]),)
+            ).fetchall()
+            qc_project_ids = {int(row["project_id"]) for row in own_projects}
 
         users = con.execute(
             """
@@ -4663,16 +4677,28 @@ def admin_accounts():
         ).fetchall()
 
         
-        projects = con.execute(
-            """
-            SELECT
-                id,
-                project_name,
-                active
-            FROM projects
-            ORDER BY project_name
-            """
-        ).fetchall()
+        if current_role == "qc":
+            if qc_project_ids:
+                placeholders = ",".join(["?"] * len(qc_project_ids))
+                projects = con.execute(
+                    f"""
+                    SELECT id, project_name, active
+                    FROM projects
+                    WHERE id IN ({placeholders})
+                    ORDER BY project_name
+                    """,
+                    tuple(sorted(qc_project_ids))
+                ).fetchall()
+            else:
+                projects = []
+        else:
+            projects = con.execute(
+                """
+                SELECT id, project_name, active
+                FROM projects
+                ORDER BY project_name
+                """
+            ).fetchall()
 
         # Load all project assignments at once.
         assignments = con.execute(
@@ -4705,11 +4731,14 @@ def admin_accounts():
     for user in users:
 
         user_id = int(user["id"])
+        user_role = normalize_text(user["role"]).lower()
+        assigned = assignment_map.get(user_id, [])
 
-        assigned = assignment_map.get(
-            user_id,
-            []
-        )
+        if current_role == "qc":
+            assigned_to_qc = {item["id"] for item in assigned} & qc_project_ids
+            if user_role not in ("qc", "biller") or not assigned_to_qc:
+                continue
+            assigned = [item for item in assigned if item["id"] in qc_project_ids]
 
         assigned_ids = [
             item["id"]
@@ -4748,7 +4777,8 @@ def admin_accounts():
     return render_template(
         "accounts.html",
         accounts=accounts,
-        projects=projects
+        projects=projects,
+        current_role=current_role
     )
 
 
@@ -4762,10 +4792,13 @@ def admin_accounts():
     methods=["POST"]
 )
 @login_required
-@admin_required
+@role_required("admin", "qc")
 def create_account():
 
     validate_csrf()
+
+    current_user = get_active_session_user()
+    current_role = normalize_text(current_user["role"]).lower()
 
     display_name = normalize_text(
         request.form.get("display_name")
@@ -4809,15 +4842,16 @@ def create_account():
 
         return redirect(url_for("admin_accounts"))
 
-    if role not in (
-        "admin",
-        "biller",
-        "qc",
-        "supervisor"
-    ):
+    allowed_new_roles = (
+        ("biller", "qc")
+        if current_role == "qc"
+        else ("admin", "biller", "qc", "supervisor")
+    )
+
+    if role not in allowed_new_roles:
 
         flash(
-            "Invalid account role.",
+            "You are not allowed to create this account role.",
             "danger"
         )
 
@@ -4891,10 +4925,24 @@ def create_account():
                 }
 
                 if valid_ids != clean_project_ids:
-
                     raise ValueError(
                         "One or more selected projects are invalid or inactive."
                     )
+
+                if current_role == "qc":
+                    own_projects = con.execute(
+                        """
+                        SELECT project_id
+                        FROM user_projects
+                        WHERE user_id = ?
+                        """,
+                        (int(current_user["id"]),)
+                    ).fetchall()
+                    own_project_ids = {int(row["project_id"]) for row in own_projects}
+                    if not clean_project_ids.issubset(own_project_ids):
+                        raise ValueError(
+                            "You can assign accounts only to projects assigned to your QC account."
+                        )
 
             # RETURNING id works with PostgreSQL
             # and modern SQLite.
