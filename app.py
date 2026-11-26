@@ -7805,6 +7805,81 @@ def get_biller_project_ids():
     return get_user_project_ids(user_id)
 
 
+def get_act_external_accuracy_summary(project_ids):
+    """
+    Return project-wide ACT External accuracy for authorized project IDs.
+    Use the imported accuracy_value values directly; when multiple rows
+    exist for a month/type, average those imported values rather than
+    recalculating accuracy from audited and errors.
+    """
+    clean_ids = sorted({
+        int(value) for value in (project_ids or [])
+        if str(value).strip().isdigit()
+    })
+    if not clean_ids:
+        return []
+
+    placeholders = ", ".join(["?"] * len(clean_ids))
+
+    with db() as con:
+        rows = con.execute(
+            f"""
+            SELECT
+                CASE
+                    WHEN TRIM(COALESCE(ar.month, '')) <> ''
+                    THEN TRIM(ar.month)
+                    ELSE SUBSTR(ar.record_date, 1, 7)
+                END AS period,
+                ar.accuracy_type,
+                AVG(CAST(ar.accuracy_value AS DOUBLE PRECISION)) AS accuracy
+            FROM accuracy_records ar
+            INNER JOIN projects p
+                ON p.id = ar.project_id
+            WHERE ar.project_id IN ({placeholders})
+              AND UPPER(TRIM(COALESCE(p.project_name, ''))) = 'ACT'
+              AND UPPER(TRIM(COALESCE(ar.sheet, ''))) = 'EXTERNAL'
+              AND ar.imported_at = (
+                  SELECT MAX(latest.imported_at)
+                  FROM accuracy_records latest
+                  WHERE latest.project_id = ar.project_id
+                    AND UPPER(TRIM(COALESCE(latest.sheet, ''))) = 'EXTERNAL'
+              )
+              AND ar.accuracy_type IN (?, ?)
+              AND (
+                  (TRIM(COALESCE(ar.month, '')) <> ''
+                   AND TRIM(ar.month) >= '2026-01')
+                  OR ar.record_date >= '2026-01-01'
+              )
+            GROUP BY
+                CASE
+                    WHEN TRIM(COALESCE(ar.month, '')) <> ''
+                    THEN TRIM(ar.month)
+                    ELSE SUBSTR(ar.record_date, 1, 7)
+                END,
+                ar.accuracy_type
+            ORDER BY period DESC
+            """,
+            (*clean_ids, EXTERNAL_ACCURACY[0], EXTERNAL_ACCURACY[1])
+        ).fetchall()
+
+    summaries = {}
+    for row in rows:
+        period = normalize_text(row["period"])
+        accuracy_type = normalize_text(row["accuracy_type"])
+        if not period:
+            continue
+        item = summaries.setdefault(
+            period,
+            {"period": period, "external_wc": None, "external_woc": None}
+        )
+        if accuracy_type == EXTERNAL_ACCURACY[0]:
+            item["external_wc"] = number_value(row["accuracy"])
+        elif accuracy_type == EXTERNAL_ACCURACY[1]:
+            item["external_woc"] = number_value(row["accuracy"])
+
+    return [summaries[key] for key in sorted(summaries, reverse=True)]
+
+
 # =========================================================
 # BILLER: ACCURACY SUMMARY FOR SELECTED MONTH
 # =========================================================
@@ -8131,7 +8206,8 @@ def biller_dashboard():
 
         graph_context = build_dashboard_graph_context(allowed_project_ids=[], username=username)
         return render_template("biller.html", response_counts=response_counts,
-                               format_accuracy=format_accuracy, **graph_context)
+                               act_external_accuracy=[], format_accuracy=format_accuracy,
+                               **graph_context)
 
     placeholders = ", ".join(
         ["?"] * len(project_ids)
@@ -8189,7 +8265,9 @@ def biller_dashboard():
     )
 
     graph_context = build_dashboard_graph_context(allowed_project_ids=project_ids, username=username)
+    act_external_accuracy = get_act_external_accuracy_summary(project_ids)
     return render_template("biller.html", response_counts=response_counts,
+                           act_external_accuracy=act_external_accuracy,
                            format_accuracy=format_accuracy, **graph_context)
 
 
