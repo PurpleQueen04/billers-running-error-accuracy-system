@@ -2542,8 +2542,8 @@ def import_accuracy_sheet(
         raise ValueError("Invalid accuracy sheet.")
 
     columns = get_accuracy_columns(dataframe)
-    if not columns["username"]:
-        raise ValueError(f"{sheet_name} sheet must contain USER.")
+    # USER is required for individual accuracy records. ACT EXTERNAL
+    # accuracy is project-wide, so it may be imported without a Biller USER.
     if not columns["biller_name"]:
         raise ValueError(f"{sheet_name} sheet must contain NAME.")
     if not columns["audited"]:
@@ -2667,11 +2667,6 @@ def import_accuracy_sheet(
 
     for dataframe_index, row in dataframe.iterrows():
         source_row = int(dataframe_index) + 2
-        username = dataframe_value(row, columns["username"])
-        biller_name = dataframe_value(row, columns["biller_name"])
-        if not username:
-            continue
-
         project_name = dataframe_value(row, columns["project"])
         cache_key = normalize_text(project_name).casefold() or f"default:{default_project_id}"
         if cache_key not in project_cache:
@@ -2679,6 +2674,31 @@ def import_accuracy_sheet(
                 con, project_name, default_project_id, allowed_project_ids
             )
         project_id = project_cache[cache_key]
+
+        project_row = con.execute(
+            "SELECT project_name FROM projects WHERE id = ?",
+            (project_id,)
+        ).fetchone()
+        is_act_project = bool(
+            project_row
+            and normalize_text(project_row["project_name"]).casefold() == "act"
+        )
+
+        username = (
+            dataframe_value(row, columns["username"])
+            if columns["username"] else ""
+        )
+        if not username:
+            if sheet_name == "EXTERNAL" and is_act_project:
+                # Stable project-wide key; this is not a Biller username.
+                username = "__ACT_PROJECT_WIDE__"
+            else:
+                raise ValueError(
+                    f"{sheet_name} sheet must contain USER "
+                    "for projects other than ACT EXTERNAL."
+                )
+
+        biller_name = dataframe_value(row, columns["biller_name"])
 
         source_month = dataframe_value(row, columns["month"])
         record_date = parse_accuracy_date(
