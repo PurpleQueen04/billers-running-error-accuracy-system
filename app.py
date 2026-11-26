@@ -1245,6 +1245,7 @@ def init_db():
             "INTEGER"
         )
 
+        add_column_if_missing(con, "projects", "site", "TEXT")
         add_column_if_missing(con, "error_records", "site", "TEXT")
         add_column_if_missing(con, "accuracy_records", "site", "TEXT")
 
@@ -6122,6 +6123,7 @@ def admin_projects():
                 project_name,
                 name,
                 role,
+                site,
                 active,
                 created_at
             FROM projects
@@ -6209,6 +6211,7 @@ def admin_projects():
             ).upper(),
             "active": bool(project["active"]),
             "created_at": project["created_at"],
+            "site": normalize_site_name(project["site"]) or "—",
             "sites": ", ".join(project_site_map.get(project_id, [])) or "—",
             "assigned_accounts": (
                 ", ".join(account_names)
@@ -6244,6 +6247,11 @@ def create_project():
     project_name = normalize_text(
         request.form.get("project_name")
     )
+    project_site = normalize_site_name(request.form.get("site"))
+
+    if project_site not in ("Manila", "Leyte"):
+        flash("Please select Manila or Leyte for the project Site.", "warning")
+        return redirect(url_for("admin_projects"))
 
     if not project_name:
 
@@ -6285,13 +6293,15 @@ def create_project():
                     project_name,
                     name,
                     role,
+                    site,
                     active,
                     created_at
                 )
-                VALUES (?, NULL, '', 1, ?)
+                VALUES (?, NULL, '', ?, 1, ?)
                 """,
                 (
                     project_name,
+                    project_site,
                     datetime.now().isoformat(timespec="seconds")
                 )
             )
@@ -6309,7 +6319,7 @@ def create_project():
                 (
                     session.get("username", ""),
                     "CREATE PROJECT",
-                    f"Created project: {project_name}",
+                    f"Created project: {project_name} (Site: {project_site})",
                     datetime.now().isoformat(timespec="seconds")
                 )
             )
@@ -6350,6 +6360,11 @@ def edit_project(project_id):
     project_name = normalize_text(
         request.form.get("project_name")
     )
+    project_site = normalize_site_name(request.form.get("site"))
+
+    if project_site not in ("Manila", "Leyte"):
+        flash("Please select Manila or Leyte for the project Site.", "warning")
+        return redirect(url_for("admin_projects"))
 
     if not project_name:
 
@@ -6366,7 +6381,7 @@ def edit_project(project_id):
 
             project = con.execute(
                 """
-                SELECT id, project_name
+                SELECT id, project_name, site
                 FROM projects
                 WHERE id = ?
                 """,
@@ -6403,10 +6418,10 @@ def edit_project(project_id):
             con.execute(
                 """
                 UPDATE projects
-                SET project_name = ?
+                SET project_name = ?, site = ?
                 WHERE id = ?
                 """,
-                (project_name, project_id)
+                (project_name, project_site, project_id)
             )
 
             con.execute(
@@ -6422,7 +6437,7 @@ def edit_project(project_id):
                 (
                     session.get("username", ""),
                     "EDIT PROJECT",
-                    f"Updated project {old_name} to {project_name}",
+                    f"Updated project {old_name} to {project_name} (Site: {project_site})",
                     datetime.now().isoformat(timespec="seconds")
                 )
             )
